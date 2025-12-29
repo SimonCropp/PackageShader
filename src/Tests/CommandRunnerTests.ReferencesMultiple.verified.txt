@@ -1,0 +1,23 @@
+﻿{
+  directory: {CurrentDirectory},
+  suffix: _Alias,
+  assembliesToAlias: [
+    assembly
+  ],
+  references: [
+    reference1,
+    reference2
+  ],
+  consoleError: ,
+  consoleOut:
+TargetDirectory: {CurrentDirectory}
+Internalize: False
+Suffix: _Alias
+AssembliesToAlias:
+ * assembly
+References:
+ * reference1
+ * reference2
+,
+  internalize: false
+}

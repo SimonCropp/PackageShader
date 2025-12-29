@@ -1,0 +1,14 @@
+﻿{
+  StandardOutput:
+AssemblyWithEmbeddedSymbols
+AssemblyWithStrongName
+AssemblyWithNoStrongName
+AssemblyWithNoSymbols
+AssemblyWithPdb
+AssemblyToInclude
+"a\\b"
+AssemblyToInclude
+AssemblyWithResources: ResourceValue
+,
+  StandardError: 
+}

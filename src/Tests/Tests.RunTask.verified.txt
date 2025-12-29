@@ -1,0 +1,61 @@
+﻿{
+  buildOutput:
+  
+  Prefix: Prefix_
+  Suffix: _Suffix
+  Internalize: True
+  StrongName: False
+  AssembliesToAlias:
+  	Newtonsoft.Json
+  	AssemblyWithEmbeddedSymbols
+  	AssemblyWithNoStrongName
+  	AssemblyWithNoSymbols
+  	AssemblyWithPdb
+  	AssemblyWithResources
+  	AssemblyWithStrongName
+  AssembliesToTarget:
+  	AssemblyToProcess
+  	AssemblyToInclude
+  TargetInfos:
+  	Newtonsoft.Json => Prefix_Newtonsoft.Json_Suffix
+  	AssemblyWithEmbeddedSymbols => Prefix_AssemblyWithEmbeddedSymbols_Suffix
+  	AssemblyWithNoStrongName => Prefix_AssemblyWithNoStrongName_Suffix
+  	AssemblyWithNoSymbols => Prefix_AssemblyWithNoSymbols_Suffix
+  	AssemblyWithPdb => Prefix_AssemblyWithPdb_Suffix
+  	AssemblyWithResources => Prefix_AssemblyWithResources_Suffix
+  	AssemblyWithStrongName => Prefix_AssemblyWithStrongName_Suffix
+  	AssemblyToProcess => AssemblyToProcess
+  	AssemblyToInclude => AssemblyToInclude
+  ReferenceCopyLocalPaths:
+  	Newtonsoft.Json.dll
+  	{SolutionDir}AssemblyToInclude/bin/IncludeAliasTask/net10.0/AssemblyToInclude.dll
+  	{SolutionDir}AssemblyWithEmbeddedSymbols/bin/IncludeAliasTask/net10.0/AssemblyWithEmbeddedSymbols.dll
+  	{SolutionDir}AssemblyWithNoStrongName/bin/IncludeAliasTask/net6.0/AssemblyWithNoStrongName.dll
+  	{SolutionDir}AssemblyWithNoSymbols/bin/IncludeAliasTask/net10.0/AssemblyWithNoSymbols.dll
+  	{SolutionDir}AssemblyWithPdb/bin/IncludeAliasTask/net10.0/AssemblyWithPdb.dll
+  	{SolutionDir}AssemblyWithResources/bin/IncludeAliasTask/net10.0/AssemblyWithResources.dll
+  	{SolutionDir}AssemblyWithStrongName/bin/IncludeAliasTask/net10.0/AssemblyWithStrongName.dll
+  	{SolutionDir}AssemblyWithNoStrongName/bin/IncludeAliasTask/net6.0/AssemblyWithNoStrongName.pdb
+  	{SolutionDir}AssemblyWithPdb/bin/IncludeAliasTask/net10.0/AssemblyWithPdb.pdb
+  	{SolutionDir}AssemblyWithResources/bin/IncludeAliasTask/net10.0/AssemblyWithResources.pdb
+  	{SolutionDir}AssemblyWithStrongName/bin/IncludeAliasTask/net10.0/AssemblyWithStrongName.pdb
+  
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+,
+  consoleOutput:
+AssemblyWithEmbeddedSymbols
+AssemblyWithStrongName
+AssemblyWithNoStrongName
+AssemblyWithNoSymbols
+AssemblyWithPdb
+AssemblyToInclude
+"a//b"
+AssemblyToInclude
+AssemblyWithResources: ResourceValue
+,
+  consoleError: 
+}

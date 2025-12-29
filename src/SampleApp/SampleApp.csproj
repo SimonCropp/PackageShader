@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Version>1.0.0</Version>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AssemblyToProcess\AssemblyToProcess.csproj" />
+    <ProjectReference Include="..\AssemblyWithEmbeddedSymbols\AssemblyWithEmbeddedSymbols.csproj" />
+    <ProjectReference Include="..\AssemblyWithNoStrongName\AssemblyWithNoStrongName.csproj" />
+    <ProjectReference Include="..\AssemblyWithNoSymbols\AssemblyWithNoSymbols.csproj" />
+    <ProjectReference Include="..\AssemblyWithPdb\AssemblyWithPdb.csproj" />
+    <ProjectReference Include="..\AssemblyWithResources\AssemblyWithResources.csproj" />
+    <ProjectReference Include="..\AssemblyWithStrongName\AssemblyWithStrongName.csproj" />
+  </ItemGroup>
+
+  <!-- begin-snippet: WriteReferenceForAlias -->
+  <Target Name="WriteReferenceForAlias" AfterTargets="AfterCompile">
+    <ItemGroup>
+      <ReferenceForAlias Include="@(ReferencePath)" Condition="'%(FileName)' == 'CommandLine'" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(TargetDir)/alias-references.txt" Lines="%(ReferenceForAlias.FullPath)" Overwrite="true" />
+  </Target>
+  <!-- end-snippet -->
+</Project>
