@@ -22,7 +22,7 @@ build_script:
       }
     }
 - dotnet build src --configuration Release
-- dotnet test src --configuration Release --no-build --no-restore
+- dotnet run --project src/Tests --configuration Release
 test: off
 artifacts:
 - path: nugets\*.nupkg
