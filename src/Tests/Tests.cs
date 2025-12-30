@@ -99,7 +99,9 @@ public class AliasTests
         }
 
         var namesToAliases = assemblyFiles.Where(_ => _.StartsWith("AssemblyWith") || _ == "Newtonsoft.Json").ToList();
-        Program.Inner(tempPath, namesToAliases, new(), keyFile, new(), null, "_Alias", internalize, _=>{});
+        Program.Inner(tempPath, namesToAliases, new(), keyFile, new(), null, "_Alias", internalize, _ =>
+        {
+        });
 
         return BuildResults(tempPath);
     }
@@ -163,55 +165,48 @@ public class AliasTests
             .WithValidation(CommandResultValidation.None)
             .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
 
-        var shutdown = Cli.Wrap("dotnet")
+        await Cli.Wrap("dotnet")
             .WithArguments("build-server shutdown")
             .ExecuteAsync(TestContext.Current.CancellationToken);
 
-        try
+        if (buildResult.StandardError.Length > 0)
         {
-            if (buildResult.StandardError.Length > 0)
-            {
-                throw new(buildResult.StandardError);
-            }
+            throw new(buildResult.StandardError);
+        }
 
-            if (buildResult.StandardOutput.Contains("error"))
-            {
-                throw new(buildResult.StandardOutput.Replace(solutionDir, ""));
-            }
+        if (buildResult.StandardOutput.Contains("error"))
+        {
+            throw new(buildResult.StandardOutput.Replace(solutionDir, ""));
+        }
 
-            var appPath = Path.Combine(solutionDir, "SampleAppForMsBuild/bin/IncludeAliasTask/SampleAppForMsBuild.dll");
-            var runResult = await Cli.Wrap("dotnet")
-                .WithArguments(appPath)
-                .WithValidation(CommandResultValidation.None)
-                .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
+        var appPath = Path.Combine(solutionDir, "SampleAppForMsBuild/bin/IncludeAliasTask/SampleAppForMsBuild.dll");
+        var runResult = await Cli.Wrap("dotnet")
+            .WithArguments(appPath)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
 
-            await Verify(
-                    new
-                    {
-                        buildOutput = buildResult.StandardOutput,
-                        consoleOutput = runResult.StandardOutput,
-                        consoleError = runResult.StandardError
-                    })
-                .ScrubLinesContaining(
-                    " -> ",
-                    "You are using a preview version",
-                    "MSBuild version ",
-                    "Time Elapsed")
-                .ScrubLinesWithReplace(line => line.Replace('\\', '/'))
-                .ScrubLinesWithReplace(line =>
+        await Verify(
+                new
                 {
-                    if (line.Contains("Newtonsoft.Json.dll"))
-                    {
-                        return "  	Newtonsoft.Json.dll";
-                    }
+                    buildOutput = buildResult.StandardOutput,
+                    consoleOutput = runResult.StandardOutput,
+                    consoleError = runResult.StandardError
+                })
+            .ScrubLinesContaining(
+                " -> ",
+                "You are using a preview version",
+                "MSBuild version ",
+                "Time Elapsed")
+            .ScrubLinesWithReplace(line => line.Replace('\\', '/'))
+            .ScrubLinesWithReplace(line =>
+            {
+                if (line.Contains("Newtonsoft.Json.dll"))
+                {
+                    return "  	Newtonsoft.Json.dll";
+                }
 
-                    return line;
-                });
-        }
-        finally
-        {
-            await shutdown;
-        }
+                return line;
+            });
     }
 
 #if DEBUG
@@ -269,7 +264,11 @@ public class AliasTests
         File.WriteAllText(depsFile, text);
     }
 
-    static bool[] bools = {true, false};
+    static bool[] bools =
+    {
+        true,
+        false
+    };
 
     public static IEnumerable<object[]> GetData()
     {
@@ -277,7 +276,12 @@ public class AliasTests
         foreach (var sign in bools)
         foreach (var internalize in bools)
         {
-            yield return new object[] {copyPdbs, sign, internalize};
+            yield return
+            [
+                copyPdbs,
+                sign,
+                internalize
+            ];
         }
     }
 }
