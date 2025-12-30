@@ -1,4 +1,6 @@
-﻿using Mono.Cecil;
+using Alias.Lib;
+using Alias.Lib.Pdb;
+using Alias.Lib.Signing;
 
 namespace Alias;
 
@@ -8,83 +10,85 @@ public static class Aliaser
         IEnumerable<string> references,
         IEnumerable<SourceTargetInfo> infos,
         bool internalize,
-        StrongNameKeyPair? key)
+        StrongNameKey? key)
     {
         var infoList = infos.ToList();
-        using var resolver = new AssemblyResolver(references);
-        var assembliesToCleanup = new List<ModuleDefinition>();
-        var writes = new List<Action>();
+
+        // First pass: Modify all assemblies
+        var modifiers = new List<(AssemblyModifier modifier, SourceTargetInfo info, bool hasSymbols)>();
 
         foreach (var info in infoList)
         {
-            var (module, hasSymbols) = ModuleReaderWriter.Read(info.SourcePath, resolver);
-            module.Assembly.Name.Name = info.TargetName;
-            module.SeyKey(key);
-            if (info.IsAlias && internalize)
+            var modifier = AssemblyModifier.Open(info.SourcePath);
+            var hasSymbols = PdbHandler.HasSymbols(info.SourcePath);
+
+            // Rename assembly
+            modifier.SetAssemblyName(info.TargetName);
+
+            // Set or clear strong name
+            if (key != null)
             {
-                AddVisibleTo(module, resolver, infoList, key);
-                module.MakeTypesInternal();
-            }
-
-            Redirect(module, infoList, key);
-            resolver.Add(module);
-            writes.Add(() => ModuleReaderWriter.Write(key, hasSymbols, module, info.TargetPath));
-            assembliesToCleanup.Add(module);
-        }
-
-        foreach (var write in writes)
-        {
-            write();
-        }
-
-        foreach (var assembly in assembliesToCleanup)
-        {
-            assembly.Dispose();
-        }
-    }
-
-    static void Redirect(ModuleDefinition targetModule, List<SourceTargetInfo> assemblyInfos, StrongNameKeyPair? key)
-    {
-        var assemblyReferences = targetModule.AssemblyReferences;
-        foreach (var info in assemblyInfos)
-        {
-            var toChange = assemblyReferences.SingleOrDefault(_ => _.Name == info.SourceName);
-            if (toChange == null)
-            {
-                continue;
-            }
-
-            toChange.Name = info.TargetName;
-            toChange.PublicKey = key?.PublicKey;
-        }
-    }
-
-    static void AddVisibleTo(ModuleDefinition module, AssemblyResolver resolver, List<SourceTargetInfo> assemblyInfos, StrongNameKeyPair? key)
-    {
-        var constructorImported = module.ImportReference(resolver.VisibleToConstructor);
-
-        var assembly = module.Assembly;
-
-        foreach (var info in assemblyInfos)
-        {
-            if (assembly.Name.Name == info.TargetName)
-            {
-                continue;
-            }
-
-            var attribute = new CustomAttribute(constructorImported);
-            string value;
-            if (key == null)
-            {
-                value = info.TargetName;
+                modifier.SetAssemblyPublicKey(key.PublicKey);
             }
             else
             {
-                value = $"{info.TargetName}, PublicKey={key.PublicKeyString()}";
+                modifier.ClearStrongName();
             }
 
-            attribute.ConstructorArguments.Add(new(module.TypeSystem.String, value));
-            assembly.CustomAttributes.Add(attribute);
+            // If this is an aliased assembly and internalize is enabled
+            if (info.IsAlias && internalize)
+            {
+                // Add InternalsVisibleTo for all other assemblies in the list
+                foreach (var otherInfo in infoList)
+                {
+                    if (otherInfo.TargetName != info.TargetName)
+                    {
+                        modifier.AddInternalsVisibleTo(otherInfo.TargetName, key?.PublicKey);
+                    }
+                }
+
+                // Make types internal
+                modifier.MakeTypesInternal();
+            }
+
+            // Redirect assembly references
+            foreach (var refInfo in infoList)
+            {
+                modifier.RedirectAssemblyRef(refInfo.SourceName, refInfo.TargetName, key?.PublicKeyToken);
+            }
+
+            modifiers.Add((modifier, info, hasSymbols));
         }
+
+        // Second pass: Write all assemblies
+        foreach (var (modifier, info, hasSymbols) in modifiers)
+        {
+            if (hasSymbols)
+            {
+                modifier.SaveWithSymbols(info.SourcePath, info.TargetPath, key);
+            }
+            else
+            {
+                modifier.Save(info.TargetPath, key);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Overload that accepts a StrongNameKeyPair path for backwards compatibility.
+    /// </summary>
+    public static void Run(
+        IEnumerable<string> references,
+        IEnumerable<SourceTargetInfo> infos,
+        bool internalize,
+        string? keyPath)
+    {
+        StrongNameKey? key = null;
+        if (!string.IsNullOrEmpty(keyPath) && File.Exists(keyPath))
+        {
+            key = StrongNameKey.FromFile(keyPath!);
+        }
+
+        Run(references, infos, internalize, key);
     }
 }

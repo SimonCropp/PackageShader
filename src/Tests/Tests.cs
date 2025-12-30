@@ -1,10 +1,69 @@
 ﻿using CliWrap;
 using CliWrap.Buffered;
-using Mono.Cecil;
+using Alias.Lib.Metadata;
+using Alias.Lib.PE;
+using Alias.Lib.Pdb;
 
-public class Tests
+[CollectionDefinition("Sequential", DisableParallelization = true)]
+public class SequentialCollection;
+
+[Collection("Sequential")]
+public class AliasTests
 {
-    static string binDirectory = Path.GetDirectoryName(typeof(Tests).Assembly.Location)!;
+    static string binDirectory = Path.GetDirectoryName(typeof(AliasTests).Assembly.Location)!;
+
+    [Fact]
+    public void DiagnoseRunSample()
+    {
+        var solutionDirectory = ProjectFiles.SolutionDirectory.Path;
+        var targetPath = Path.Combine(solutionDirectory, "SampleApp/bin/Debug/net8.0");
+        var tempPath2 = Path.Combine(targetPath, "temp");
+
+        // Check modified SampleApp.dll
+        var modifiedPath = Path.Combine(tempPath2, "SampleApp.dll");
+        if (File.Exists(modifiedPath))
+        {
+            Console.WriteLine($"Modified SampleApp.dll size: {new FileInfo(modifiedPath).Length}");
+
+            try
+            {
+                var reader = MetadataReader.FromFile(modifiedPath);
+                Console.WriteLine($"Assembly name: {reader.GetAssemblyName()}");
+                Console.WriteLine($"References: {reader.GetAssemblyRefs().Count()}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error reading modified assembly: {ex.GetType().Name}: {ex.Message}");
+            }
+
+            // Compare PE headers
+            var originalPath = Path.Combine(targetPath, "SampleApp.dll");
+            var origBytes = File.ReadAllBytes(originalPath);
+            var modBytes = File.ReadAllBytes(modifiedPath);
+
+            // Check DOS/PE signature
+            Console.WriteLine($"Original PE offset: {BitConverter.ToInt32(origBytes, 60):X}");
+            Console.WriteLine($"Modified PE offset: {BitConverter.ToInt32(modBytes, 60):X}");
+
+            // Check metadata RVA from CLI header
+            var origImage = PEReader.Read(originalPath);
+            var modImage = PEReader.Read(modifiedPath);
+            Console.WriteLine($"Original metadata RVA: {origImage.MetadataRva:X}, Size: {origImage.MetadataSize}");
+            Console.WriteLine($"Modified metadata RVA: {modImage.MetadataRva:X}, Size: {modImage.MetadataSize}");
+
+            // Check if sections are correct
+            Console.WriteLine($"Original sections: {origImage.Sections.Length}");
+            Console.WriteLine($"Modified sections: {modImage.Sections.Length}");
+            foreach (var section in modImage.Sections)
+            {
+                Console.WriteLine($"  {section.Name}: VA={section.VirtualAddress:X}, Size={section.SizeOfRawData}, RawPtr={section.PointerToRawData:X}");
+            }
+        }
+        else
+        {
+            Console.WriteLine("Modified SampleApp.dll not found");
+        }
+    }
 
     static List<string> assemblyFiles = new()
     {
@@ -19,16 +78,7 @@ public class Tests
         "Newtonsoft.Json"
     };
 
-    static Tests()
-    {
-        tempPath = Path.Combine(binDirectory, "Temp");
-        Directory.CreateDirectory(tempPath);
-    }
-
-    public Tests() =>
-        Helpers.PurgeDirectory(tempPath);
-
-    static IEnumerable<AssemblyResult> Run(bool copyPdbs, bool sign, bool internalize)
+    static IEnumerable<AssemblyResult> Run(bool copyPdbs, bool sign, bool internalize, string tempPath)
     {
         foreach (var assembly in assemblyFiles.OrderBy(_ => _))
         {
@@ -48,42 +98,44 @@ public class Tests
         string? keyFile = null;
         if (sign)
         {
-            keyFile = Path.Combine(AttributeReader.GetProjectDirectory(), "test.snk");
+            keyFile = Path.Combine(ProjectFiles.ProjectDirectory.Path, "test.snk");
         }
 
         var namesToAliases = assemblyFiles.Where(_ => _.StartsWith("AssemblyWith") || _ == "Newtonsoft.Json").ToList();
         Program.Inner(tempPath, namesToAliases, new(), keyFile, new(), null, "_Alias", internalize, _=>{});
 
-        return BuildResults();
+        return BuildResults(tempPath);
     }
 
-    static IEnumerable<AssemblyResult> BuildResults()
+    static IEnumerable<AssemblyResult> BuildResults(string tempPath)
     {
         var resultingFiles = Directory.EnumerateFiles(tempPath);
         foreach (var assembly in resultingFiles.Where(_ => _.EndsWith(".dll")).OrderBy(_ => _))
         {
-            using var definition = AssemblyDefinition.ReadAssembly(assembly);
-            var attributes = definition.CustomAttributes
-                .Where(_ => _.AttributeType.Name.Contains("Internals"))
-                .Select(x => $"{x.AttributeType.Name}({string.Join(',', x.ConstructorArguments.Select(y => y.Value))})")
+            var reader = MetadataReader.FromFile(assembly);
+            var assemblyName = reader.GetAssemblyName();
+            var hasSymbols = PdbHandler.HasSymbols(assembly);
+            var references = reader.GetAssemblyRefs()
+                .Select(r => r.FullName)
                 .OrderBy(_ => _)
                 .ToList();
-            yield return
-                new(
-                    definition.Name.FullName,
-                    definition.MainModule.TryReadSymbols(),
-                    definition.MainModule.AssemblyReferences.Select(_ => _.FullName).OrderBy(_ => _).ToList(),
-                    attributes);
+            var attributes = reader.GetAssemblyCustomAttributes()
+                .Where(a => a.AttributeTypeName.Contains("Internals"))
+                .Select(a => $"{a.AttributeTypeName}({a.ConstructorArgument})")
+                .OrderBy(_ => _)
+                .ToList();
+            yield return new(assemblyName, hasSymbols, references, attributes);
         }
     }
 
     [Theory]
     [MemberData(nameof(GetData))]
-    public Task Combo(bool copyPdbs, bool sign, bool internalize)
+    public async Task Combo(bool copyPdbs, bool sign, bool internalize)
     {
-        var results = Run(copyPdbs, sign, internalize);
+        using var directory = new TempDirectory();
+        var results = Run(copyPdbs, sign, internalize, directory);
 
-        return Verify(results)
+        await Verify(results)
             .UseParameters(copyPdbs, sign, internalize);
     }
 
@@ -106,17 +158,17 @@ public class Tests
     [Fact]
     public async Task RunTask()
     {
-        var solutionDir = AttributeReader.GetSolutionDirectory();
+        var solutionDir = ProjectFiles.SolutionDirectory.Path;
 
         var buildResult = await Cli.Wrap("dotnet")
             .WithArguments("build --configuration IncludeAliasTask --no-restore")
             .WithWorkingDirectory(solutionDir)
             .WithValidation(CommandResultValidation.None)
-            .ExecuteBufferedAsync();
+            .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
 
         var shutdown = Cli.Wrap("dotnet")
             .WithArguments("build-server shutdown")
-            .ExecuteAsync();
+            .ExecuteAsync(TestContext.Current.CancellationToken);
 
         try
         {
@@ -134,7 +186,7 @@ public class Tests
             var runResult = await Cli.Wrap("dotnet")
                 .WithArguments(appPath)
                 .WithValidation(CommandResultValidation.None)
-                .ExecuteBufferedAsync();
+                .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
 
             await Verify(
                     new
@@ -170,11 +222,11 @@ public class Tests
     [Fact]
     public async Task RunSample()
     {
-        var solutionDirectory = AttributeReader.GetSolutionDirectory();
+        var solutionDirectory = ProjectFiles.SolutionDirectory.Path;
 
-        var targetPath = Path.Combine(solutionDirectory, "SampleApp/bin/Debug/net10.0");
+        var targetPath = Path.Combine(solutionDirectory, "SampleApp/bin/Debug/net8.0");
 
-        var tempPath = Path.Combine(targetPath, "temp");
+        using var tempPath = new TempDirectory();
         Directory.CreateDirectory(tempPath);
         Helpers.PurgeDirectory(tempPath);
 
@@ -204,7 +256,7 @@ public class Tests
 
         var exePath = Path.Combine(tempPath, "SampleApp.exe");
 
-        var result = await Cli.Wrap(exePath).ExecuteBufferedAsync();
+        var result = await Cli.Wrap(exePath).ExecuteBufferedAsync(TestContext.Current.CancellationToken);
 
         await Verify(new
         {
@@ -219,13 +271,13 @@ public class Tests
     {
         var depsFile = Path.Combine(targetPath, "SampleApp.deps.json");
         var text = File.ReadAllText(depsFile);
-        text = text.Replace("Assembly", "Alias_Assembly");
+        // Only replace assemblies that were actually aliased (AssemblyWith* but not AssemblyTo*)
+        text = text.Replace("AssemblyWith", "Alias_AssemblyWith");
         File.Delete(depsFile);
         File.WriteAllText(depsFile, text);
     }
 
     static bool[] bools = {true, false};
-    static readonly string tempPath;
 
     public static IEnumerable<object[]> GetData()
     {

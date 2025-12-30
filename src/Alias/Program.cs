@@ -1,6 +1,6 @@
-﻿using System.Text;
+using System.Text;
 using Alias;
-using StrongNameKeyPair = Mono.Cecil.StrongNameKeyPair;
+using Alias.Lib.Signing;
 
 public static class Program
 {
@@ -41,9 +41,18 @@ public static class Program
         Action<string> log)
     {
         var list = Directory.GetFiles(directory, "*.dll", SearchOption.AllDirectories).ToList();
-        var allFiles = list.Where(x => !assembliesToExclude.Contains(x));
 
-        var assemblyInfos = Finder.FindAssemblyInfos(assemblyNamesToAlias, allFiles, prefix, suffix)
+        // Include all files, but mark excluded ones as not-aliased after finding matches
+        var assemblyInfos = Finder.FindAssemblyInfos(assemblyNamesToAlias, list, prefix, suffix)
+            .Select(info =>
+            {
+                // If assembly matches exclusion list, mark it as not-aliased
+                if (assembliesToExclude.Contains(info.SourceName))
+                {
+                    return info with { TargetName = info.SourceName, TargetPath = info.SourcePath, IsAlias = false };
+                }
+                return info;
+            })
             .ToList();
 
         var builder = new StringBuilder("Resolved assemblies to alias:");
@@ -62,18 +71,21 @@ public static class Program
         foreach (var assembly in assemblyInfos.Where(_ => _.IsAlias))
         {
             File.Delete(assembly.SourcePath);
-            File.Delete(Path.ChangeExtension(assembly.SourcePath, "pdb"));
+            var pdbPath = Path.ChangeExtension(assembly.SourcePath, "pdb");
+            if (File.Exists(pdbPath))
+            {
+                File.Delete(pdbPath);
+            }
         }
     }
 
-    static StrongNameKeyPair? GetKeyPair(string? keyFile)
+    static StrongNameKey? GetKeyPair(string? keyFile)
     {
         if (keyFile == null)
         {
             return null;
         }
 
-        var fileBytes = File.ReadAllBytes(keyFile);
-        return new(fileBytes);
+        return StrongNameKey.FromFile(keyFile);
     }
 }

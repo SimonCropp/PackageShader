@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using Mono.Cecil;
+using Alias.Lib.Signing;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 using Task = Microsoft.Build.Utilities.Task;
@@ -135,13 +135,13 @@ public class AliasTask :
 
         var separator = $"{Environment.NewLine}\t";
 
-        var strongNameKeyPair = GetKey();
+        var strongNameKey = GetKey();
         var inputs = $"""
 
                       Prefix: {Prefix}
                       Suffix: {Suffix}
                       Internalize: {Internalize}
-                      StrongName: {strongNameKeyPair != null}
+                      StrongName: {strongNameKey != null}
                       AssembliesToAlias:{separator}{string.Join(separator, assembliesToAlias.Select(Path.GetFileNameWithoutExtension))}
                       AssembliesToTarget:{separator}{string.Join(separator, assembliesToTarget.Select(Path.GetFileNameWithoutExtension))}
                       TargetInfos:{separator}{string.Join(separator, sourceTargetInfos.Select(x => $"{x.SourceName} => {x.TargetName}"))}
@@ -150,12 +150,12 @@ public class AliasTask :
                       """;
         Log.LogMessageFromText(inputs, MessageImportance.High);
 
-        Aliaser.Run(references, sourceTargetInfos, Internalize, strongNameKeyPair);
+        Aliaser.Run(references, sourceTargetInfos, Internalize, strongNameKey);
         CopyLocalPathsToRemove = copyLocalPathsToRemove.ToArray();
         CopyLocalPathsToAdd = copyLocalPathsToAdd.ToArray();
     }
 
-    StrongNameKeyPair? GetKey()
+    StrongNameKey? GetKey()
     {
         if (!SignAssembly)
         {
@@ -172,8 +172,7 @@ public class AliasTask :
             throw new ErrorException($"AssemblyOriginatorKeyFile does no exist:{AssemblyOriginatorKeyFile}");
         }
 
-        var bytes = File.ReadAllBytes(AssemblyOriginatorKeyFile);
-        return new(bytes);
+        return StrongNameKey.FromFile(AssemblyOriginatorKeyFile);
     }
 
     public void Cancel()

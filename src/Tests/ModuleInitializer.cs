@@ -1,5 +1,5 @@
 ﻿using System.Runtime.CompilerServices;
-
+[assembly: CollectionBehavior(DisableTestParallelization = true)]
 public static class ModuleInitializer
 {
     [ModuleInitializer]
