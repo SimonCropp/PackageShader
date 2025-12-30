@@ -17,18 +17,14 @@ public sealed class BlobHeap
     /// </summary>
     public byte[] Data => _data;
 
-    public BlobHeap(byte[] data)
-    {
+    public BlobHeap(byte[] data) =>
         _data = data;
-    }
 
     /// <summary>
     /// Creates an empty blob heap for building.
     /// </summary>
-    public static BlobHeap CreateEmpty()
-    {
-        return new BlobHeap([0]); // Empty blob at index 0
-    }
+    public static BlobHeap CreateEmpty() =>
+        new([0]); // Empty blob at index 0
 
     /// <summary>
     /// Reads a blob at the given index.
@@ -87,7 +83,7 @@ public sealed class BlobHeapBuilder
     {
         // Empty blob at offset 0
         _stream.WriteByte(0);
-        _blobs[Array.Empty<byte>()] = 0;
+        _blobs[[]] = 0;
     }
 
     /// <summary>

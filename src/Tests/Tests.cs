@@ -224,24 +224,19 @@ public class AliasTests
         var targetPath = Path.Combine(solutionDirectory, "SampleApp/bin/Debug/net8.0");
 
         using var tempPath = new TempDirectory();
-        Directory.CreateDirectory(tempPath);
-        Helpers.PurgeDirectory(tempPath);
 
         Helpers.CopyFilesRecursively(targetPath, tempPath);
 
         Program.Inner(
             tempPath,
-            assemblyNamesToAlias: new()
-            {
-                "Assembly*"
-            },
-            references: new(),
+            assemblyNamesToAlias: ["Assembly*"],
+            references: [],
             keyFile: null,
-            assembliesToExclude: new()
-            {
+            assembliesToExclude:
+            [
                 "AssemblyToInclude",
                 "AssemblyToProcess"
-            },
+            ],
             prefix: "Alias_",
             suffix: null,
             internalize: true,

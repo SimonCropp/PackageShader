@@ -76,24 +76,24 @@ public sealed class MetadataReader
             switch (header.Name)
             {
                 case "#Strings":
-                    stringHeap = new StringHeap(heapData);
+                    stringHeap = new(heapData);
                     break;
                 case "#Blob":
-                    blobHeap = new BlobHeap(heapData);
+                    blobHeap = new(heapData);
                     break;
                 case "#GUID":
-                    guidHeap = new GuidHeap(heapData);
+                    guidHeap = new(heapData);
                     break;
                 case "#~":
                 case "#-":
-                    tableHeap = new TableHeap(heapData);
+                    tableHeap = new(heapData);
                     break;
             }
         }
 
-        stringHeap ??= new StringHeap([0]);
-        blobHeap ??= new BlobHeap([0]);
-        guidHeap ??= new GuidHeap([]);
+        stringHeap ??= new([0]);
+        blobHeap ??= new([0]);
+        guidHeap ??= new([]);
         if (tableHeap == null)
             throw new BadImageFormatException("Table heap not found");
 
@@ -105,7 +105,7 @@ public sealed class MetadataReader
         blobHeap.IndexSize = tableHeap.BlobIndexSize;
         guidHeap.IndexSize = tableHeap.GuidIndexSize;
 
-        return new MetadataReader(image, metadataData, stringHeap, blobHeap, guidHeap, tableHeap);
+        return new(image, metadataData, stringHeap, blobHeap, guidHeap, tableHeap);
     }
 
     #region Assembly Table
@@ -205,7 +205,7 @@ public sealed class MetadataReader
             var fullName = FormatAssemblyName(name, row.MajorVersion, row.MinorVersion,
                 row.BuildNumber, row.RevisionNumber, culture,
                 publicKeyOrToken.Length == 8 ? publicKeyOrToken : ComputePublicKeyToken(publicKeyOrToken));
-            yield return new AssemblyRefInfo(i, name, fullName);
+            yield return new(i, name, fullName);
         }
     }
 
@@ -403,7 +403,7 @@ public sealed class MetadataReader
             {
                 var attrTypeName = GetCustomAttributeTypeName(row.TypeIndex);
                 var argument = ParseCustomAttributeArgument(row.ValueIndex);
-                yield return new CustomAttributeInfo(i, attrTypeName, argument);
+                yield return new(i, attrTypeName, argument);
             }
         }
     }

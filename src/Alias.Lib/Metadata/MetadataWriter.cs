@@ -34,58 +34,44 @@ public sealed class MetadataWriter
     /// <summary>
     /// Adds or updates a string in the string heap.
     /// </summary>
-    public uint AddString(string value)
-    {
-        return _stringHeap.GetOrAdd(value);
-    }
+    public uint AddString(string value) =>
+        _stringHeap.GetOrAdd(value);
 
     /// <summary>
     /// Adds a blob to the blob heap.
     /// </summary>
-    public uint AddBlob(byte[] value)
-    {
-        return _blobHeap.GetOrAdd(value);
-    }
+    public uint AddBlob(byte[] value) =>
+        _blobHeap.GetOrAdd(value);
 
     /// <summary>
     /// Modifies the assembly row.
     /// </summary>
-    public void SetAssemblyRow(uint rid, AssemblyRow row)
-    {
+    public void SetAssemblyRow(uint rid, AssemblyRow row) =>
         _modifiedAssemblyRows[rid] = row;
-    }
 
     /// <summary>
     /// Tries to get a previously modified assembly row.
     /// </summary>
-    public bool TryGetModifiedAssemblyRow(uint rid, out AssemblyRow row)
-    {
-        return _modifiedAssemblyRows.TryGetValue(rid, out row);
-    }
+    public bool TryGetModifiedAssemblyRow(uint rid, out AssemblyRow row) =>
+        _modifiedAssemblyRows.TryGetValue(rid, out row);
 
     /// <summary>
     /// Modifies an assembly reference row.
     /// </summary>
-    public void SetAssemblyRefRow(uint rid, AssemblyRefRow row)
-    {
+    public void SetAssemblyRefRow(uint rid, AssemblyRefRow row) =>
         _modifiedAssemblyRefRows[rid] = row;
-    }
 
     /// <summary>
     /// Modifies a type definition row.
     /// </summary>
-    public void SetTypeDefRow(uint rid, TypeDefRow row)
-    {
+    public void SetTypeDefRow(uint rid, TypeDefRow row) =>
         _modifiedTypeDefRows[rid] = row;
-    }
 
     /// <summary>
     /// Adds a new custom attribute row.
     /// </summary>
-    public void AddCustomAttribute(CustomAttributeRow row)
-    {
+    public void AddCustomAttribute(CustomAttributeRow row) =>
         _newCustomAttributes.Add(row);
-    }
 
     /// <summary>
     /// Adds a new TypeRef row and returns its RID.

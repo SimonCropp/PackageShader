@@ -145,16 +145,12 @@ public sealed class PEWriter
         return minOffset;
     }
 
-    private uint GetFileAlignment()
-    {
+    private uint GetFileAlignment() =>
         // FileAlignment is at offset 36 in the optional header
-        return BitConverter.ToUInt32(_image.RawData, _image.OptionalHeaderOffset + 36);
-    }
+        BitConverter.ToUInt32(_image.RawData, _image.OptionalHeaderOffset + 36);
 
-    private static uint AlignUp(uint value, uint alignment)
-    {
-        return (value + alignment - 1) & ~(alignment - 1);
-    }
+    private static uint AlignUp(uint value, uint alignment) =>
+        (value + alignment - 1) & ~(alignment - 1);
 
     private void PatchHeaders(byte[] data, Section metadataSection, int sizeDiff, int rawSizeDiff, uint newRawSize)
     {
@@ -385,7 +381,7 @@ public sealed class PEWriter
         // Since importDirRva is already patched (updated RVA), we need to use the original section info
         // but account for the file data shift
         var originalImportDirRva = _image.ImportDirectory.VirtualAddress;
-        var importDirFileOffset = (originalImportDirRva - metadataSection.VirtualAddress) + metadataSection.PointerToRawData;
+        var importDirFileOffset = originalImportDirRva - metadataSection.VirtualAddress + metadataSection.PointerToRawData;
 
         // If import dir was after metadata, it has shifted in the file
         if (originalImportDirRva >= oldMetadataRvaEnd)
@@ -437,7 +433,7 @@ public sealed class PEWriter
             {
                 // Calculate file offset of ILT
                 // Since we patched the RVA, use the original to find the file location
-                var iltFileOffset = (originalFirstThunk - metadataSection.VirtualAddress) + metadataSection.PointerToRawData;
+                var iltFileOffset = originalFirstThunk - metadataSection.VirtualAddress + metadataSection.PointerToRawData;
                 if (originalFirstThunk >= oldMetadataRvaEnd)
                 {
                     iltFileOffset = iltFileOffset + (uint)sizeDiff;
@@ -486,7 +482,7 @@ public sealed class PEWriter
         if (relocSection == null) return;
 
         // Calculate file offset of relocation data
-        var relocFileOffset = (int)((relocRva - relocSection.VirtualAddress) + relocSection.PointerToRawData);
+        var relocFileOffset = (int)(relocRva - relocSection.VirtualAddress + relocSection.PointerToRawData);
 
         // The relocation section may have shifted if it's after metadata
         if (relocSection.PointerToRawData > metadataSection.PointerToRawData)
@@ -526,7 +522,7 @@ public sealed class PEWriter
                     var newOffset = (int)(newTargetRva - pageRva);
 
                     // If the new offset still fits in the same page, update it
-                    if (newOffset >= 0 && newOffset < 0x1000)
+                    if (newOffset is >= 0 and < 0x1000)
                     {
                         var newEntry = (ushort)((type << 12) | (newOffset & 0xFFF));
                         data[entryOffset] = (byte)(newEntry & 0xFF);

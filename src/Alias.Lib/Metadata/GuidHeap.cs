@@ -17,18 +17,14 @@ public sealed class GuidHeap
     /// </summary>
     public byte[] Data => _data;
 
-    public GuidHeap(byte[] data)
-    {
+    public GuidHeap(byte[] data) =>
         _data = data;
-    }
 
     /// <summary>
     /// Creates an empty GUID heap for building.
     /// </summary>
-    public static GuidHeap CreateEmpty()
-    {
-        return new GuidHeap([]);
-    }
+    public static GuidHeap CreateEmpty() =>
+        new([]);
 
     /// <summary>
     /// Reads a GUID at the given 1-based index.
@@ -45,7 +41,7 @@ public sealed class GuidHeap
 
         var bytes = new byte[16];
         Array.Copy(_data, offset, bytes, 0, 16);
-        return new Guid(bytes);
+        return new(bytes);
     }
 
     /// <summary>

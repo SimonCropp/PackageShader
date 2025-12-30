@@ -12,17 +12,4 @@
             File.Copy(newPath, newPath.Replace(sourcePath, targetPath), true);
         }
     }
-
-    public static void PurgeDirectory(string directory)
-    {
-        foreach (var subDirectory in Directory.EnumerateDirectories(directory))
-        {
-            Directory.Delete(subDirectory, true);
-        }
-
-        foreach (var file in Directory.EnumerateFiles(directory))
-        {
-            File.Delete(file);
-        }
-    }
 }

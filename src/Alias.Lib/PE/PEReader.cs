@@ -167,7 +167,7 @@ public sealed class PEReader
                 Array.Copy(_data, pointerToRawData, data, 0, Math.Min(sizeOfRawData, _data.Length - pointerToRawData));
             }
 
-            sections[i] = new Section
+            sections[i] = new()
             {
                 Name = name,
                 VirtualSize = virtualSize,
@@ -187,7 +187,7 @@ public sealed class PEReader
         // Check if this is a .NET assembly (has CLI header)
         if (image.CLIHeaderDirectory.VirtualAddress == 0)
         {
-            image.CLIHeader = new CLIHeader();
+            image.CLIHeader = new();
             return;
         }
 
@@ -245,7 +245,7 @@ public sealed class PEReader
         image.MetadataVersionString = ReadZeroTerminatedString(versionLength);
 
         // Align to 4-byte boundary
-        var padding = (4 - (versionLength % 4)) % 4;
+        var padding = (4 - versionLength % 4) % 4;
         if (padding > 0 && versionLength % 4 != 0)
             padding = 4 - (versionLength % 4);
         // Actually the version length already includes padding, so we just advance by the version length
@@ -266,7 +266,7 @@ public sealed class PEReader
             var size = ReadUInt32();
             var name = ReadAlignedString(32);
 
-            streamHeaders[i] = new StreamHeader
+            streamHeaders[i] = new()
             {
                 Offset = offset,
                 Size = size,
@@ -314,7 +314,7 @@ public sealed class PEReader
             };
 
             // Read debug data
-            if (entry.PointerToRawData > 0 && entry.SizeOfData > 0 &&
+            if (entry is {PointerToRawData: > 0, SizeOfData: > 0} &&
                 entry.PointerToRawData + entry.SizeOfData <= _data.Length)
             {
                 var currentPos = _position;
@@ -338,10 +338,8 @@ public sealed class PEReader
 
     #region Reading Helpers
 
-    private byte ReadByte()
-    {
-        return _data[_position++];
-    }
+    private byte ReadByte() =>
+        _data[_position++];
 
     private byte[] ReadBytes(int count)
     {
@@ -372,24 +370,18 @@ public sealed class PEReader
         return value;
     }
 
-    private DataDirectory ReadDataDirectory()
-    {
-        return new DataDirectory
+    private DataDirectory ReadDataDirectory() =>
+        new()
         {
             VirtualAddress = ReadUInt32(),
             Size = ReadUInt32()
         };
-    }
 
-    private void Advance(int bytes)
-    {
+    private void Advance(int bytes) =>
         _position += bytes;
-    }
 
-    private void MoveTo(int position)
-    {
+    private void MoveTo(int position) =>
         _position = position;
-    }
 
     private string ReadZeroTerminatedString(int maxLength)
     {

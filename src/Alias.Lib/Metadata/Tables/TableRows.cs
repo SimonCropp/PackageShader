@@ -18,7 +18,7 @@ public struct AssemblyRow
     public static AssemblyRow Read(byte[] data, int blobIndexSize, int stringIndexSize)
     {
         var reader = new TableRowReader(data);
-        return new AssemblyRow
+        return new()
         {
             HashAlgId = reader.ReadUInt32(),
             MajorVersion = reader.ReadUInt16(),
@@ -72,7 +72,7 @@ public struct AssemblyRefRow
     public static AssemblyRefRow Read(byte[] data, int blobIndexSize, int stringIndexSize)
     {
         var reader = new TableRowReader(data);
-        return new AssemblyRefRow
+        return new()
         {
             MajorVersion = reader.ReadUInt16(),
             MinorVersion = reader.ReadUInt16(),
@@ -135,7 +135,7 @@ public struct TypeDefRow
         int fieldIndexSize, int methodIndexSize)
     {
         var reader = new TableRowReader(data);
-        return new TypeDefRow
+        return new()
         {
             Flags = reader.ReadUInt32(),
             NameIndex = reader.ReadIndex(stringIndexSize),
@@ -217,7 +217,7 @@ public struct CustomAttributeRow
         int customAttributeTypeSize, int blobIndexSize)
     {
         var reader = new TableRowReader(data);
-        return new CustomAttributeRow
+        return new()
         {
             ParentIndex = reader.ReadIndex(hasCustomAttributeSize),
             TypeIndex = reader.ReadIndex(customAttributeTypeSize),
@@ -254,7 +254,7 @@ public struct TypeRefRow
     public static TypeRefRow Read(byte[] data, int resolutionScopeSize, int stringIndexSize)
     {
         var reader = new TableRowReader(data);
-        return new TypeRefRow
+        return new()
         {
             ResolutionScopeIndex = reader.ReadIndex(resolutionScopeSize),
             NameIndex = reader.ReadIndex(stringIndexSize),
@@ -291,7 +291,7 @@ public struct MemberRefRow
         int stringIndexSize, int blobIndexSize)
     {
         var reader = new TableRowReader(data);
-        return new MemberRefRow
+        return new()
         {
             ClassIndex = reader.ReadIndex(memberRefParentSize),
             NameIndex = reader.ReadIndex(stringIndexSize),
@@ -351,8 +351,6 @@ public class TableRowReader
         return ReadUInt32();
     }
 
-    public void Skip(int bytes)
-    {
+    public void Skip(int bytes) =>
         _position += bytes;
-    }
 }

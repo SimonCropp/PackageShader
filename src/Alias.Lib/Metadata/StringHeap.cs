@@ -21,18 +21,14 @@ public sealed class StringHeap
     /// </summary>
     public byte[] Data => _data;
 
-    public StringHeap(byte[] data)
-    {
+    public StringHeap(byte[] data) =>
         _data = data;
-    }
 
     /// <summary>
     /// Creates an empty string heap for building.
     /// </summary>
-    public static StringHeap CreateEmpty()
-    {
-        return new StringHeap([0]); // Empty string at index 0
-    }
+    public static StringHeap CreateEmpty() =>
+        new([0]); // Empty string at index 0
 
     /// <summary>
     /// Reads a string at the given index.

@@ -148,7 +148,7 @@ public sealed class AssemblyModifier
             throw new InvalidOperationException("Could not find or create InternalsVisibleTo constructor reference");
 
         // Build attribute value
-        var value = publicKey != null && publicKey.Length > 0
+        var value = publicKey is {Length: > 0}
             ? $"{assemblyName}, PublicKey={Convert.ToHexString(publicKey)}"
             : assemblyName;
 
@@ -199,8 +199,9 @@ public sealed class AssemblyModifier
         // Create TypeRef for InternalsVisibleToAttribute
         var typeRefRow = new TypeRefRow
         {
-            ResolutionScopeIndex = CodedIndexHelper.EncodeToken(CodedIndex.ResolutionScope,
-                new MetadataToken(TokenType.AssemblyRef, resolutionScope.Value)),
+            ResolutionScopeIndex = CodedIndexHelper.EncodeToken(
+                CodedIndex.ResolutionScope,
+                new(TokenType.AssemblyRef, resolutionScope.Value)),
             NameIndex = _writer.AddString("InternalsVisibleToAttribute"),
             NamespaceIndex = _writer.AddString("System.Runtime.CompilerServices")
         };
@@ -233,8 +234,9 @@ public sealed class AssemblyModifier
 
         var memberRefRow = new MemberRefRow
         {
-            ClassIndex = CodedIndexHelper.EncodeToken(CodedIndex.MemberRefParent,
-                new MetadataToken(TokenType.TypeRef, typeRefRid)),
+            ClassIndex = CodedIndexHelper.EncodeToken(
+                CodedIndex.MemberRefParent,
+                new(TokenType.TypeRef, typeRefRid)),
             NameIndex = _writer.AddString(".ctor"),
             SignatureIndex = _writer.AddBlob(ctorSignature)
         };

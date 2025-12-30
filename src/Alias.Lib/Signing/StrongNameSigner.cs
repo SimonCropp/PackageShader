@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-
 namespace Alias.Lib.Signing;
 
 /// <summary>

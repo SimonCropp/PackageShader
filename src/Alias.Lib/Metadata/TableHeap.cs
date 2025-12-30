@@ -28,34 +28,26 @@ public sealed class TableHeap
     /// </summary>
     public TableInfo this[Table table] => _tables[(int)table];
 
-    public TableHeap(byte[] data)
-    {
+    public TableHeap(byte[] data) =>
         _data = data;
-    }
 
     /// <summary>
     /// Checks if a table exists in this heap.
     /// </summary>
-    public bool HasTable(Table table)
-    {
-        return (Valid & (1L << (int)table)) != 0;
-    }
+    public bool HasTable(Table table) =>
+        (Valid & (1L << (int)table)) != 0;
 
     /// <summary>
     /// Gets the row count for a table.
     /// </summary>
-    public int GetRowCount(Table table)
-    {
-        return (int)_tables[(int)table].RowCount;
-    }
+    public int GetRowCount(Table table) =>
+        (int)_tables[(int)table].RowCount;
 
     /// <summary>
     /// Gets the index size (2 or 4) for a table.
     /// </summary>
-    public int GetTableIndexSize(Table table)
-    {
-        return GetRowCount(table) < 65536 ? 2 : 4;
-    }
+    public int GetTableIndexSize(Table table) =>
+        GetRowCount(table) < 65536 ? 2 : 4;
 
     /// <summary>
     /// Gets the index size (2 or 4) for a coded index.
@@ -130,14 +122,13 @@ public sealed class TableHeap
         }
     }
 
-    private int ComputeRowSize(Table table)
-    {
-        return table switch
+    private int ComputeRowSize(Table table) =>
+        table switch
         {
             Table.Module => 2 + StringIndexSize + GuidIndexSize * 3,
             Table.TypeRef => GetCodedIndexSize(CodedIndex.ResolutionScope) + StringIndexSize * 2,
             Table.TypeDef => 4 + StringIndexSize * 2 + GetCodedIndexSize(CodedIndex.TypeDefOrRef)
-                + GetTableIndexSize(Table.Field) + GetTableIndexSize(Table.Method),
+                             + GetTableIndexSize(Table.Field) + GetTableIndexSize(Table.Method),
             Table.FieldPtr => GetTableIndexSize(Table.Field),
             Table.Field => 2 + StringIndexSize + BlobIndexSize,
             Table.MethodPtr => GetTableIndexSize(Table.Method),
@@ -148,7 +139,7 @@ public sealed class TableHeap
             Table.MemberRef => GetCodedIndexSize(CodedIndex.MemberRefParent) + StringIndexSize + BlobIndexSize,
             Table.Constant => 2 + GetCodedIndexSize(CodedIndex.HasConstant) + BlobIndexSize,
             Table.CustomAttribute => GetCodedIndexSize(CodedIndex.HasCustomAttribute)
-                + GetCodedIndexSize(CodedIndex.CustomAttributeType) + BlobIndexSize,
+                                     + GetCodedIndexSize(CodedIndex.CustomAttributeType) + BlobIndexSize,
             Table.FieldMarshal => GetCodedIndexSize(CodedIndex.HasFieldMarshal) + BlobIndexSize,
             Table.DeclSecurity => 2 + GetCodedIndexSize(CodedIndex.HasDeclSecurity) + BlobIndexSize,
             Table.ClassLayout => 6 + GetTableIndexSize(Table.TypeDef),
@@ -162,11 +153,11 @@ public sealed class TableHeap
             Table.Property => 2 + StringIndexSize + BlobIndexSize,
             Table.MethodSemantics => 2 + GetTableIndexSize(Table.Method) + GetCodedIndexSize(CodedIndex.HasSemantics),
             Table.MethodImpl => GetTableIndexSize(Table.TypeDef)
-                + GetCodedIndexSize(CodedIndex.MethodDefOrRef) + GetCodedIndexSize(CodedIndex.MethodDefOrRef),
+                                + GetCodedIndexSize(CodedIndex.MethodDefOrRef) + GetCodedIndexSize(CodedIndex.MethodDefOrRef),
             Table.ModuleRef => StringIndexSize,
             Table.TypeSpec => BlobIndexSize,
             Table.ImplMap => 2 + GetCodedIndexSize(CodedIndex.MemberForwarded)
-                + StringIndexSize + GetTableIndexSize(Table.ModuleRef),
+                               + StringIndexSize + GetTableIndexSize(Table.ModuleRef),
             Table.FieldRVA => 4 + GetTableIndexSize(Table.Field),
             Table.EncLog => 8,
             Table.EncMap => 4,
@@ -187,16 +178,15 @@ public sealed class TableHeap
             Table.Document => BlobIndexSize + GuidIndexSize + BlobIndexSize + GuidIndexSize,
             Table.MethodDebugInformation => GetTableIndexSize(Table.Document) + BlobIndexSize,
             Table.LocalScope => GetTableIndexSize(Table.Method) + GetTableIndexSize(Table.ImportScope)
-                + GetTableIndexSize(Table.LocalVariable) + GetTableIndexSize(Table.LocalConstant) + 8,
+                                                                + GetTableIndexSize(Table.LocalVariable) + GetTableIndexSize(Table.LocalConstant) + 8,
             Table.LocalVariable => 4 + StringIndexSize,
             Table.LocalConstant => StringIndexSize + BlobIndexSize,
             Table.ImportScope => GetTableIndexSize(Table.ImportScope) + BlobIndexSize,
             Table.StateMachineMethod => GetTableIndexSize(Table.Method) * 2,
             Table.CustomDebugInformation => GetCodedIndexSize(CodedIndex.HasCustomDebugInformation)
-                + GuidIndexSize + BlobIndexSize,
+                                            + GuidIndexSize + BlobIndexSize,
             _ => throw new NotSupportedException($"Unknown table: {table}")
         };
-    }
 
     /// <summary>
     /// Reads raw bytes for a specific table row.

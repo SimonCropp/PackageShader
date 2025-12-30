@@ -171,15 +171,14 @@ public static class CodedIndexHelper
             max = Math.Max(getRowCount(table), max);
         }
 
-        return max < (1 << (16 - bits)) ? 2 : 4;
+        return max < 1 << (16 - bits) ? 2 : 4;
     }
 
     /// <summary>
     /// Gets bit count and tables for a coded index type.
     /// </summary>
-    public static (int bits, Table[] tables) GetCodedIndexInfo(CodedIndex codedIndex)
-    {
-        return codedIndex switch
+    public static (int bits, Table[] tables) GetCodedIndexInfo(CodedIndex codedIndex) =>
+        codedIndex switch
         {
             CodedIndex.TypeDefOrRef => (2, [Table.TypeDef, Table.TypeRef, Table.TypeSpec]),
             CodedIndex.HasConstant => (2, [Table.Field, Table.Param, Table.Property]),
@@ -213,7 +212,6 @@ public static class CodedIndexHelper
             ]),
             _ => throw new ArgumentException($"Unknown coded index: {codedIndex}")
         };
-    }
 
     /// <summary>
     /// Decodes a coded index value to a metadata token.
@@ -235,7 +233,7 @@ public static class CodedIndexHelper
             return MetadataToken.Zero;
 
         var tokenType = TableToTokenType(table);
-        return new MetadataToken(tokenType, rid);
+        return new(tokenType, rid);
     }
 
     /// <summary>
@@ -258,9 +256,8 @@ public static class CodedIndexHelper
         throw new ArgumentException($"Token type {token.TokenType} not valid for coded index {codedIndex}");
     }
 
-    private static TokenType TableToTokenType(Table table)
-    {
-        return table switch
+    private static TokenType TableToTokenType(Table table) =>
+        table switch
         {
             Table.Module => TokenType.Module,
             Table.TypeRef => TokenType.TypeRef,
@@ -292,11 +289,9 @@ public static class CodedIndexHelper
             Table.ImportScope => TokenType.ImportScope,
             _ => throw new ArgumentException($"No token type for table {table}")
         };
-    }
 
-    private static Table TokenTypeToTable(TokenType tokenType)
-    {
-        return tokenType switch
+    private static Table TokenTypeToTable(TokenType tokenType) =>
+        tokenType switch
         {
             TokenType.Module => Table.Module,
             TokenType.TypeRef => Table.TypeRef,
@@ -328,5 +323,4 @@ public static class CodedIndexHelper
             TokenType.ImportScope => Table.ImportScope,
             _ => throw new ArgumentException($"No table for token type {tokenType}")
         };
-    }
 }

@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-
 namespace Alias.Lib.Signing;
 
 /// <summary>
@@ -46,7 +44,7 @@ public sealed class StrongNameKey
         var rsa = FromCapiKeyBlob(blob);
         var publicKey = BuildPublicKeyBlob(rsa);
         var publicKeyToken = ComputePublicKeyToken(publicKey);
-        return new StrongNameKey(rsa, publicKey, publicKeyToken);
+        return new(rsa, publicKey, publicKeyToken);
     }
 
     /// <summary>
