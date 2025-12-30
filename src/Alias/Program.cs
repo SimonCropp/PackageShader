@@ -8,7 +8,7 @@ public static class Program
     {
         try
         {
-            var errors = CommandRunner.RunCommand(Inner, args);
+            var errors = CommandRunner.RunCommand(Inner, Console.WriteLine, args);
 
             if (errors.Any())
             {

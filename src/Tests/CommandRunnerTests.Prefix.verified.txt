@@ -4,7 +4,6 @@
   assembliesToAlias: [
     assembly
   ],
-  consoleError: ,
   consoleOut:
 TargetDirectory: {CurrentDirectory}
 Internalize: False

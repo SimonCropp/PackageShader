@@ -3,7 +3,7 @@ using CommandLine;
 
 public static class CommandRunner
 {
-    public static IEnumerable<Error> RunCommand(Invoke invoke, params string[] args)
+    public static IEnumerable<Error> RunCommand(Invoke invoke, Action<string> log, params string[] args)
     {
         var arguments = Parser.Default.ParseArguments<Options>(args);
 
@@ -21,20 +21,20 @@ public static class CommandRunner
             throw new ErrorException($"Target directory does not exist: {targetDirectory}");
         }
 
-        Console.WriteLine($"TargetDirectory: {targetDirectory}");
-        Console.WriteLine($"Internalize: {options.Internalize}");
+        log($"TargetDirectory: {targetDirectory}");
+        log($"Internalize: {options.Internalize}");
         var prefix = options.Prefix;
         if (prefix != null)
         {
             ValidatePrefixSuffix(prefix);
-            Console.WriteLine($"Prefix: {prefix}");
+            log($"Prefix: {prefix}");
         }
 
         var suffix = options.Suffix;
         if (suffix != null)
         {
             ValidatePrefixSuffix(suffix);
-            Console.WriteLine($"Suffix: {suffix}");
+            log($"Suffix: {suffix}");
         }
 
         if (prefix == null && suffix == null)
@@ -47,28 +47,28 @@ public static class CommandRunner
         if (keyFile != null)
         {
             keyFile = Path.GetFullPath(keyFile);
-            Console.WriteLine($"KeyFile: {keyFile}");
+            log($"KeyFile: {keyFile}");
             if (!File.Exists(keyFile))
             {
                 throw new ErrorException($"KeyFile directory does not exist: {keyFile}");
             }
         }
 
-        Console.WriteLine("AssembliesToAlias:");
+        log("AssembliesToAlias:");
         var assemblyToAliases = options.AssembliesToAlias.ToList();
         foreach (var assembly in assemblyToAliases)
         {
-            Console.WriteLine($" * {assembly}");
+            log($" * {assembly}");
         }
 
         var assembliesToExclude = options.AssembliesToExclude.ToList();
 
         if (assembliesToExclude.Any())
         {
-            Console.WriteLine("AssembliesToExclude:");
+            log("AssembliesToExclude:");
             foreach (var assembly in assembliesToExclude)
             {
-                Console.WriteLine($" * {assembly}");
+                log($" * {assembly}");
             }
         }
 
@@ -86,10 +86,10 @@ public static class CommandRunner
 
         if (references.Any())
         {
-            Console.WriteLine("References:");
+            log("References:");
             foreach (var reference in references)
             {
-                Console.WriteLine($" * {reference}");
+                log($" * {reference}");
             }
         }
 
@@ -102,7 +102,7 @@ public static class CommandRunner
             prefix,
             suffix,
             options.Internalize,
-            Console.WriteLine);
+            log);
         return Enumerable.Empty<Error>();
     }
 

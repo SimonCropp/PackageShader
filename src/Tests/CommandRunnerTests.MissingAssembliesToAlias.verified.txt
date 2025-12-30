@@ -10,36 +10,6 @@
       StopsProcessing: false
     }
   ],
-  consoleError:
-Tests 0.4.3+226b38cea4d371cdd8ce720f961455d1a2270828
-Copyright 2025. All rights reserved
-
-ERROR(S):
-  Required option 'a, assemblies-to-alias' is missing.
-
-  -t, --target-directory         
-
-  -i, --internalize              
-
-  -a, --assemblies-to-alias      Required.
-
-  -e, --assemblies-to-exclude    
-
-  -r, --references               
-
-  --reference-file               
-
-  -k, --key                      
-
-  -p, --prefix                   
-
-  -s, --suffix                   
-
-  --help                         Display this help screen.
-
-  --version                      Display version information.
-
-,
   consoleOut: ,
   internalize: false
 }

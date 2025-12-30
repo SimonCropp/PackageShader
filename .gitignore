@@ -91,3 +91,4 @@ Fody/.DS_Store
 *.received.txt
 *.bak
 Integration/Directory.Build.props
+.claude/settings.local.json

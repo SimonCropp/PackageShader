@@ -6,7 +6,6 @@
   assembliesToAlias: [
     assembly
   ],
-  consoleError: ,
   consoleOut:
 TargetDirectory: {CurrentDirectory}directory
 Internalize: False

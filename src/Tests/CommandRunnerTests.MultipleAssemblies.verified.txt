@@ -5,7 +5,6 @@
     assembly1,
     assembly2
   ],
-  consoleError: ,
   consoleOut:
 TargetDirectory: {CurrentDirectory}
 Internalize: False

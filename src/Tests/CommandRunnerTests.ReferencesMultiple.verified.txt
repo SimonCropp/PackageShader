@@ -8,7 +8,6 @@
     reference1,
     reference2
   ],
-  consoleError: ,
   consoleOut:
 TargetDirectory: {CurrentDirectory}
 Internalize: False
