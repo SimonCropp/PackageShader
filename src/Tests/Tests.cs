@@ -4,9 +4,6 @@ using Alias.Lib.Metadata;
 using Alias.Lib.PE;
 using Alias.Lib.Pdb;
 
-[CollectionDefinition("Sequential", DisableParallelization = true)]
-public class SequentialCollection;
-
 [Collection("Sequential")]
 public class AliasTests
 {

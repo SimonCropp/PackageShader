@@ -1,5 +1,6 @@
 ﻿using CommandLine;
 
+[Collection("Sequential")]
 public class CommandRunnerTests
 {
     [Fact]
