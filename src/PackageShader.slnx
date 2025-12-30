@@ -1,0 +1,46 @@
+<Solution>
+  <Configurations>
+    <BuildType Name="Debug" />
+    <BuildType Name="IncludeAliasTask" />
+    <BuildType Name="Release" />
+  </Configurations>
+  <Folder Name="/Solution Items/">
+    <File Path="../readme.md" />
+    <File Path="appveyor.yml" />
+    <File Path="Directory.Build.props" />
+    <File Path="global.json" />
+    <File Path="mdsnippets.json" />
+  </Folder>
+  <Project Path="Alias.Lib/Alias.Lib.csproj" />
+  <Project Path="Alias.MsBuild/Alias.MsBuild.csproj" />
+  <Project Path="Alias/Alias.csproj">
+    <Build Solution="IncludeAliasTask|*" Project="false" />
+  </Project>
+  <Project Path="AssemblyToInclude/AssemblyToInclude.csproj" />
+  <Project Path="AssemblyToProcess/AssemblyToProcess.csproj">
+    <BuildDependency Project="Alias.MsBuild/Alias.MsBuild.csproj" />
+  </Project>
+  <Project Path="AssemblyWithEmbeddedSymbols/AssemblyWithEmbeddedSymbols.csproj" />
+  <Project Path="AssemblyWithNoStrongName/AssemblyWithNoStrongName.csproj" />
+  <Project Path="AssemblyWithNoSymbols/AssemblyWithNoSymbols.csproj" />
+  <Project Path="AssemblyWithPdb/AssemblyWithPdb.csproj" />
+  <Project Path="AssemblyWithResources/AssemblyWithResources.csproj" />
+  <Project Path="AssemblyWithStrongName/AssemblyWithStrongName.csproj" />
+  <Project Path="DummyAssembly/DummyAssembly.csproj">
+    <Build Solution="IncludeAliasTask|*" Project="false" />
+  </Project>
+  <Project Path="SampleApp/SampleApp.csproj">
+    <BuildDependency Project="Alias/Alias.csproj" />
+    <Build Solution="IncludeAliasTask|*" Project="false" />
+  </Project>
+  <Project Path="SampleAppForMsBuild/SampleAppForMsBuild.csproj">
+    <BuildDependency Project="Alias.MsBuild/Alias.MsBuild.csproj" />
+  </Project>
+  <Project Path="Tests/Tests.csproj">
+    <BuildDependency Project="SampleApp/SampleApp.csproj" />
+    <Build Solution="IncludeAliasTask|*" Project="false" />
+  </Project>
+  <Properties Name="MonoDevelopProperties">
+    <Property Name="StartupItem" Value="Fody\Fody.csproj" />
+  </Properties>
+</Solution>
