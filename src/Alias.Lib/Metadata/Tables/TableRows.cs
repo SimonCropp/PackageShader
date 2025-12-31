@@ -169,15 +169,7 @@ public struct TypeDefRow
         {
             Flags = (Flags & ~VisibilityMask) | NotPublic;
         }
-        else if (visibility == NestedPublic)
-        {
-            Flags = (Flags & ~VisibilityMask) | NestedAssembly;
-        }
-        else if (visibility == NestedFamily)
-        {
-            Flags = (Flags & ~VisibilityMask) | NestedAssembly;
-        }
-        else if (visibility == NestedFamORAssem)
+        else if (visibility is NestedPublic or NestedFamily or NestedFamORAssem)
         {
             Flags = (Flags & ~VisibilityMask) | NestedAssembly;
         }
@@ -191,7 +183,7 @@ public struct TypeDefRow
         get
         {
             var visibility = Flags & VisibilityMask;
-            return visibility == Public || visibility == NestedPublic;
+            return visibility is Public or NestedPublic;
         }
     }
 

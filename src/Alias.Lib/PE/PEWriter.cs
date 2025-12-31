@@ -7,8 +7,8 @@ namespace Alias.Lib.PE;
 /// </summary>
 public sealed class PEWriter
 {
-    private readonly PEImage _image;
-    private readonly byte[] _newMetadata;
+    readonly PEImage _image;
+    readonly byte[] _newMetadata;
 
     public PEWriter(PEImage image, byte[] newMetadata)
     {
@@ -127,14 +127,14 @@ public sealed class PEWriter
         return result;
     }
 
-    private int GetEndOfHeaders()
+    int GetEndOfHeaders()
     {
         // End of section headers
         var sectionHeaderSize = 40; // Size of IMAGE_SECTION_HEADER
         return _image.SectionHeadersOffset + _image.Sections.Length * sectionHeaderSize;
     }
 
-    private uint GetFirstSectionOffset()
+    uint GetFirstSectionOffset()
     {
         uint minOffset = uint.MaxValue;
         foreach (var section in _image.Sections)
@@ -145,14 +145,14 @@ public sealed class PEWriter
         return minOffset;
     }
 
-    private uint GetFileAlignment() =>
+    uint GetFileAlignment() =>
         // FileAlignment is at offset 36 in the optional header
         BitConverter.ToUInt32(_image.RawData, _image.OptionalHeaderOffset + 36);
 
-    private static uint AlignUp(uint value, uint alignment) =>
+    static uint AlignUp(uint value, uint alignment) =>
         (value + alignment - 1) & ~(alignment - 1);
 
-    private void PatchHeaders(byte[] data, Section metadataSection, int sizeDiff, int rawSizeDiff, uint newRawSize)
+    void PatchHeaders(byte[] data, Section metadataSection, int sizeDiff, int rawSizeDiff, uint newRawSize)
     {
         // Patch CLI header with new metadata size
         var cliHeaderOffset = _image.CLIHeaderFileOffset;
@@ -357,7 +357,7 @@ public sealed class PEWriter
         }
     }
 
-    private void PatchImportDirectory(byte[] data, uint oldMetadataRvaEnd, int sizeDiff)
+    void PatchImportDirectory(byte[] data, uint oldMetadataRvaEnd, int sizeDiff)
     {
         // Find the import directory in the patched data directories
         var optionalHeaderOffset = _image.OptionalHeaderOffset;
@@ -441,7 +441,7 @@ public sealed class PEWriter
 
                 // Patch ILT entries (4 bytes for PE32, 8 for PE64)
                 var iltEntrySize = _image.IsPE64 ? 8 : 4;
-                for (int j = 0; j < 100; j++) // reasonable limit
+                for (var j = 0; j < 100; j++) // reasonable limit
                 {
                     var iltEntryOffset = (int)iltFileOffset + j * iltEntrySize;
                     if (iltEntryOffset + iltEntrySize > data.Length) break;
@@ -462,7 +462,7 @@ public sealed class PEWriter
         }
     }
 
-    private void PatchBaseRelocations(byte[] data, uint oldMetadataRvaEnd, int sizeDiff, Section metadataSection)
+    void PatchBaseRelocations(byte[] data, uint oldMetadataRvaEnd, int sizeDiff, Section metadataSection)
     {
         // Find base relocation directory (index 5)
         var optionalHeaderOffset = _image.OptionalHeaderOffset;
@@ -537,7 +537,7 @@ public sealed class PEWriter
         }
     }
 
-    private static void WriteUInt32(byte[] data, int offset, uint value)
+    static void WriteUInt32(byte[] data, int offset, uint value)
     {
         data[offset] = (byte)(value & 0xFF);
         data[offset + 1] = (byte)((value >> 8) & 0xFF);

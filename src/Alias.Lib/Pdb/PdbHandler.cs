@@ -1,5 +1,3 @@
-using System.IO.Compression;
-
 namespace Alias.Lib.Pdb;
 
 /// <summary>
@@ -17,7 +15,9 @@ public static class PdbHandler
 
         // Skip if source and target are the same file
         if (string.Equals(Path.GetFullPath(sourcePdb), Path.GetFullPath(targetPdb), StringComparison.OrdinalIgnoreCase))
+        {
             return;
+        }
 
         if (File.Exists(sourcePdb))
         {
@@ -45,91 +45,17 @@ public static class PdbHandler
     /// </summary>
     public static bool HasEmbeddedPdb(byte[] data)
     {
-        // Find debug directory
-        var debugEntries = FindDebugDirectoryEntries(data);
-
-        foreach (var entry in debugEntries)
-        {
-            // Type 17 = EmbeddedPortablePdb
-            if (entry.type == 17)
-                return true;
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// Extracts embedded PDB data from a PE file.
-    /// </summary>
-    public static byte[]? ExtractEmbeddedPdb(byte[] data)
-    {
-        var debugEntries = FindDebugDirectoryEntries(data);
-
-        foreach (var (type, offset, size) in debugEntries)
-        {
-            if (type == 17 && size > 8) // EmbeddedPortablePdb
-            {
-                // Format: [MPDB signature (4)] [uncompressed size (4)] [compressed data]
-                var signature = BitConverter.ToUInt32(data, offset);
-                if (signature != 0x4244504D) // "MPDB"
-                    continue;
-
-                var uncompressedSize = BitConverter.ToInt32(data, offset + 4);
-                var compressedData = new byte[size - 8];
-                Array.Copy(data, offset + 8, compressedData, 0, size - 8);
-
-                // Decompress
-                using var compressed = new MemoryStream(compressedData);
-                using var decompressed = new MemoryStream();
-                using var deflate = new DeflateStream(compressed, CompressionMode.Decompress);
-                deflate.CopyTo(decompressed);
-
-                return decompressed.ToArray();
-            }
-        }
-
-        return null;
-    }
-
-    /// <summary>
-    /// Creates embedded PDB data for inclusion in debug directory.
-    /// </summary>
-    public static byte[] CreateEmbeddedPdbEntry(byte[] pdbData)
-    {
-        using var result = new MemoryStream();
-        using var writer = new BinaryWriter(result);
-
-        // MPDB signature
-        writer.Write(0x4244504D); // "MPDB"
-
-        // Uncompressed size
-        writer.Write(pdbData.Length);
-
-        // Compress the PDB data
-        using var compressedStream = new MemoryStream();
-        using (var deflate = new DeflateStream(compressedStream, CompressionLevel.Optimal, leaveOpen: true))
-        {
-            deflate.Write(pdbData, 0, pdbData.Length);
-        }
-
-        writer.Write(compressedStream.ToArray());
-
-        return result.ToArray();
-    }
-
-    private static List<(int type, int offset, int size)> FindDebugDirectoryEntries(byte[] data)
-    {
-        var entries = new List<(int type, int offset, int size)>();
-
         if (data.Length < 64)
-            return entries;
+        {
+            return false;
+        }
 
-        // Find PE header
         var peOffset = BitConverter.ToInt32(data, 60);
         if (peOffset + 24 > data.Length)
-            return entries;
+        {
+            return false;
+        }
 
-        // Determine PE32 or PE32+
         var optionalHeaderOffset = peOffset + 24;
         var magic = BitConverter.ToUInt16(data, optionalHeaderOffset);
         var isPE64 = magic == 0x20b;
@@ -139,39 +65,50 @@ public static class PdbHandler
         var debugDirOffset = dataDirectoriesOffset + 6 * 8;
 
         if (debugDirOffset + 8 > data.Length)
-            return entries;
+        {
+            return false;
+        }
 
         var debugRva = BitConverter.ToUInt32(data, debugDirOffset);
         var debugSize = BitConverter.ToUInt32(data, debugDirOffset + 4);
 
         if (debugRva == 0 || debugSize == 0)
-            return entries;
+        {
+            return false;
+        }
 
-        // Resolve debug directory file offset
         var debugFileOffset = ResolveRva(data, peOffset, debugRva);
         if (debugFileOffset == 0)
-            return entries;
+        {
+            return false;
+        }
 
-        // Each debug directory entry is 28 bytes
         var entryCount = (int)(debugSize / 28);
 
-        for (int i = 0; i < entryCount; i++)
+        for (var i = 0; i < entryCount; i++)
         {
             var entryOffset = (int)debugFileOffset + i * 28;
             if (entryOffset + 28 > data.Length)
+            {
                 break;
+            }
 
             var type = BitConverter.ToInt32(data, entryOffset + 12);
             var dataSize = BitConverter.ToInt32(data, entryOffset + 16);
             var dataOffset = BitConverter.ToInt32(data, entryOffset + 24);
 
-            if (dataOffset > 0 && dataSize > 0)
+            if (dataOffset <= 0 || dataSize <= 0)
             {
-                entries.Add((type, dataOffset, dataSize));
+                continue;
+            }
+
+            if (type == 17)
+            {
+                return true;
             }
         }
 
-        return entries;
+        return false;
     }
 
     private static uint ResolveRva(byte[] data, int peOffset, uint rva)

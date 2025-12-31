@@ -31,11 +31,15 @@ public sealed class PEReader
         var image = new PEImage { RawData = _data };
 
         if (_data.Length < 128)
+        {
             throw new BadImageFormatException("File too small to be a valid PE");
+        }
 
         // DOS Header
         if (ReadUInt16() != 0x5a4d) // MZ
+        {
             throw new BadImageFormatException("Invalid DOS header");
+        }
 
         Advance(58);
         var peHeaderOffset = (int)ReadUInt32();
@@ -45,7 +49,9 @@ public sealed class PEReader
 
         // PE Signature
         if (ReadUInt32() != 0x00004550) // PE\0\0
+        {
             throw new BadImageFormatException("Invalid PE signature");
+        }
 
         // COFF Header
         image.Architecture = (TargetArchitecture)ReadUInt16();
