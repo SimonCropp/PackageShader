@@ -2,6 +2,7 @@
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using System.Runtime.Loader;
+using System.Text;
 using CliWrap;
 using CliWrap.Buffered;
 using Alias.Lib.Pdb;
@@ -11,70 +12,8 @@ public class AliasTests
 {
     static string binDirectory = Path.GetDirectoryName(typeof(AliasTests).Assembly.Location)!;
 
-    [Fact]
-    public void DiagnoseRunSample()
-    {
-        var solutionDirectory = ProjectFiles.SolutionDirectory.Path;
-        var targetPath = Path.Combine(solutionDirectory, "SampleApp/bin/Debug/net8.0");
-        var tempPath2 = Path.Combine(targetPath, "temp");
-
-        // Check modified SampleApp.dll
-        var modifiedPath = Path.Combine(tempPath2, "SampleApp.dll");
-        if (File.Exists(modifiedPath))
-        {
-            Console.WriteLine($"Modified SampleApp.dll size: {new FileInfo(modifiedPath).Length}");
-
-            try
-            {
-                using var modStream = File.OpenRead(modifiedPath);
-                using var modPeReader = new PEReader(modStream);
-                var modMetadataReader = modPeReader.GetMetadataReader();
-                Console.WriteLine($"Assembly name: {FormatAssemblyName(modMetadataReader)}");
-                Console.WriteLine($"References: {modMetadataReader.AssemblyReferences.Count}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error reading modified assembly: {ex.GetType().Name}: {ex.Message}");
-            }
-
-            // Compare PE headers
-            var originalPath = Path.Combine(targetPath, "SampleApp.dll");
-            var origBytes = File.ReadAllBytes(originalPath);
-            var modBytes = File.ReadAllBytes(modifiedPath);
-
-            // Check DOS/PE signature
-            Console.WriteLine($"Original PE offset: {BitConverter.ToInt32(origBytes, 60):X}");
-            Console.WriteLine($"Modified PE offset: {BitConverter.ToInt32(modBytes, 60):X}");
-
-            // Check metadata RVA from CLI header
-            using var origStream = File.OpenRead(originalPath);
-            using var origPeReader = new PEReader(origStream);
-            using var modStream2 = File.OpenRead(modifiedPath);
-            using var modPeReader2 = new PEReader(modStream2);
-
-            var origMetadata = origPeReader.PEHeaders.CorHeader!.MetadataDirectory;
-            var modMetadata = modPeReader2.PEHeaders.CorHeader!.MetadataDirectory;
-            Console.WriteLine($"Original metadata RVA: {origMetadata.RelativeVirtualAddress:X}, Size: {origMetadata.Size}");
-            Console.WriteLine($"Modified metadata RVA: {modMetadata.RelativeVirtualAddress:X}, Size: {modMetadata.Size}");
-
-            // Check if sections are correct
-            var origSections = origPeReader.PEHeaders.SectionHeaders;
-            var modSections = modPeReader2.PEHeaders.SectionHeaders;
-            Console.WriteLine($"Original sections: {origSections.Length}");
-            Console.WriteLine($"Modified sections: {modSections.Length}");
-            foreach (var section in modSections)
-            {
-                Console.WriteLine($"  {section.Name}: VA={section.VirtualAddress:X}, Size={section.SizeOfRawData}, RawPtr={section.PointerToRawData:X}");
-            }
-        }
-        else
-        {
-            Console.WriteLine("Modified SampleApp.dll not found");
-        }
-    }
-
-    static List<string> assemblyFiles = new()
-    {
+    static List<string> assemblyFiles =
+    [
         "AssemblyToProcess",
         "AssemblyToInclude",
         "AssemblyWithEmbeddedSymbols",
@@ -84,7 +23,7 @@ public class AliasTests
         "AssemblyWithPdb",
         "AssemblyWithResources",
         "Newtonsoft.Json"
-    };
+    ];
 
     static IEnumerable<AssemblyResult> Run(bool copyPdbs, bool sign, bool internalize, string tempPath)
     {

@@ -142,7 +142,9 @@ public sealed class AssemblyModifier
         // Find or create reference to InternalsVisibleToAttribute
         var constructorRid = FindOrCreateInternalsVisibleToConstructor();
         if (constructorRid == 0)
+        {
             throw new InvalidOperationException("Could not find or create InternalsVisibleTo constructor reference");
+        }
 
         // Build attribute value
         var value = publicKey is {Length: > 0}
@@ -223,7 +225,7 @@ public sealed class AssemblyModifier
         return null;
     }
 
-    private uint CreateConstructorMemberRef(uint typeRefRid)
+    uint CreateConstructorMemberRef(uint typeRefRid)
     {
         // Constructor signature for InternalsVisibleToAttribute(string):
         // HASTHIS (0x20) | ParamCount(1) | ReturnType:VOID(0x01) | Param:STRING(0x0E)
@@ -241,7 +243,7 @@ public sealed class AssemblyModifier
         return _writer.AddMemberRef(memberRefRow);
     }
 
-    private static byte[] CreateCustomAttributeBlob(string value)
+    static byte[] CreateCustomAttributeBlob(string value)
     {
         using var ms = new MemoryStream();
         using var writer = new BinaryWriter(ms);

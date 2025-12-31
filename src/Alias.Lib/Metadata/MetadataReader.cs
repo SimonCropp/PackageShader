@@ -191,39 +191,6 @@ public sealed class MetadataReader
     #region AssemblyRef Table
 
     /// <summary>
-    /// Gets all assembly references with their full names.
-    /// </summary>
-    public IEnumerable<AssemblyRefInfo> GetAssemblyRefs()
-    {
-        var count = TableHeap.GetRowCount(Table.AssemblyRef);
-        for (uint i = 1; i <= count; i++)
-        {
-            var row = ReadAssemblyRefRow(i);
-            var name = StringHeap.Read(row.NameIndex);
-            var culture = StringHeap.Read(row.CultureIndex);
-            var publicKeyOrToken = BlobHeap.Read(row.PublicKeyOrTokenIndex);
-            var fullName = FormatAssemblyName(name, row.MajorVersion, row.MinorVersion,
-                row.BuildNumber, row.RevisionNumber, culture,
-                publicKeyOrToken.Length == 8 ? publicKeyOrToken : ComputePublicKeyToken(publicKeyOrToken));
-            yield return new(i, name, fullName);
-        }
-    }
-
-    /// <summary>
-    /// Gets all assembly references (simple version for internal use).
-    /// </summary>
-    public IEnumerable<(uint rid, string name)> GetAssemblyRefNames()
-    {
-        var count = TableHeap.GetRowCount(Table.AssemblyRef);
-        for (uint i = 1; i <= count; i++)
-        {
-            var row = ReadAssemblyRefRow(i);
-            var name = StringHeap.Read(row.NameIndex);
-            yield return (i, name);
-        }
-    }
-
-    /// <summary>
     /// Reads an assembly reference row.
     /// </summary>
     public AssemblyRefRow ReadAssemblyRefRow(uint rid)
