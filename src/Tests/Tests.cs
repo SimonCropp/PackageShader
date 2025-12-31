@@ -5,8 +5,6 @@ using System.Runtime.Loader;
 using CliWrap;
 using CliWrap.Buffered;
 using Alias.Lib.Pdb;
-using AliasMetadataReader = Alias.Lib.Metadata.MetadataReader;
-using AliasPEReader = Alias.Lib.PE.PEReader;
 
 [Collection("Sequential")]
 public class AliasTests
@@ -28,9 +26,11 @@ public class AliasTests
 
             try
             {
-                var reader = AliasMetadataReader.FromFile(modifiedPath);
-                Console.WriteLine($"Assembly name: {reader.GetAssemblyName()}");
-                Console.WriteLine($"References: {reader.GetAssemblyRefs().Count()}");
+                using var modStream = File.OpenRead(modifiedPath);
+                using var modPeReader = new PEReader(modStream);
+                var modMetadataReader = modPeReader.GetMetadataReader();
+                Console.WriteLine($"Assembly name: {FormatAssemblyName(modMetadataReader)}");
+                Console.WriteLine($"References: {modMetadataReader.AssemblyReferences.Count}");
             }
             catch (Exception ex)
             {
@@ -47,15 +47,22 @@ public class AliasTests
             Console.WriteLine($"Modified PE offset: {BitConverter.ToInt32(modBytes, 60):X}");
 
             // Check metadata RVA from CLI header
-            var origImage = AliasPEReader.Read(originalPath);
-            var modImage = AliasPEReader.Read(modifiedPath);
-            Console.WriteLine($"Original metadata RVA: {origImage.MetadataRva:X}, Size: {origImage.MetadataSize}");
-            Console.WriteLine($"Modified metadata RVA: {modImage.MetadataRva:X}, Size: {modImage.MetadataSize}");
+            using var origStream = File.OpenRead(originalPath);
+            using var origPeReader = new PEReader(origStream);
+            using var modStream2 = File.OpenRead(modifiedPath);
+            using var modPeReader2 = new PEReader(modStream2);
+
+            var origMetadata = origPeReader.PEHeaders.CorHeader!.MetadataDirectory;
+            var modMetadata = modPeReader2.PEHeaders.CorHeader!.MetadataDirectory;
+            Console.WriteLine($"Original metadata RVA: {origMetadata.RelativeVirtualAddress:X}, Size: {origMetadata.Size}");
+            Console.WriteLine($"Modified metadata RVA: {modMetadata.RelativeVirtualAddress:X}, Size: {modMetadata.Size}");
 
             // Check if sections are correct
-            Console.WriteLine($"Original sections: {origImage.Sections.Length}");
-            Console.WriteLine($"Modified sections: {modImage.Sections.Length}");
-            foreach (var section in modImage.Sections)
+            var origSections = origPeReader.PEHeaders.SectionHeaders;
+            var modSections = modPeReader2.PEHeaders.SectionHeaders;
+            Console.WriteLine($"Original sections: {origSections.Length}");
+            Console.WriteLine($"Modified sections: {modSections.Length}");
+            foreach (var section in modSections)
             {
                 Console.WriteLine($"  {section.Name}: VA={section.VirtualAddress:X}, Size={section.SizeOfRawData}, RawPtr={section.PointerToRawData:X}");
             }
@@ -113,22 +120,144 @@ public class AliasTests
     static IEnumerable<AssemblyResult> BuildResults(string tempPath)
     {
         var resultingFiles = Directory.EnumerateFiles(tempPath);
-        foreach (var assembly in resultingFiles.Where(_ => _.EndsWith(".dll")).OrderBy(_ => _))
+        foreach (var assemblyPath in resultingFiles.Where(_ => _.EndsWith(".dll")).OrderBy(_ => _))
         {
-            var reader = AliasMetadataReader.FromFile(assembly);
-            var assemblyName = reader.GetAssemblyName();
-            var hasSymbols = PdbHandler.HasSymbols(assembly);
-            var references = reader.GetAssemblyRefs()
-                .Select(r => r.FullName)
+            using var fileStream = File.OpenRead(assemblyPath);
+            using var peReader = new PEReader(fileStream);
+            var metadataReader = peReader.GetMetadataReader();
+
+            var assemblyName = FormatAssemblyName(metadataReader);
+            var hasSymbols = PdbHandler.HasSymbols(assemblyPath);
+            var references = GetAssemblyReferences(metadataReader)
                 .OrderBy(_ => _)
                 .ToList();
-            var attributes = reader.GetAssemblyCustomAttributes()
-                .Where(a => a.AttributeTypeName.Contains("Internals"))
-                .Select(a => $"{a.AttributeTypeName}({a.ConstructorArgument})")
+            var attributes = GetAssemblyCustomAttributes(metadataReader)
+                .Where(a => a.typeName.Contains("Internals"))
+                .Select(a => $"{a.typeName}({a.argument})")
                 .OrderBy(_ => _)
                 .ToList();
             yield return new(assemblyName, hasSymbols, references, attributes);
         }
+    }
+
+    static string FormatAssemblyName(MetadataReader reader)
+    {
+        var assemblyDef = reader.GetAssemblyDefinition();
+        var name = reader.GetString(assemblyDef.Name);
+        var version = assemblyDef.Version;
+        var culture = reader.GetString(assemblyDef.Culture);
+        var cultureStr = string.IsNullOrEmpty(culture) ? "neutral" : culture;
+        var publicKey = reader.GetBlobBytes(assemblyDef.PublicKey);
+        var tokenStr = FormatPublicKeyToken(publicKey);
+
+        return $"{name}, Version={version}, Culture={cultureStr}, PublicKeyToken={tokenStr}";
+    }
+
+    static string FormatAssemblyRefName(MetadataReader reader, AssemblyReference assemblyRef)
+    {
+        var name = reader.GetString(assemblyRef.Name);
+        var version = assemblyRef.Version;
+        var culture = reader.GetString(assemblyRef.Culture);
+        var cultureStr = string.IsNullOrEmpty(culture) ? "neutral" : culture;
+        var publicKeyOrToken = reader.GetBlobBytes(assemblyRef.PublicKeyOrToken);
+        var tokenStr = publicKeyOrToken.Length == 8
+            ? BitConverter.ToString(publicKeyOrToken).Replace("-", "").ToLowerInvariant()
+            : FormatPublicKeyToken(publicKeyOrToken);
+
+        return $"{name}, Version={version}, Culture={cultureStr}, PublicKeyToken={tokenStr}";
+    }
+
+    static string FormatPublicKeyToken(byte[] publicKey)
+    {
+        if (publicKey.Length == 0)
+            return "null";
+
+        using var sha1 = System.Security.Cryptography.SHA1.Create();
+        var hash = sha1.ComputeHash(publicKey);
+
+        // Token is last 8 bytes reversed
+        var token = new byte[8];
+        for (int i = 0; i < 8; i++)
+            token[i] = hash[hash.Length - 1 - i];
+
+        return BitConverter.ToString(token).Replace("-", "").ToLowerInvariant();
+    }
+
+    static IEnumerable<string> GetAssemblyReferences(MetadataReader reader)
+    {
+        foreach (var refHandle in reader.AssemblyReferences)
+        {
+            var assemblyRef = reader.GetAssemblyReference(refHandle);
+            yield return FormatAssemblyRefName(reader, assemblyRef);
+        }
+    }
+
+    static IEnumerable<(string typeName, string argument)> GetAssemblyCustomAttributes(MetadataReader reader)
+    {
+        var assemblyToken = EntityHandle.AssemblyDefinition;
+        foreach (var attrHandle in reader.GetCustomAttributes(assemblyToken))
+        {
+            var attr = reader.GetCustomAttribute(attrHandle);
+            var typeName = GetAttributeTypeName(reader, attr);
+            var argument = ParseAttributeArgument(reader, attr);
+            yield return (typeName, argument);
+        }
+    }
+
+    static string GetAttributeTypeName(MetadataReader reader, CustomAttribute attr)
+    {
+        if (attr.Constructor.Kind == HandleKind.MemberReference)
+        {
+            var memberRef = reader.GetMemberReference((MemberReferenceHandle)attr.Constructor);
+            if (memberRef.Parent.Kind == HandleKind.TypeReference)
+            {
+                var typeRef = reader.GetTypeReference((TypeReferenceHandle)memberRef.Parent);
+                return reader.GetString(typeRef.Name);
+            }
+        }
+        return string.Empty;
+    }
+
+    static string ParseAttributeArgument(MetadataReader reader, CustomAttribute attr)
+    {
+        var blob = reader.GetBlobBytes(attr.Value);
+        if (blob.Length < 2)
+            return string.Empty;
+
+        // Skip prolog (2 bytes: 0x01 0x00)
+        if (blob[0] != 0x01 || blob[1] != 0x00)
+            return string.Empty;
+
+        // Try to read a string argument
+        var offset = 2;
+        if (offset >= blob.Length)
+            return string.Empty;
+
+        // Read compressed length
+        int length;
+        if ((blob[offset] & 0x80) == 0)
+        {
+            length = blob[offset];
+            offset++;
+        }
+        else if ((blob[offset] & 0xC0) == 0x80)
+        {
+            if (offset + 1 >= blob.Length) return string.Empty;
+            length = ((blob[offset] & 0x3F) << 8) | blob[offset + 1];
+            offset += 2;
+        }
+        else
+        {
+            if (offset + 3 >= blob.Length) return string.Empty;
+            length = ((blob[offset] & 0x1F) << 24) | (blob[offset + 1] << 16) |
+                     (blob[offset + 2] << 8) | blob[offset + 3];
+            offset += 4;
+        }
+
+        if (offset + length > blob.Length)
+            return string.Empty;
+
+        return System.Text.Encoding.UTF8.GetString(blob, offset, length);
     }
 
     [Theory]
