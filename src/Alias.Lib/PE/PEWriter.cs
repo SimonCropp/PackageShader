@@ -16,14 +16,6 @@ public sealed class PEWriter
         _newMetadata = newMetadata;
     }
 
-    /// <summary>
-    /// Writes the modified PE to a file.
-    /// </summary>
-    public void Write(string path)
-    {
-        var data = Build();
-        File.WriteAllBytes(path, data);
-    }
 
     /// <summary>
     /// Builds the modified PE as a byte array.
@@ -543,25 +535,5 @@ public sealed class PEWriter
         data[offset + 1] = (byte)((value >> 8) & 0xFF);
         data[offset + 2] = (byte)((value >> 16) & 0xFF);
         data[offset + 3] = (byte)((value >> 24) & 0xFF);
-    }
-
-    /// <summary>
-    /// Writes a PE file with modified metadata.
-    /// </summary>
-    public static void Write(string path, PEImage image, MetadataWriter metadataWriter)
-    {
-        var newMetadata = metadataWriter.Build();
-        var writer = new PEWriter(image, newMetadata);
-        writer.Write(path);
-    }
-
-    /// <summary>
-    /// Builds a PE file with modified metadata.
-    /// </summary>
-    public static byte[] Build(PEImage image, MetadataWriter metadataWriter)
-    {
-        var newMetadata = metadataWriter.Build();
-        var writer = new PEWriter(image, newMetadata);
-        return writer.Build();
     }
 }

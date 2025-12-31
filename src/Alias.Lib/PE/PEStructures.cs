@@ -158,19 +158,6 @@ public sealed class PEImage
     }
 
     /// <summary>
-    /// Gets a section by name.
-    /// </summary>
-    public Section? GetSection(string name)
-    {
-        foreach (var section in Sections)
-        {
-            if (section.Name == name)
-                return section;
-        }
-        return null;
-    }
-
-    /// <summary>
     /// Gets the stream header by name.
     /// </summary>
     public StreamHeader? GetStreamHeader(string name)

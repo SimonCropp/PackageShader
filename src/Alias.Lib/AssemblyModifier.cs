@@ -39,22 +39,6 @@ public sealed class AssemblyModifier
     }
 
     /// <summary>
-    /// Checks if the file is a managed .NET assembly.
-    /// </summary>
-    public static bool IsManagedAssembly(string path)
-    {
-        try
-        {
-            var image = PEReader.Read(path);
-            return image.IsManagedAssembly;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    /// <summary>
     /// Sets the assembly name.
     /// </summary>
     public void SetAssemblyName(string name)

@@ -6,16 +6,6 @@ namespace Alias.Lib.Signing;
 public static class StrongNameSigner
 {
     /// <summary>
-    /// Signs a PE file in place.
-    /// </summary>
-    public static void Sign(string path, StrongNameKey key)
-    {
-        var data = File.ReadAllBytes(path);
-        Sign(data, key);
-        File.WriteAllBytes(path, data);
-    }
-
-    /// <summary>
     /// Signs PE data in place.
     /// </summary>
     /// <returns>True if signing was successful, false if assembly has no signature placeholder.</returns>

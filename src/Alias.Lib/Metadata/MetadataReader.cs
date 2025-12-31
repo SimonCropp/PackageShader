@@ -38,15 +38,6 @@ public sealed class MetadataReader
     }
 
     /// <summary>
-    /// Creates a metadata reader from a file path.
-    /// </summary>
-    public static MetadataReader FromFile(string path)
-    {
-        var image = PEReader.Read(path);
-        return Read(image);
-    }
-
-    /// <summary>
     /// Reads metadata from a PE image.
     /// </summary>
     public static MetadataReader Read(PEImage image)

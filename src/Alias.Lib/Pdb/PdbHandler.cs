@@ -58,65 +58,6 @@ public static class PdbHandler
         return false;
     }
 
-    /// <summary>
-    /// Extracts embedded PDB data from a PE file.
-    /// </summary>
-    public static byte[]? ExtractEmbeddedPdb(byte[] data)
-    {
-        var debugEntries = FindDebugDirectoryEntries(data);
-
-        foreach (var (type, offset, size) in debugEntries)
-        {
-            if (type == 17 && size > 8) // EmbeddedPortablePdb
-            {
-                // Format: [MPDB signature (4)] [uncompressed size (4)] [compressed data]
-                var signature = BitConverter.ToUInt32(data, offset);
-                if (signature != 0x4244504D) // "MPDB"
-                    continue;
-
-                var uncompressedSize = BitConverter.ToInt32(data, offset + 4);
-                var compressedData = new byte[size - 8];
-                Array.Copy(data, offset + 8, compressedData, 0, size - 8);
-
-                // Decompress
-                using var compressed = new MemoryStream(compressedData);
-                using var decompressed = new MemoryStream();
-                using var deflate = new DeflateStream(compressed, CompressionMode.Decompress);
-                deflate.CopyTo(decompressed);
-
-                return decompressed.ToArray();
-            }
-        }
-
-        return null;
-    }
-
-    /// <summary>
-    /// Creates embedded PDB data for inclusion in debug directory.
-    /// </summary>
-    public static byte[] CreateEmbeddedPdbEntry(byte[] pdbData)
-    {
-        using var result = new MemoryStream();
-        using var writer = new BinaryWriter(result);
-
-        // MPDB signature
-        writer.Write(0x4244504D); // "MPDB"
-
-        // Uncompressed size
-        writer.Write(pdbData.Length);
-
-        // Compress the PDB data
-        using var compressedStream = new MemoryStream();
-        using (var deflate = new DeflateStream(compressedStream, CompressionLevel.Optimal, leaveOpen: true))
-        {
-            deflate.Write(pdbData, 0, pdbData.Length);
-        }
-
-        writer.Write(compressedStream.ToArray());
-
-        return result.ToArray();
-    }
-
     private static List<(int type, int offset, int size)> FindDebugDirectoryEntries(byte[] data)
     {
         var entries = new List<(int type, int offset, int size)>();
