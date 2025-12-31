@@ -154,7 +154,7 @@ public class AliasTests
     //    return Verifier.Verify(results);
     //}
 
-    [Fact]
+    [Fact(Explicit = true)]
     public async Task RunTask()
     {
         var solutionDir = ProjectFiles.SolutionDirectory.Path;

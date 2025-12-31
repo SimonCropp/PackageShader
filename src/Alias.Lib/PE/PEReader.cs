@@ -22,14 +22,6 @@ public sealed class PEReader
     public static PEImage Read(string path)
     {
         var data = File.ReadAllBytes(path);
-        return Read(data);
-    }
-
-    /// <summary>
-    /// Reads a PE file from the given byte array.
-    /// </summary>
-    public static PEImage Read(byte[] data)
-    {
         var reader = new PEReader(data);
         return reader.ReadImage();
     }
@@ -91,7 +83,9 @@ public sealed class PEReader
 
         // Read Debug Directory
         if (!image.DebugDirectory.IsZero)
+        {
             ReadDebugDirectory(image);
+        }
 
         return image;
     }

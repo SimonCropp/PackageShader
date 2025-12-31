@@ -16,11 +16,6 @@ public sealed class AssemblyModifier
     private readonly MetadataReader _reader;
     private readonly MetadataWriter _writer;
 
-    /// <summary>
-    /// Gets the assembly name.
-    /// </summary>
-    public string? AssemblyName => _reader.GetAssemblyName();
-
     private AssemblyModifier(PEImage image, MetadataReader reader, MetadataWriter writer)
     {
         _image = image;
@@ -35,7 +30,9 @@ public sealed class AssemblyModifier
     {
         var image = PEReader.Read(path);
         if (!image.IsManagedAssembly)
+        {
             throw new BadImageFormatException($"'{path}' is not a managed .NET assembly");
+        }
         var reader = MetadataReader.Read(image);
         var writer = new MetadataWriter(reader);
         return new(image, reader, writer);
