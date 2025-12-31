@@ -16,6 +16,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Alias.Lib\Alias.Lib.csproj" />
     <ProjectReference Include="..\Alias\Alias.csproj" />
+    <ProjectReference Include="..\Alias.MsBuild\Alias.MsBuild.csproj" />
     <ProjectReference Include="..\AssemblyToProcess\AssemblyToProcess.csproj" />
     <ProjectReference Include="..\AssemblyWithEmbeddedSymbols\AssemblyWithEmbeddedSymbols.csproj" />
     <ProjectReference Include="..\AssemblyWithNoStrongName\AssemblyWithNoStrongName.csproj" />
@@ -32,6 +33,8 @@
     <PackageReference Include="CliWrap" Version="3.10.0" />
     <PackageReference Include="xunit.v3" Version="3.2.1" />
     <PackageReference Include="Argon" Version="0.33.0" />
+    <PackageReference Include="Microsoft.Build.Framework" Version="18.0.2" />
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="18.0.2" />
     <None Update="test.snk">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

@@ -10,6 +10,8 @@
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
+    <SignAssembly>True</SignAssembly>
+    <AssemblyOriginatorKeyFile>$(SolutionDir)key.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
   <ItemGroup>
     <Content Include=".\bin\$(Configuration)\Alias.MsBuild.dll">
