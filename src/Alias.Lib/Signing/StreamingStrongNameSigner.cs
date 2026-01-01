@@ -1,6 +1,3 @@
-using System.Reflection.PortableExecutable;
-using System.Security.Cryptography;
-
 namespace Alias.Lib.Signing;
 
 /// <summary>
@@ -97,7 +94,7 @@ public static class StreamingStrongNameSigner
         // Define regions to skip (checksum and signature)
         var skipRegions = new[]
         {
-            (start: (long)checksumOffset, end: (long)(checksumOffset + 4)),
+            (start: checksumOffset, end: checksumOffset + 4),
             (start: signatureOffset, end: signatureOffset + signatureSize)
         };
 

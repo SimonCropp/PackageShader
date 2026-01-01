@@ -257,6 +257,7 @@ public sealed class StreamingAssemblyModifier : IDisposable
             // Need to rebuild metadata section
             SaveWithMetadataRebuild(path, key, isSameFile);
         }
+        PdbHandler.CopyExternalPdb(_peFile.FilePath, path);
     }
 
     private void SaveWithInPlacePatching(string path, StrongNameKey? key, bool isSameFile)
@@ -371,14 +372,6 @@ public sealed class StreamingAssemblyModifier : IDisposable
         }
     }
 
-    /// <summary>
-    /// Saves the modified assembly and copies PDB if present.
-    /// </summary>
-    public void SaveWithSymbols(string targetPath, StrongNameKey? key = null)
-    {
-        Save(targetPath, key);
-        PdbHandler.CopyExternalPdb(_peFile.FilePath, targetPath);
-    }
 
     public void Dispose()
     {

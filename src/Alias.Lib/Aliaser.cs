@@ -1,5 +1,4 @@
 using Alias.Lib;
-using Alias.Lib.Pdb;
 using Alias.Lib.Signing;
 
 namespace Alias;
@@ -17,8 +16,6 @@ public static class Aliaser
         // Process each assembly using streaming modifier (memory efficient)
         foreach (var info in infoList)
         {
-            var hasSymbols = PdbHandler.HasSymbols(info.SourcePath);
-
             using var modifier = StreamingAssemblyModifier.Open(info.SourcePath);
 
             // Rename assembly
@@ -56,15 +53,7 @@ public static class Aliaser
                 modifier.RedirectAssemblyRef(refInfo.SourceName, refInfo.TargetName, key?.PublicKeyToken);
             }
 
-            // Save the modified assembly
-            if (hasSymbols)
-            {
-                modifier.SaveWithSymbols(info.TargetPath, key);
-            }
-            else
-            {
-                modifier.Save(info.TargetPath, key);
-            }
+            modifier.Save(info.TargetPath, key);
         }
     }
 

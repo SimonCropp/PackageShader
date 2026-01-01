@@ -1,6 +1,5 @@
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
-using System.Reflection.PortableExecutable;
 using Alias.Lib.Metadata.Tables;
 using Alias.Lib.PE;
 using SrmMetadataReader = System.Reflection.Metadata.MetadataReader;

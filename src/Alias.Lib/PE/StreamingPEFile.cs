@@ -1,4 +1,3 @@
-using System.Reflection.PortableExecutable;
 using System.Text;
 
 namespace Alias.Lib.PE;
