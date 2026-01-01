@@ -142,7 +142,7 @@ public class TaskTests
 
         task.Execute();
 
-        Assert.Contains(buildEngine.Messages, m => m.Contains("Finished AssemblyAlias") && m.Contains("ms"));
+        Assert.Contains(buildEngine.Messages, m => m.Contains("Finished PackageShader") && m.Contains("ms"));
     }
 
     [Fact]

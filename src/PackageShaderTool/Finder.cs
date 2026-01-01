@@ -1,4 +1,4 @@
-﻿namespace Alias;
+﻿namespace PackageShader;
 
 public static class Finder
 {

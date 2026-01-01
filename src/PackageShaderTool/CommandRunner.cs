@@ -1,6 +1,4 @@
-﻿using CommandLine;
-
-public static class CommandRunner
+﻿public static class CommandRunner
 {
     public static IEnumerable<Error> RunCommand(Invoke invoke, Action<string> log, params string[] args)
     {
