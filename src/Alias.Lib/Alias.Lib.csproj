@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <PackageReference Include="Polyfill" Version="9.5.0" PrivateAssets="all" />
+    <PackageReference Include="System.Reflection.Metadata" Version="9.0.0" />
     <None Include="$(SolutionDir)icon.png" Pack="true" PackagePath="\" />
     <Using Remove="System.Net.Http" />
   </ItemGroup>

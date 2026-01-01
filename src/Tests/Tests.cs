@@ -1,73 +1,13 @@
-﻿using System.Reflection;
-using System.Reflection.Metadata;
-using System.Reflection.PortableExecutable;
-using System.Runtime.Loader;
-using CliWrap;
+﻿using CliWrap;
 using CliWrap.Buffered;
-using Alias.Lib.Pdb;
-using AliasMetadataReader = Alias.Lib.Metadata.MetadataReader;
-using AliasPEReader = Alias.Lib.PE.PEReader;
 
 [Collection("Sequential")]
 public class AliasTests
 {
     static string binDirectory = Path.GetDirectoryName(typeof(AliasTests).Assembly.Location)!;
 
-    [Fact]
-    public void DiagnoseRunSample()
-    {
-        var solutionDirectory = ProjectFiles.SolutionDirectory.Path;
-        var targetPath = Path.Combine(solutionDirectory, "SampleApp/bin/Debug/net8.0");
-        var tempPath2 = Path.Combine(targetPath, "temp");
-
-        // Check modified SampleApp.dll
-        var modifiedPath = Path.Combine(tempPath2, "SampleApp.dll");
-        if (File.Exists(modifiedPath))
-        {
-            Console.WriteLine($"Modified SampleApp.dll size: {new FileInfo(modifiedPath).Length}");
-
-            try
-            {
-                var reader = AliasMetadataReader.FromFile(modifiedPath);
-                Console.WriteLine($"Assembly name: {reader.GetAssemblyName()}");
-                Console.WriteLine($"References: {reader.GetAssemblyRefs().Count()}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error reading modified assembly: {ex.GetType().Name}: {ex.Message}");
-            }
-
-            // Compare PE headers
-            var originalPath = Path.Combine(targetPath, "SampleApp.dll");
-            var origBytes = File.ReadAllBytes(originalPath);
-            var modBytes = File.ReadAllBytes(modifiedPath);
-
-            // Check DOS/PE signature
-            Console.WriteLine($"Original PE offset: {BitConverter.ToInt32(origBytes, 60):X}");
-            Console.WriteLine($"Modified PE offset: {BitConverter.ToInt32(modBytes, 60):X}");
-
-            // Check metadata RVA from CLI header
-            var origImage = AliasPEReader.Read(originalPath);
-            var modImage = AliasPEReader.Read(modifiedPath);
-            Console.WriteLine($"Original metadata RVA: {origImage.MetadataRva:X}, Size: {origImage.MetadataSize}");
-            Console.WriteLine($"Modified metadata RVA: {modImage.MetadataRva:X}, Size: {modImage.MetadataSize}");
-
-            // Check if sections are correct
-            Console.WriteLine($"Original sections: {origImage.Sections.Length}");
-            Console.WriteLine($"Modified sections: {modImage.Sections.Length}");
-            foreach (var section in modImage.Sections)
-            {
-                Console.WriteLine($"  {section.Name}: VA={section.VirtualAddress:X}, Size={section.SizeOfRawData}, RawPtr={section.PointerToRawData:X}");
-            }
-        }
-        else
-        {
-            Console.WriteLine("Modified SampleApp.dll not found");
-        }
-    }
-
-    static List<string> assemblyFiles = new()
-    {
+    static List<string> assemblyFiles =
+    [
         "AssemblyToProcess",
         "AssemblyToInclude",
         "AssemblyWithEmbeddedSymbols",
@@ -77,7 +17,7 @@ public class AliasTests
         "AssemblyWithPdb",
         "AssemblyWithResources",
         "Newtonsoft.Json"
-    };
+    ];
 
     static IEnumerable<AssemblyResult> Run(bool copyPdbs, bool sign, bool internalize, string tempPath)
     {
@@ -113,22 +53,144 @@ public class AliasTests
     static IEnumerable<AssemblyResult> BuildResults(string tempPath)
     {
         var resultingFiles = Directory.EnumerateFiles(tempPath);
-        foreach (var assembly in resultingFiles.Where(_ => _.EndsWith(".dll")).OrderBy(_ => _))
+        foreach (var assemblyPath in resultingFiles.Where(_ => _.EndsWith(".dll")).OrderBy(_ => _))
         {
-            var reader = AliasMetadataReader.FromFile(assembly);
-            var assemblyName = reader.GetAssemblyName();
-            var hasSymbols = PdbHandler.HasSymbols(assembly);
-            var references = reader.GetAssemblyRefs()
-                .Select(r => r.FullName)
+            using var fileStream = File.OpenRead(assemblyPath);
+            using var peReader = new PEReader(fileStream);
+            var metadataReader = peReader.GetMetadataReader();
+
+            var assemblyName = FormatAssemblyName(metadataReader);
+            var hasSymbols = HasSymbols(assemblyPath);
+            var references = GetAssemblyReferences(metadataReader)
                 .OrderBy(_ => _)
                 .ToList();
-            var attributes = reader.GetAssemblyCustomAttributes()
-                .Where(a => a.AttributeTypeName.Contains("Internals"))
-                .Select(a => $"{a.AttributeTypeName}({a.ConstructorArgument})")
+            var attributes = GetAssemblyCustomAttributes(metadataReader)
+                .Where(_ => _.typeName.Contains("Internals"))
+                .Select(_ => $"{_.typeName}({_.argument})")
                 .OrderBy(_ => _)
                 .ToList();
             yield return new(assemblyName, hasSymbols, references, attributes);
         }
+    }
+
+    static string FormatAssemblyName(MetadataReader reader)
+    {
+        var assemblyDef = reader.GetAssemblyDefinition();
+        var name = reader.GetString(assemblyDef.Name);
+        var version = assemblyDef.Version;
+        var culture = reader.GetString(assemblyDef.Culture);
+        var cultureStr = string.IsNullOrEmpty(culture) ? "neutral" : culture;
+        var publicKey = reader.GetBlobBytes(assemblyDef.PublicKey);
+        var tokenStr = FormatPublicKeyToken(publicKey);
+
+        return $"{name}, Version={version}, Culture={cultureStr}, PublicKeyToken={tokenStr}";
+    }
+
+    static string FormatAssemblyRefName(MetadataReader reader, AssemblyReference assemblyRef)
+    {
+        var name = reader.GetString(assemblyRef.Name);
+        var version = assemblyRef.Version;
+        var culture = reader.GetString(assemblyRef.Culture);
+        var cultureStr = string.IsNullOrEmpty(culture) ? "neutral" : culture;
+        var publicKeyOrToken = reader.GetBlobBytes(assemblyRef.PublicKeyOrToken);
+        var tokenStr = publicKeyOrToken.Length == 8
+            ? BitConverter.ToString(publicKeyOrToken).Replace("-", "").ToLowerInvariant()
+            : FormatPublicKeyToken(publicKeyOrToken);
+
+        return $"{name}, Version={version}, Culture={cultureStr}, PublicKeyToken={tokenStr}";
+    }
+
+    static string FormatPublicKeyToken(byte[] publicKey)
+    {
+        if (publicKey.Length == 0)
+            return "null";
+
+        using var sha1 = System.Security.Cryptography.SHA1.Create();
+        var hash = sha1.ComputeHash(publicKey);
+
+        // Token is last 8 bytes reversed
+        var token = new byte[8];
+        for (int i = 0; i < 8; i++)
+            token[i] = hash[hash.Length - 1 - i];
+
+        return BitConverter.ToString(token).Replace("-", "").ToLowerInvariant();
+    }
+
+    static IEnumerable<string> GetAssemblyReferences(MetadataReader reader)
+    {
+        foreach (var refHandle in reader.AssemblyReferences)
+        {
+            var assemblyRef = reader.GetAssemblyReference(refHandle);
+            yield return FormatAssemblyRefName(reader, assemblyRef);
+        }
+    }
+
+    static IEnumerable<(string typeName, string argument)> GetAssemblyCustomAttributes(MetadataReader reader)
+    {
+        var assemblyToken = EntityHandle.AssemblyDefinition;
+        foreach (var attrHandle in reader.GetCustomAttributes(assemblyToken))
+        {
+            var attr = reader.GetCustomAttribute(attrHandle);
+            var typeName = GetAttributeTypeName(reader, attr);
+            var argument = ParseAttributeArgument(reader, attr);
+            yield return (typeName, argument);
+        }
+    }
+
+    static string GetAttributeTypeName(MetadataReader reader, CustomAttribute attr)
+    {
+        if (attr.Constructor.Kind == HandleKind.MemberReference)
+        {
+            var memberRef = reader.GetMemberReference((MemberReferenceHandle)attr.Constructor);
+            if (memberRef.Parent.Kind == HandleKind.TypeReference)
+            {
+                var typeRef = reader.GetTypeReference((TypeReferenceHandle)memberRef.Parent);
+                return reader.GetString(typeRef.Name);
+            }
+        }
+        return string.Empty;
+    }
+
+    static string ParseAttributeArgument(MetadataReader reader, CustomAttribute attr)
+    {
+        var blob = reader.GetBlobBytes(attr.Value);
+        if (blob.Length < 2)
+            return string.Empty;
+
+        // Skip prolog (2 bytes: 0x01 0x00)
+        if (blob[0] != 0x01 || blob[1] != 0x00)
+            return string.Empty;
+
+        // Try to read a string argument
+        var offset = 2;
+        if (offset >= blob.Length)
+            return string.Empty;
+
+        // Read compressed length
+        int length;
+        if ((blob[offset] & 0x80) == 0)
+        {
+            length = blob[offset];
+            offset++;
+        }
+        else if ((blob[offset] & 0xC0) == 0x80)
+        {
+            if (offset + 1 >= blob.Length) return string.Empty;
+            length = ((blob[offset] & 0x3F) << 8) | blob[offset + 1];
+            offset += 2;
+        }
+        else
+        {
+            if (offset + 3 >= blob.Length) return string.Empty;
+            length = ((blob[offset] & 0x1F) << 24) | (blob[offset + 1] << 16) |
+                     (blob[offset + 2] << 8) | blob[offset + 3];
+            offset += 4;
+        }
+
+        if (offset + length > blob.Length)
+            return string.Empty;
+
+        return System.Text.Encoding.UTF8.GetString(blob, offset, length);
     }
 
     [Theory]
@@ -186,7 +248,7 @@ public class AliasTests
         foreach (var dllPath in Directory.GetFiles(directory, "*.dll"))
         {
             using var fileStream = File.OpenRead(dllPath);
-            using var peReader = new System.Reflection.PortableExecutable.PEReader(fileStream);
+            using var peReader = new PEReader(fileStream);
 
             Assert.True(peReader.HasMetadata, $"{Path.GetFileName(dllPath)} should have metadata");
 
@@ -232,6 +294,27 @@ public class AliasTests
         }
     }
 
+
+    public static bool HasSymbols(string path)
+    {
+        var pdbPath = Path.ChangeExtension(path, ".pdb");
+        if (File.Exists(pdbPath))
+        {
+            return true;
+        }
+
+        return HasEmbeddedPdb(path);
+    }
+
+    public static bool HasEmbeddedPdb(string path)
+    {
+        using var stream = File.OpenRead(path);
+        using var peReader = new PEReader(stream, PEStreamOptions.LeaveOpen);
+        var debug = peReader.ReadDebugDirectory();
+
+        return Enumerable.Any(debug, _ => _.Type == DebugDirectoryEntryType.EmbeddedPortablePdb);
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -247,7 +330,7 @@ public class AliasTests
         {
             var pdbPath = Path.ChangeExtension(dllPath, ".pdb");
             var hasExternalPdb = File.Exists(pdbPath);
-            var hasEmbeddedPdb = PdbHandler.HasEmbeddedPdb(File.ReadAllBytes(dllPath));
+            var hasEmbeddedPdb = HasEmbeddedPdb(dllPath);
 
             if (!hasExternalPdb && !hasEmbeddedPdb)
             {
@@ -257,9 +340,9 @@ public class AliasTests
             assembliesWithSymbolsChecked++;
 
             using var dllStream = File.OpenRead(dllPath);
-            using var peReader = new System.Reflection.PortableExecutable.PEReader(dllStream);
+            using var peReader = new PEReader(dllStream);
 
-            System.Reflection.Metadata.MetadataReaderProvider? pdbReaderProvider = null;
+            MetadataReaderProvider? pdbReaderProvider = null;
 
             try
             {
@@ -281,7 +364,7 @@ public class AliasTests
                     // Read external PDB - load into memory to avoid stream disposal issues
                     var pdbBytes = File.ReadAllBytes(pdbPath);
                     using var pdbStream = new MemoryStream(pdbBytes);
-                    pdbReaderProvider = System.Reflection.Metadata.MetadataReaderProvider.FromPortablePdbStream(pdbStream);
+                    pdbReaderProvider = MetadataReaderProvider.FromPortablePdbStream(pdbStream);
                     ValidatePdbReader(pdbReaderProvider);
                 }
             }
@@ -303,10 +386,10 @@ public class AliasTests
 
         var embeddedSymbolsPath = Path.Combine(directory, "AssemblyWithEmbeddedSymbols_Alias.dll");
         Assert.True(File.Exists(embeddedSymbolsPath), "AssemblyWithEmbeddedSymbols_Alias.dll should exist");
-        Assert.True(PdbHandler.HasEmbeddedPdb(File.ReadAllBytes(embeddedSymbolsPath)), "Should have embedded PDB");
+        Assert.True(HasEmbeddedPdb(embeddedSymbolsPath), "Should have embedded PDB");
 
         using var dllStream = File.OpenRead(embeddedSymbolsPath);
-        using var peReader = new System.Reflection.PortableExecutable.PEReader(dllStream);
+        using var peReader = new PEReader(dllStream);
 
         var embeddedEntry = peReader.ReadDebugDirectory()
             .First(e => e.Type == DebugDirectoryEntryType.EmbeddedPortablePdb);
@@ -473,7 +556,7 @@ public class AliasTests
         }
     }
 
-    static void ValidatePdbReader(System.Reflection.Metadata.MetadataReaderProvider pdbReaderProvider)
+    static void ValidatePdbReader(MetadataReaderProvider pdbReaderProvider)
     {
         var pdbReader = pdbReaderProvider.GetMetadataReader();
 

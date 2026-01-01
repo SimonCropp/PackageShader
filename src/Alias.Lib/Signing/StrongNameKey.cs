@@ -20,11 +20,17 @@ public sealed class StrongNameKey
     /// </summary>
     public byte[] PublicKeyToken { get; }
 
-    private StrongNameKey(RSA rsa, byte[] publicKey, byte[] publicKeyToken)
+    /// <summary>
+    /// The raw key pair blob (for Cecil strong naming).
+    /// </summary>
+    public byte[] KeyPair { get; }
+
+    StrongNameKey(RSA rsa, byte[] publicKey, byte[] publicKeyToken, byte[] keyPair)
     {
         Rsa = rsa;
         PublicKey = publicKey;
         PublicKeyToken = publicKeyToken;
+        KeyPair = keyPair;
     }
 
     /// <summary>
@@ -44,18 +50,15 @@ public sealed class StrongNameKey
         var rsa = FromCapiKeyBlob(blob);
         var publicKey = BuildPublicKeyBlob(rsa);
         var publicKeyToken = ComputePublicKeyToken(publicKey);
-        return new(rsa, publicKey, publicKeyToken);
+        return new(rsa, publicKey, publicKeyToken, blob);
     }
 
-    /// <summary>
-    /// Gets the public key as a hex string for InternalsVisibleTo attributes.
-    /// </summary>
-    public string PublicKeyString => Convert.ToHexString(PublicKey);
-
-    private static RSA FromCapiKeyBlob(byte[] blob)
+    static RSA FromCapiKeyBlob(byte[] blob)
     {
         if (blob == null || blob.Length < 12)
+        {
             throw new CryptographicException("Invalid key blob");
+        }
 
         // Check blob type
         return blob[0] switch
@@ -67,7 +70,7 @@ public sealed class StrongNameKey
         };
     }
 
-    private static RSA FromCapiPrivateKeyBlob(byte[] blob, int offset)
+    static RSA FromCapiPrivateKeyBlob(byte[] blob, int offset)
     {
         // Validate header: PRIVATEKEYBLOB (0x07), Version (0x02), Reserved (0x0000)
         if (blob[offset] != 0x07 || blob[offset + 1] != 0x02)
@@ -122,7 +125,7 @@ public sealed class StrongNameKey
         return rsa;
     }
 
-    private static RSA FromCapiPublicKeyBlob(byte[] blob, int offset)
+    static RSA FromCapiPublicKeyBlob(byte[] blob, int offset)
     {
         // Validate header: PUBLICKEYBLOB (0x06), Version (0x02)
         if (blob[offset] != 0x06 || blob[offset + 1] != 0x02)
@@ -156,7 +159,7 @@ public sealed class StrongNameKey
         return rsa;
     }
 
-    private static byte[] ReadReversed(byte[] data, ref int pos, int length)
+    static byte[] ReadReversed(byte[] data, ref int pos, int length)
     {
         var result = new byte[length];
         Array.Copy(data, pos, result, 0, length);
@@ -165,7 +168,7 @@ public sealed class StrongNameKey
         return result;
     }
 
-    private static byte[] TrimLeadingZeros(byte[] data)
+    static byte[] TrimLeadingZeros(byte[] data)
     {
         int start = 0;
         while (start < data.Length - 1 && data[start] == 0)
@@ -179,7 +182,7 @@ public sealed class StrongNameKey
         return result;
     }
 
-    private static byte[] BuildPublicKeyBlob(RSA rsa)
+    static byte[] BuildPublicKeyBlob(RSA rsa)
     {
         var parameters = rsa.ExportParameters(false);
         var keyLength = parameters.Modulus!.Length;
@@ -209,7 +212,9 @@ public sealed class StrongNameKey
         // Public exponent (little-endian)
         var exp = parameters.Exponent!;
         for (int i = 0; i < exp.Length && i < 4; i++)
+        {
             capiBlob[16 + i] = exp[exp.Length - 1 - i];
+        }
 
         // Modulus (little-endian)
         var modulus = (byte[])parameters.Modulus.Clone();
@@ -244,7 +249,7 @@ public sealed class StrongNameKey
         return publicKey;
     }
 
-    private static byte[] ComputePublicKeyToken(byte[] publicKey)
+    static byte[] ComputePublicKeyToken(byte[] publicKey)
     {
         using var sha1 = SHA1.Create();
         var hash = sha1.ComputeHash(publicKey);
@@ -252,7 +257,9 @@ public sealed class StrongNameKey
         // Take last 8 bytes, reversed
         var token = new byte[8];
         for (int i = 0; i < 8; i++)
+        {
             token[i] = hash[hash.Length - 1 - i];
+        }
 
         return token;
     }

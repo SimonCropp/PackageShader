@@ -229,10 +229,8 @@ public class TaskTests
         File.Copy(sourceAssembly, Path.Combine(tempDir, "Target.dll"), overwrite: true);
     }
 
-    static List<string> GetTestAssemblyPaths(string tempDir)
-    {
-        return Directory.GetFiles(tempDir, "*.dll").ToList();
-    }
+    static List<string> GetTestAssemblyPaths(string tempDir) =>
+        Directory.GetFiles(tempDir, "*.dll").ToList();
 
     class MockBuildEngine : IBuildEngine
     {
@@ -245,38 +243,30 @@ public class TaskTests
         public int ColumnNumberOfTaskNode => 0;
         public string ProjectFileOfTaskNode => "";
 
-        public bool BuildProjectFile(string projectFileName, string[] targetNames, System.Collections.IDictionary globalProperties, System.Collections.IDictionary targetOutputs) => true;
+        public bool BuildProjectFile(string projectFileName, string[] targetNames, IDictionary globalProperties, IDictionary targetOutputs) => true;
 
         public void LogCustomEvent(CustomBuildEventArgs e) { }
 
-        public void LogErrorEvent(BuildErrorEventArgs e)
-        {
+        public void LogErrorEvent(BuildErrorEventArgs e) =>
             Errors.Add(e.Message ?? "");
-        }
 
-        public void LogMessageEvent(BuildMessageEventArgs e)
-        {
+        public void LogMessageEvent(BuildMessageEventArgs e) =>
             Messages.Add(e.Message ?? "");
-        }
 
-        public void LogWarningEvent(BuildWarningEventArgs e)
-        {
+        public void LogWarningEvent(BuildWarningEventArgs e) =>
             Warnings.Add(e.Message ?? "");
-        }
     }
 
     class MockTaskItem : ITaskItem
     {
-        public MockTaskItem(string itemSpec)
-        {
+        public MockTaskItem(string itemSpec) =>
             ItemSpec = itemSpec;
-        }
 
         public string ItemSpec { get; set; }
         public int MetadataCount => 0;
         public ICollection MetadataNames => Array.Empty<string>();
 
-        public System.Collections.IDictionary CloneCustomMetadata() => new Dictionary<string, string>();
+        public IDictionary CloneCustomMetadata() => new Dictionary<string, string>();
         public void CopyMetadataTo(ITaskItem destinationItem) { }
         public string GetMetadata(string metadataName) => "";
         public void RemoveMetadata(string metadataName) { }
