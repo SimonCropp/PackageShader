@@ -60,7 +60,7 @@ Optional. If no directory is passed the current directory will be used.
 
 `-i` or `--internalize`
 
-Optional. To internalize all types in the aliased assemblies. Defaults to false.
+Optional. To internalize all types in the shaded assemblies. Defaults to false.
 
 
 #### Prefix/Suffix
@@ -86,7 +86,7 @@ The suffix to use when renaming assemblies.
 
 `-a` or `--assemblies-to-shade`
 
-Required. A semi-colon separated list of assembly names to alias. Names ending in `*` are treated as wildcards.
+Required. A semi-colon separated list of assembly names to shade. Names ending in `*` are treated as wildcards.
 
 
 #### Assemblies to exclude
