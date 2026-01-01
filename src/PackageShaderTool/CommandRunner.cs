@@ -51,9 +51,9 @@
             }
         }
 
-        log("AssembliesToAlias:");
-        var assemblyToAliases = options.AssembliesToAlias.ToList();
-        foreach (var assembly in assemblyToAliases)
+        log("AssembliesToShade:");
+        var assemblyToShade = options.AssembliesToShade.ToList();
+        foreach (var assembly in assemblyToShade)
         {
             log($" * {assembly}");
         }
@@ -92,7 +92,7 @@
 
         invoke(
             targetDirectory,
-            assemblyToAliases,
+            assemblyToShade,
             references,
             keyFile,
             assembliesToExclude,

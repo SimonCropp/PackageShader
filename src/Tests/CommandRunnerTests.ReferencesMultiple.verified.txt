@@ -1,7 +1,7 @@
 ﻿{
   directory: {CurrentDirectory},
   suffix: _Shaded,
-  assembliesToAlias: [
+  assembliesToShade: [
     assembly
   ],
   references: [
@@ -12,7 +12,7 @@
 TargetDirectory: {CurrentDirectory}
 Internalize: False
 Suffix: _Shaded
-AssembliesToAlias:
+AssembliesToShade:
  * assembly
 References:
  * reference1

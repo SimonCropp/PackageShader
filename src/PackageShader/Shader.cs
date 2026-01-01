@@ -1,6 +1,6 @@
 namespace PackageShader;
 
-public static class Aliaser
+public static class Shader
 {
     public static void Run(
         IEnumerable<string> references,

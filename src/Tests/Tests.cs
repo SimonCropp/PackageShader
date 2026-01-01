@@ -2,9 +2,9 @@
 using CliWrap.Buffered;
 
 [Collection("Sequential")]
-public class AliasTests
+public class ShaderTests
 {
-    static string binDirectory = Path.GetDirectoryName(typeof(AliasTests).Assembly.Location)!;
+    static string binDirectory = Path.GetDirectoryName(typeof(ShaderTests).Assembly.Location)!;
 
     static List<string> assemblyFiles =
     [
@@ -42,8 +42,8 @@ public class AliasTests
             keyFile = Path.Combine(ProjectFiles.ProjectDirectory.Path, "test.snk");
         }
 
-        var namesToAliases = assemblyFiles.Where(_ => _.StartsWith("AssemblyWith") || _ == "Newtonsoft.Json").ToList();
-        Program.Inner(tempPath, namesToAliases, new(), keyFile, new(), null, "_Shaded", internalize, _ =>
+        var namesToShade = assemblyFiles.Where(_ => _.StartsWith("AssemblyWith") || _ == "Newtonsoft.Json").ToList();
+        Program.Inner(tempPath, namesToShade, new(), keyFile, new(), null, "_Shaded", internalize, _ =>
         {
         });
 
@@ -418,8 +418,8 @@ public class AliasTests
     //        File.Copy(Path.Combine(binDirectory, assemblyFile), Path.Combine(tempPath, assemblyFile));
     //    }
 
-    //    var namesToAliases = assemblyFiles.Where(_ => _.StartsWith("AssemblyWith")).ToList();
-    //    Program.Inner(tempPath, namesToAliases, new(), null, new(), null, "_Shaded", false);
+    //    var namesToShade = assemblyFiles.Where(_ => _.StartsWith("AssemblyWith")).ToList();
+    //    Program.Inner(tempPath, namesToShade, new(), null, new(), null, "_Shaded", false);
     //    var results = BuildResults();
 
     //    return Verifier.Verify(results);
@@ -495,7 +495,7 @@ public class AliasTests
 
         Program.Inner(
             tempPath,
-            assemblyNamesToAlias: ["Assembly*"],
+            assemblyNamesToShade: ["Assembly*"],
             references: [],
             keyFile: null,
             assembliesToExclude:

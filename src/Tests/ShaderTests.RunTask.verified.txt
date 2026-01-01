@@ -5,7 +5,7 @@
   Suffix: _Suffix
   Internalize: True
   StrongName: False
-  AssembliesToAlias:
+  AssembliesToShade: 
   	Newtonsoft.Json
   	AssemblyWithEmbeddedSymbols
   	AssemblyWithNoStrongName
@@ -13,10 +13,10 @@
   	AssemblyWithPdb
   	AssemblyWithResources
   	AssemblyWithStrongName
-  AssembliesToTarget:
+  AssembliesToTarget: 
   	AssemblyToProcess
   	AssemblyToInclude
-  TargetInfos:
+  TargetInfos: 
   	Newtonsoft.Json => Prefix_Newtonsoft.Json_Suffix
   	AssemblyWithEmbeddedSymbols => Prefix_AssemblyWithEmbeddedSymbols_Suffix
   	AssemblyWithNoStrongName => Prefix_AssemblyWithNoStrongName_Suffix
@@ -26,7 +26,7 @@
   	AssemblyWithStrongName => Prefix_AssemblyWithStrongName_Suffix
   	AssemblyToProcess => AssemblyToProcess
   	AssemblyToInclude => AssemblyToInclude
-  ReferenceCopyLocalPaths:
+  ReferenceCopyLocalPaths: 
   	Newtonsoft.Json.dll
   	{SolutionDir}AssemblyToInclude/bin/IncludeTask/net8.0/AssemblyToInclude.dll
   	{SolutionDir}AssemblyWithEmbeddedSymbols/bin/IncludeTask/net8.0/AssemblyWithEmbeddedSymbols.dll

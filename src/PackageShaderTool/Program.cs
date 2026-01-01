@@ -27,7 +27,7 @@ public static class Program
 
     public static void Inner(
         string directory,
-        List<string> assemblyNamesToAlias,
+        List<string> assemblyNamesToShade,
         List<string> references,
         string? keyFile,
         List<string> assembliesToExclude,
@@ -39,7 +39,7 @@ public static class Program
         var list = Directory.GetFiles(directory, "*.dll", SearchOption.AllDirectories).ToList();
 
         // Include all files, but mark excluded ones as not-aliased after finding matches
-        var assemblyInfos = Finder.FindAssemblyInfos(assemblyNamesToAlias, list, prefix, suffix)
+        var assemblyInfos = Finder.FindAssemblyInfos(assemblyNamesToShade, list, prefix, suffix)
             .Select(info =>
             {
                 // If assembly matches exclusion list, mark it as not-aliased
@@ -62,7 +62,7 @@ public static class Program
 
         var keyPair = GetKeyPair(keyFile);
 
-        Aliaser.Run(references, assemblyInfos, internalize, keyPair);
+        Shader.Run(references, assemblyInfos, internalize, keyPair);
 
         foreach (var assembly in assemblyInfos.Where(_ => _.IsAlias))
         {

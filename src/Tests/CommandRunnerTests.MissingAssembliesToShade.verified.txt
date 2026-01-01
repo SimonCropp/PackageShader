@@ -3,8 +3,8 @@
     {
       NameInfo: {
         ShortName: a,
-        LongName: assemblies-to-alias,
-        NameText: a, assemblies-to-alias
+        LongName: assemblies-to-shade,
+        NameText: a, assemblies-to-shade
       },
       Tag: MissingRequiredOptionError,
       StopsProcessing: false

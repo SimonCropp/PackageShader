@@ -6,8 +6,8 @@
     [Option('i', "internalize", Required = false)]
     public bool Internalize { get; set; } = false;
 
-    [Option('a', "assemblies-to-alias", Required = true, Separator = ';')]
-    public IEnumerable<string> AssembliesToAlias { get; set; } = null!;
+    [Option('a', "assemblies-to-shade", Required = true, Separator = ';')]
+    public IEnumerable<string> AssembliesToShade { get; set; } = null!;
 
     [Option('e', "assemblies-to-exclude", Required = false, Separator = ';')]
     public IEnumerable<string> AssembliesToExclude { get; set; } = null!;

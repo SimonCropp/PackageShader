@@ -74,7 +74,7 @@ public class ShadeTask :
             .Where(x => !assemblyCopyLocalPaths.Contains(x))
             .ToList();
 
-        var assembliesToAlias= assemblyCopyLocalPaths
+        var assembliesToShade = assemblyCopyLocalPaths
             .Where(x => !assembliesToSkipRename.Contains(Path.GetFileNameWithoutExtension(x)))
             .ToList();
 
@@ -112,7 +112,7 @@ public class ShadeTask :
             }
         }
 
-        foreach (var sourcePath in assembliesToAlias)
+        foreach (var sourcePath in assembliesToShade )
         {
             var sourceName = Path.GetFileNameWithoutExtension(sourcePath);
             var targetName = $"{Prefix}{sourceName}{Suffix}";
@@ -138,15 +138,15 @@ public class ShadeTask :
                       Suffix: {Suffix}
                       Internalize: {Internalize}
                       StrongName: {strongNameKey != null}
-                      AssembliesToAlias:{separator}{string.Join(separator, assembliesToAlias.Select(Path.GetFileNameWithoutExtension))}
-                      AssembliesToTarget:{separator}{string.Join(separator, assembliesToTarget.Select(Path.GetFileNameWithoutExtension))}
-                      TargetInfos:{separator}{string.Join(separator, sourceTargetInfos.Select(_ => $"{_.SourceName} => {_.TargetName}"))}
-                      ReferenceCopyLocalPaths:{separator}{string.Join(separator, referenceCopyLocalPaths.Select(x=> SolutionDir != null ? x.Replace(SolutionDir, "{SolutionDir}") : x))}
+                      AssembliesToShade: {separator}{string.Join(separator, assembliesToShade.Select(Path.GetFileNameWithoutExtension))}
+                      AssembliesToTarget: {separator}{string.Join(separator, assembliesToTarget.Select(Path.GetFileNameWithoutExtension))}
+                      TargetInfos: {separator}{string.Join(separator, sourceTargetInfos.Select(_ => $"{_.SourceName} => {_.TargetName}"))}
+                      ReferenceCopyLocalPaths: {separator}{string.Join(separator, referenceCopyLocalPaths.Select(x=> SolutionDir != null ? x.Replace(SolutionDir, "{SolutionDir}") : x))}
 
                       """;
         Log.LogMessageFromText(inputs, MessageImportance.High);
 
-        Aliaser.Run(references, sourceTargetInfos, Internalize, strongNameKey);
+        Shader.Run(references, sourceTargetInfos, Internalize, strongNameKey);
         CopyLocalPathsToRemove = copyLocalPathsToRemove.ToArray();
         CopyLocalPathsToAdd = copyLocalPathsToAdd.ToArray();
     }

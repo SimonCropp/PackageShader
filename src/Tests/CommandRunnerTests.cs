@@ -4,7 +4,7 @@ using CommandLine;
 public class CommandRunnerTests
 {
     [Fact]
-    public Task MissingAssembliesToAlias()
+    public Task MissingAssembliesToShade()
     {
         var result = Parse("--target-directory directory --suffix _Shaded");
         return Verify(result);
@@ -14,85 +14,85 @@ public class CommandRunnerTests
     public Task All()
     {
         Directory.CreateDirectory("directory");
-        var result = Parse("--target-directory directory --suffix _Shaded --prefix Shaded_ --key test.snk --assemblies-to-alias assembly");
+        var result = Parse("--target-directory directory --suffix _Shaded --prefix Shaded_ --key test.snk --assemblies-to-shade assembly");
         return Verify(result);
     }
 
     [Fact]
     public Task Prefix()
     {
-        var result = Parse("--prefix Shaded_ --assemblies-to-alias assembly");
+        var result = Parse("--prefix Shaded_ --assemblies-to-shade assembly");
         return Verify(result);
     }
 
     [Fact]
     public Task Suffix()
     {
-        var result = Parse("--suffix _Shaded --assemblies-to-alias assembly");
+        var result = Parse("--suffix _Shaded --assemblies-to-shade assembly");
         return Verify(result);
     }
 
     [Fact]
     public Task NoPrefixOrSuffix() =>
-        Throws(() => Parse("--assemblies-to-alias assembly"));
+        Throws(() => Parse("--assemblies-to-shade assembly"));
 
     [Fact]
     public Task BadKeyPath() =>
-        Throws(() => Parse("--key bad.snk --assemblies-to-alias assembly --suffix _Shaded"));
+        Throws(() => Parse("--key bad.snk --assemblies-to-shade assembly --suffix _Shaded"));
 
     [Fact]
     public Task KeyRelative()
     {
-        var result = Parse("--key test.snk --assemblies-to-alias assembly --suffix _Shaded");
+        var result = Parse("--key test.snk --assemblies-to-shade assembly --suffix _Shaded");
         return Verify(result);
     }
 
     [Fact]
     public Task KeyFull()
     {
-        var result = Parse($"--key {Environment.CurrentDirectory}/test.snk --assemblies-to-alias assembly --suffix _Shaded");
+        var result = Parse($"--key {Environment.CurrentDirectory}/test.snk --assemblies-to-shade assembly --suffix _Shaded");
         return Verify(result);
     }
 
     [Fact]
     public Task ReferenceFile()
     {
-        var result = Parse("--assemblies-to-alias assembly --reference-file referenceFile --suffix _Shaded");
+        var result = Parse("--assemblies-to-shade assembly --reference-file referenceFile --suffix _Shaded");
         return Verify(result);
     }
 
     [Fact]
     public Task References()
     {
-        var result = Parse("--assemblies-to-alias assembly --references reference1 --suffix _Shaded");
+        var result = Parse("--assemblies-to-shade assembly --references reference1 --suffix _Shaded");
         return Verify(result);
     }
 
     [Fact]
     public Task ReferencesMultiple()
     {
-        var result = Parse("--assemblies-to-alias assembly --references reference1;reference2 --suffix _Shaded");
+        var result = Parse("--assemblies-to-shade assembly --references reference1;reference2 --suffix _Shaded");
         return Verify(result);
     }
 
     [Fact]
     public Task CurrentDirectory()
     {
-        var result = Parse("--assemblies-to-alias assembly --suffix _Shaded");
+        var result = Parse("--assemblies-to-shade assembly --suffix _Shaded");
         return Verify(result);
     }
 
     [Fact]
     public Task MultipleAssemblies()
     {
-        var result = Parse("--assemblies-to-alias assembly1;assembly2 --suffix _Shaded");
+        var result = Parse("--assemblies-to-shade assembly1;assembly2 --suffix _Shaded");
         return Verify(result);
     }
 
     //[Fact]
     //public Task MultipleAssembliesSplit()
     //{
-    //    var result = Parse("--assemblies-to-alias", "assembly2", "--assemblies-to-alias", "assembly2 --suffix _Shaded");
+    //    var result = Parse("--assemblies-to-shade", "assembly2", "--assemblies-to-shade", "assembly2 --suffix _Shaded");
     //    return Verifier.Verify(result);
     //}
 
@@ -104,15 +104,15 @@ public class CommandRunnerTests
         string? prefix = null;
         string? suffix = null;
         var internalize = false;
-        IEnumerable<string>? assembliesToAlias = null;
+        IEnumerable<string>? assembliesToShade = null;
         IEnumerable<string>? assembliesToExclude = null;
         IEnumerable<string>? references = null;
         var result = CommandRunner.RunCommand(
-            (_directory, _assembliesToAlias, _references, _key, _assembliesToExclude, _prefix, _suffix, _internalize, _) =>
+            (_directory, _assembliesToShade, _references, _key, _assembliesToExclude, _prefix, _suffix, _internalize, _) =>
             {
                 directory = _directory;
                 key = _key;
-                assembliesToAlias = _assembliesToAlias;
+                assembliesToShade = _assembliesToShade;
                 assembliesToExclude = _assembliesToExclude;
                 references = _references;
                 prefix = _prefix;
@@ -121,7 +121,7 @@ public class CommandRunnerTests
             },
             line => consoleOut.AppendLine(line),
             input.Split(' '));
-        return new(result, directory, prefix, suffix, key, assembliesToAlias, references, assembliesToExclude, consoleOut.ToString(), internalize);
+        return new(result, directory, prefix, suffix, key, assembliesToShade, references, assembliesToExclude, consoleOut.ToString(), internalize);
     }
 
     public record Result(
@@ -130,7 +130,7 @@ public class CommandRunnerTests
         string? prefix,
         string? suffix,
         string? key,
-        IEnumerable<string>? assembliesToAlias,
+        IEnumerable<string>? assembliesToShade,
         IEnumerable<string>? references,
         IEnumerable<string>? assembliesToExclude,
         string consoleOut,

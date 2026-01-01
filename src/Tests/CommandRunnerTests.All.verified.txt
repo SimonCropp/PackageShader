@@ -3,7 +3,7 @@
   prefix: Shaded_,
   suffix: _Shaded,
   key: {CurrentDirectory}test.snk,
-  assembliesToAlias: [
+  assembliesToShade: [
     assembly
   ],
   consoleOut:
@@ -12,7 +12,7 @@ Internalize: False
 Prefix: Shaded_
 Suffix: _Shaded
 KeyFile: {CurrentDirectory}test.snk
-AssembliesToAlias:
+AssembliesToShade:
  * assembly
 ,
   internalize: false
