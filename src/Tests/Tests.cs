@@ -791,4 +791,58 @@ public class StreamingAssemblyModifierTests
         Assert.True(reader.IsAssembly);
     }
 
+    [Fact]
+    public void HasEmbeddedPdb_ReturnsTrueForEmbeddedPdb()
+    {
+        var dllPath = Path.Combine(binDirectory, "AssemblyWithEmbeddedSymbols.dll");
+        var data = File.ReadAllBytes(dllPath);
+
+        Assert.True(PdbHandler.HasEmbeddedPdb(data));
+    }
+
+    [Fact]
+    public void HasEmbeddedPdb_ReturnsFalseForExternalPdb()
+    {
+        var dllPath = Path.Combine(binDirectory, "AssemblyWithPdb.dll");
+        var data = File.ReadAllBytes(dllPath);
+
+        Assert.False(PdbHandler.HasEmbeddedPdb(data));
+    }
+
+    [Fact]
+    public void HasEmbeddedPdb_ReturnsFalseForNoSymbols()
+    {
+        var dllPath = Path.Combine(binDirectory, "AssemblyWithNoSymbols.dll");
+        var data = File.ReadAllBytes(dllPath);
+
+        Assert.False(PdbHandler.HasEmbeddedPdb(data));
+    }
+
+    [Fact]
+    public void HasEmbeddedPdb_ReturnsFalseForEmptyData()
+    {
+        Assert.False(PdbHandler.HasEmbeddedPdb([]));
+    }
+
+    [Fact]
+    public void HasEmbeddedPdb_ReturnsFalseForTruncatedData()
+    {
+        // Less than 64 bytes (minimum for PE header location)
+        var data = new byte[32];
+        Assert.False(PdbHandler.HasEmbeddedPdb(data));
+    }
+
+    [Fact]
+    public void HasEmbeddedPdb_ReturnsFalseForInvalidPeHeader()
+    {
+        // 64 bytes but invalid PE offset
+        var data = new byte[64];
+        data[60] = 0xFF; // Invalid PE offset pointing past end of data
+        data[61] = 0xFF;
+        data[62] = 0xFF;
+        data[63] = 0xFF;
+
+        Assert.False(PdbHandler.HasEmbeddedPdb(data));
+    }
+
 }
