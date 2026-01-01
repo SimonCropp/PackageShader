@@ -25,7 +25,7 @@ public sealed class StrongNameKey
     /// </summary>
     public byte[] KeyPair { get; }
 
-    private StrongNameKey(RSA rsa, byte[] publicKey, byte[] publicKeyToken, byte[] keyPair)
+    StrongNameKey(RSA rsa, byte[] publicKey, byte[] publicKeyToken, byte[] keyPair)
     {
         Rsa = rsa;
         PublicKey = publicKey;
@@ -70,7 +70,7 @@ public sealed class StrongNameKey
         };
     }
 
-    private static RSA FromCapiPrivateKeyBlob(byte[] blob, int offset)
+    static RSA FromCapiPrivateKeyBlob(byte[] blob, int offset)
     {
         // Validate header: PRIVATEKEYBLOB (0x07), Version (0x02), Reserved (0x0000)
         if (blob[offset] != 0x07 || blob[offset + 1] != 0x02)
@@ -125,7 +125,7 @@ public sealed class StrongNameKey
         return rsa;
     }
 
-    private static RSA FromCapiPublicKeyBlob(byte[] blob, int offset)
+    static RSA FromCapiPublicKeyBlob(byte[] blob, int offset)
     {
         // Validate header: PUBLICKEYBLOB (0x06), Version (0x02)
         if (blob[offset] != 0x06 || blob[offset + 1] != 0x02)
@@ -159,7 +159,7 @@ public sealed class StrongNameKey
         return rsa;
     }
 
-    private static byte[] ReadReversed(byte[] data, ref int pos, int length)
+    static byte[] ReadReversed(byte[] data, ref int pos, int length)
     {
         var result = new byte[length];
         Array.Copy(data, pos, result, 0, length);
@@ -168,7 +168,7 @@ public sealed class StrongNameKey
         return result;
     }
 
-    private static byte[] TrimLeadingZeros(byte[] data)
+    static byte[] TrimLeadingZeros(byte[] data)
     {
         int start = 0;
         while (start < data.Length - 1 && data[start] == 0)
@@ -249,7 +249,7 @@ public sealed class StrongNameKey
         return publicKey;
     }
 
-    private static byte[] ComputePublicKeyToken(byte[] publicKey)
+    static byte[] ComputePublicKeyToken(byte[] publicKey)
     {
         using var sha1 = SHA1.Create();
         var hash = sha1.ComputeHash(publicKey);

@@ -155,11 +155,19 @@ public sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modi
 
         // Update Valid if we're adding rows to new tables
         if (plan.NewTypeRefs.Count > 0 && source.GetRowCount(TableIndex.TypeRef) == 0)
+        {
             valid |= 1L << (int)TableIndex.TypeRef;
+        }
+
         if (plan.NewMemberRefs.Count > 0 && source.GetRowCount(TableIndex.MemberRef) == 0)
+        {
             valid |= 1L << (int)TableIndex.MemberRef;
+        }
+
         if (plan.NewCustomAttributes.Count > 0 && source.GetRowCount(TableIndex.CustomAttribute) == 0)
+        {
             valid |= 1L << (int)TableIndex.CustomAttribute;
+        }
 
         writer.Write(valid);
         writer.Write(sorted);
