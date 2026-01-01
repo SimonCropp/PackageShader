@@ -15,8 +15,6 @@ namespace Alias.Lib.Metadata;
 public sealed class StreamingMetadataReader : IDisposable
 {
     private readonly StreamingPEFile _peFile;
-    private readonly FileStream _fileStream;
-    private readonly PEReader _peReader;
     private readonly SrmMetadataReader _reader;
     private readonly long _metadataBaseOffset;
     private bool _disposed;
@@ -50,10 +48,8 @@ public sealed class StreamingMetadataReader : IDisposable
         _peFile = peFile;
         _metadataBaseOffset = peFile.MetadataFileOffset;
 
-        // Open file for SRM
-        _fileStream = new FileStream(peFile.FilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        _peReader = new PEReader(_fileStream);
-        _reader = _peReader.GetMetadataReader();
+        // Use PEReader from StreamingPEFile (avoids duplicate file handles)
+        _reader = peFile.PEReader.GetMetadataReader();
 
         // Parse stream headers for heap locations (needed for streaming copy)
         ParseStreamLocations();
@@ -509,8 +505,7 @@ public sealed class StreamingMetadataReader : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        _peReader.Dispose();
-        _fileStream.Dispose();
         // Don't dispose _peFile - caller owns it
+        // PEReader is owned by StreamingPEFile
     }
 }
