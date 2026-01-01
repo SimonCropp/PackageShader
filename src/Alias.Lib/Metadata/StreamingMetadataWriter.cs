@@ -9,17 +9,8 @@ namespace Alias.Lib.Metadata;
 /// <summary>
 /// Writes metadata section incrementally to a stream, applying modifications.
 /// </summary>
-public sealed class StreamingMetadataWriter
+public sealed class StreamingMetadataWriter(StreamingMetadataReader source, ModificationPlan plan)
 {
-    private readonly StreamingMetadataReader _source;
-    private readonly ModificationPlan _plan;
-
-    public StreamingMetadataWriter(StreamingMetadataReader source, ModificationPlan plan)
-    {
-        _source = source;
-        _plan = plan;
-    }
-
     /// <summary>
     /// Writes the complete metadata section to the output stream.
     /// </summary>
@@ -30,11 +21,8 @@ public sealed class StreamingMetadataWriter
         // Write metadata root header
         WriteMetadataRoot(writer);
 
-        // Track positions for stream headers (we'll patch these later)
-        var streamHeadersPosition = output.Position;
-
         // Write placeholder stream headers and track their positions
-        var streamHeaders = _source.PEFile.StreamHeaders;
+        var streamHeaders = source.PEFile.StreamHeaders;
         var headerPositions = new long[streamHeaders.Length];
         for (int i = 0; i < streamHeaders.Length; i++)
         {
@@ -73,11 +61,11 @@ public sealed class StreamingMetadataWriter
 
                 case "#US":
                     // User strings - just copy
-                    var usHeader = _source.PEFile.GetStreamHeader("#US");
+                    var usHeader = source.PEFile.GetStreamHeader("#US");
                     if (usHeader is {Size: > 0})
                     {
-                        var usData = _source.PEFile.ReadBytesAt(
-                            _source.PEFile.MetadataFileOffset + usHeader.Offset,
+                        var usData = source.PEFile.ReadBytesAt(
+                            source.PEFile.MetadataFileOffset + usHeader.Offset,
                             (int)usHeader.Size);
                         writer.Write(usData);
                         AlignTo4(writer);
@@ -94,11 +82,11 @@ public sealed class StreamingMetadataWriter
 
                 default:
                     // Unknown stream - copy from source
-                    var srcHeader = _source.PEFile.GetStreamHeader(header.Name);
+                    var srcHeader = source.PEFile.GetStreamHeader(header.Name);
                     if (srcHeader is {Size: > 0})
                     {
-                        var data = _source.PEFile.ReadBytesAt(
-                            _source.PEFile.MetadataFileOffset + srcHeader.Offset,
+                        var data = source.PEFile.ReadBytesAt(
+                            source.PEFile.MetadataFileOffset + srcHeader.Offset,
                             (int)srcHeader.Size);
                         writer.Write(data);
                         AlignTo4(writer);
@@ -129,7 +117,7 @@ public sealed class StreamingMetadataWriter
         writer.Write(0u);
 
         // Version string (aligned to 4 bytes)
-        var versionBytes = Encoding.UTF8.GetBytes(_source.PEFile.MetadataVersionString);
+        var versionBytes = Encoding.UTF8.GetBytes(source.PEFile.MetadataVersionString);
         var alignedLen = (versionBytes.Length + 3) & ~3;
         writer.Write(alignedLen);
         writer.Write(versionBytes);
@@ -140,7 +128,7 @@ public sealed class StreamingMetadataWriter
         writer.Write((ushort)0);
 
         // Stream count
-        writer.Write((ushort)_source.PEFile.StreamHeaders.Length);
+        writer.Write((ushort)source.PEFile.StreamHeaders.Length);
     }
 
     private uint WriteTableHeap(BinaryWriter writer)
@@ -154,23 +142,23 @@ public sealed class StreamingMetadataWriter
 
         // HeapSizes
         byte heapSizes = 0;
-        if (_source.StringIndexSize == 4) heapSizes |= 0x01;
-        if (_source.GuidIndexSize == 4) heapSizes |= 0x02;
-        if (_source.BlobIndexSize == 4) heapSizes |= 0x04;
+        if (source.StringIndexSize == 4) heapSizes |= 0x01;
+        if (source.GuidIndexSize == 4) heapSizes |= 0x02;
+        if (source.BlobIndexSize == 4) heapSizes |= 0x04;
         writer.Write(heapSizes);
 
         writer.Write((byte)1); // Reserved
 
         // Valid and Sorted bitmasks
-        var valid = _source.Valid;
-        var sorted = _source.Sorted;
+        var valid = source.Valid;
+        var sorted = source.Sorted;
 
         // Update Valid if we're adding rows to new tables
-        if (_plan.NewTypeRefs.Count > 0 && _source.GetRowCount(TableIndex.TypeRef) == 0)
+        if (plan.NewTypeRefs.Count > 0 && source.GetRowCount(TableIndex.TypeRef) == 0)
             valid |= 1L << (int)TableIndex.TypeRef;
-        if (_plan.NewMemberRefs.Count > 0 && _source.GetRowCount(TableIndex.MemberRef) == 0)
+        if (plan.NewMemberRefs.Count > 0 && source.GetRowCount(TableIndex.MemberRef) == 0)
             valid |= 1L << (int)TableIndex.MemberRef;
-        if (_plan.NewCustomAttributes.Count > 0 && _source.GetRowCount(TableIndex.CustomAttribute) == 0)
+        if (plan.NewCustomAttributes.Count > 0 && source.GetRowCount(TableIndex.CustomAttribute) == 0)
             valid |= 1L << (int)TableIndex.CustomAttribute;
 
         writer.Write(valid);
@@ -182,15 +170,15 @@ public sealed class StreamingMetadataWriter
             if ((valid & (1L << i)) == 0) continue;
 
             var table = (TableIndex)i;
-            var count = _source.GetRowCount(table);
+            var count = source.GetRowCount(table);
 
             // Add new rows
             if (table == TableIndex.TypeRef)
-                count += _plan.NewTypeRefs.Count;
+                count += plan.NewTypeRefs.Count;
             else if (table == TableIndex.MemberRef)
-                count += _plan.NewMemberRefs.Count;
+                count += plan.NewMemberRefs.Count;
             else if (table == TableIndex.CustomAttribute)
-                count += _plan.NewCustomAttributes.Count;
+                count += plan.NewCustomAttributes.Count;
 
             writer.Write((uint)count);
         }
@@ -211,35 +199,34 @@ public sealed class StreamingMetadataWriter
 
     private void WriteTableData(BinaryWriter writer, TableIndex table)
     {
-        var rowCount = _source.GetRowCount(table);
-        var rowSize = _source.GetRowSize(table);
+        var rowCount = source.GetRowCount(table);
 
         switch (table)
         {
             case TableIndex.Assembly:
                 for (uint rid = 1; rid <= rowCount; rid++)
                 {
-                    var row = _plan.GetAssemblyRow(rid);
-                    row.Write(writer, _source.BlobIndexSize, _source.StringIndexSize);
+                    var row = plan.GetAssemblyRow(rid);
+                    row.Write(writer, source.BlobIndexSize, source.StringIndexSize);
                 }
                 break;
 
             case TableIndex.AssemblyRef:
                 for (uint rid = 1; rid <= rowCount; rid++)
                 {
-                    var row = _plan.GetAssemblyRefRow(rid);
-                    row.Write(writer, _source.BlobIndexSize, _source.StringIndexSize);
+                    var row = plan.GetAssemblyRefRow(rid);
+                    row.Write(writer, source.BlobIndexSize, source.StringIndexSize);
                 }
                 break;
 
             case TableIndex.TypeDef:
                 for (uint rid = 1; rid <= rowCount; rid++)
                 {
-                    var row = _plan.GetTypeDefRow(rid);
-                    row.Write(writer, _source.StringIndexSize,
-                        _source.GetCodedIndexSize(CodedIndex.TypeDefOrRef),
-                        _source.GetTableIndexSize(TableIndex.Field),
-                        _source.GetTableIndexSize(TableIndex.MethodDef));
+                    var row = plan.GetTypeDefRow(rid);
+                    row.Write(writer, source.StringIndexSize,
+                        source.GetCodedIndexSize(CodedIndex.TypeDefOrRef),
+                        source.GetTableIndexSize(TableIndex.Field),
+                        source.GetTableIndexSize(TableIndex.MethodDef));
                 }
                 break;
 
@@ -247,17 +234,17 @@ public sealed class StreamingMetadataWriter
                 // Existing rows
                 for (uint rid = 1; rid <= rowCount; rid++)
                 {
-                    var row = _source.ReadTypeRefRow(rid);
+                    var row = source.ReadTypeRefRow(rid);
                     row.Write(writer,
-                        _source.GetCodedIndexSize(CodedIndex.ResolutionScope),
-                        _source.StringIndexSize);
+                        source.GetCodedIndexSize(CodedIndex.ResolutionScope),
+                        source.StringIndexSize);
                 }
                 // New rows
-                foreach (var row in _plan.NewTypeRefs)
+                foreach (var row in plan.NewTypeRefs)
                 {
                     row.Write(writer,
-                        _source.GetCodedIndexSize(CodedIndex.ResolutionScope),
-                        _source.StringIndexSize);
+                        source.GetCodedIndexSize(CodedIndex.ResolutionScope),
+                        source.StringIndexSize);
                 }
                 break;
 
@@ -265,19 +252,19 @@ public sealed class StreamingMetadataWriter
                 // Existing rows
                 for (uint rid = 1; rid <= rowCount; rid++)
                 {
-                    var row = _source.ReadMemberRefRow(rid);
+                    var row = source.ReadMemberRefRow(rid);
                     row.Write(writer,
-                        _source.GetCodedIndexSize(CodedIndex.MemberRefParent),
-                        _source.StringIndexSize,
-                        _source.BlobIndexSize);
+                        source.GetCodedIndexSize(CodedIndex.MemberRefParent),
+                        source.StringIndexSize,
+                        source.BlobIndexSize);
                 }
                 // New rows
-                foreach (var row in _plan.NewMemberRefs)
+                foreach (var row in plan.NewMemberRefs)
                 {
                     row.Write(writer,
-                        _source.GetCodedIndexSize(CodedIndex.MemberRefParent),
-                        _source.StringIndexSize,
-                        _source.BlobIndexSize);
+                        source.GetCodedIndexSize(CodedIndex.MemberRefParent),
+                        source.StringIndexSize,
+                        source.BlobIndexSize);
                 }
                 break;
 
@@ -287,7 +274,7 @@ public sealed class StreamingMetadataWriter
 
             default:
                 // Copy unchanged table data
-                _source.CopyTableData(table, writer.BaseStream);
+                source.CopyTableData(table, writer.BaseStream);
                 break;
         }
     }
@@ -300,11 +287,11 @@ public sealed class StreamingMetadataWriter
         // Read existing rows
         for (uint rid = 1; rid <= existingCount; rid++)
         {
-            allRows.Add(_source.ReadCustomAttributeRow(rid));
+            allRows.Add(source.ReadCustomAttributeRow(rid));
         }
 
         // Add new rows
-        allRows.AddRange(_plan.NewCustomAttributes);
+        allRows.AddRange(plan.NewCustomAttributes);
 
         // Sort by Parent
         allRows.Sort((a, b) => a.ParentIndex.CompareTo(b.ParentIndex));
@@ -313,9 +300,9 @@ public sealed class StreamingMetadataWriter
         foreach (var row in allRows)
         {
             row.Write(writer,
-                _source.GetCodedIndexSize(CodedIndex.HasCustomAttribute),
-                _source.GetCodedIndexSize(CodedIndex.CustomAttributeType),
-                _source.BlobIndexSize);
+                source.GetCodedIndexSize(CodedIndex.HasCustomAttribute),
+                source.GetCodedIndexSize(CodedIndex.CustomAttributeType),
+                source.BlobIndexSize);
         }
     }
 
@@ -324,10 +311,10 @@ public sealed class StreamingMetadataWriter
         var startPos = writer.BaseStream.Position;
 
         // Copy original string heap
-        _source.CopyStringHeap(writer.BaseStream);
+        source.CopyStringHeap(writer.BaseStream);
 
         // Append new strings
-        foreach (var kvp in _plan.NewStrings)
+        foreach (var kvp in plan.NewStrings)
         {
             var bytes = Encoding.UTF8.GetBytes(kvp.Key);
             writer.Write(bytes);
@@ -344,10 +331,10 @@ public sealed class StreamingMetadataWriter
         var startPos = writer.BaseStream.Position;
 
         // Copy original blob heap
-        _source.CopyBlobHeap(writer.BaseStream);
+        source.CopyBlobHeap(writer.BaseStream);
 
         // Append new blobs
-        foreach (var (data, _) in _plan.NewBlobs)
+        foreach (var (data, _) in plan.NewBlobs)
         {
             WriteCompressedLength(writer, data.Length);
             writer.Write(data);
@@ -363,7 +350,7 @@ public sealed class StreamingMetadataWriter
         var startPos = writer.BaseStream.Position;
 
         // Just copy the original GUID heap (we don't add new GUIDs)
-        _source.CopyGuidHeap(writer.BaseStream);
+        source.CopyGuidHeap(writer.BaseStream);
 
         AlignTo4(writer);
 

@@ -5,63 +5,32 @@ using Alias.Lib.Metadata.Tables;
 namespace Alias.Lib.Modification;
 
 /// <summary>
-/// Output strategy based on modifications required.
-/// </summary>
-public enum ModificationStrategy
-{
-    /// <summary>
-    /// Direct byte patches - no metadata size change.
-    /// Only modifying existing rows with indices that already exist in heaps.
-    /// </summary>
-    InPlacePatch,
-
-    /// <summary>
-    /// Metadata needs rebuild but fits in existing section padding.
-    /// </summary>
-    MetadataRebuildWithPadding,
-
-    /// <summary>
-    /// Metadata section must grow, shifting subsequent sections.
-    /// </summary>
-    FullMetadataSectionRebuild
-}
-
-/// <summary>
 /// Collects planned modifications and determines optimal output strategy.
 /// </summary>
-public sealed class ModificationPlan
+public sealed class ModificationPlan(StreamingMetadataReader metadata)
 {
-    private readonly StreamingMetadataReader _metadata;
-
     // Modified rows (keyed by RID)
-    private readonly Dictionary<uint, AssemblyRow> _assemblyMods = new();
-    private readonly Dictionary<uint, AssemblyRefRow> _assemblyRefMods = new();
-    private readonly Dictionary<uint, TypeDefRow> _typeDefMods = new();
+    Dictionary<uint, AssemblyRow> assemblyMods = new();
+    Dictionary<uint, AssemblyRefRow> assemblyRefMods = new();
+    Dictionary<uint, TypeDefRow> typeDefMods = new();
 
     // New rows to add
-    private readonly List<CustomAttributeRow> _newCustomAttributes = new();
-    private readonly List<TypeRefRow> _newTypeRefs = new();
-    private readonly List<MemberRefRow> _newMemberRefs = new();
+    List<CustomAttributeRow> newCustomAttributes = [];
+    List<TypeRefRow> newTypeRefs = [];
+    List<MemberRefRow> newMemberRefs = [];
 
     // String additions (value -> new index)
-    private readonly Dictionary<string, uint> _newStrings = new();
-    private uint _nextStringIndex;
+    Dictionary<string, uint> newStrings = new();
+    uint nextStringIndex = metadata.StringHeapSize;
 
     // Blob additions (value -> new index)
-    private readonly List<(byte[] data, uint index)> _newBlobs = new();
-    private uint _nextBlobIndex;
+    List<(byte[] data, uint index)> newBlobs = [];
+    uint nextBlobIndex = metadata.BlobHeapSize;
 
     // Tracks if we need to add new heap data
-    private bool _hasNewStrings;
-    private bool _hasNewBlobs;
-    private bool _hasNewRows;
-
-    public ModificationPlan(StreamingMetadataReader metadata)
-    {
-        _metadata = metadata;
-        _nextStringIndex = metadata.StringHeapSize;
-        _nextBlobIndex = metadata.BlobHeapSize;
-    }
+    bool hasNewStrings;
+    bool hasNewBlobs;
+    bool hasNewRows;
 
     #region Row Modifications
 
@@ -69,48 +38,57 @@ public sealed class ModificationPlan
     /// Sets a modified assembly row.
     /// </summary>
     public void SetAssemblyRow(uint rid, AssemblyRow row) =>
-        _assemblyMods[rid] = row;
+        assemblyMods[rid] = row;
 
     /// <summary>
     /// Gets the assembly row (modified or original).
     /// </summary>
     public AssemblyRow GetAssemblyRow(uint rid)
     {
-        if (_assemblyMods.TryGetValue(rid, out var modified))
+        if (assemblyMods.TryGetValue(rid, out var modified))
+        {
             return modified;
-        return _metadata.ReadAssemblyRow(rid);
+        }
+
+        return metadata.ReadAssemblyRow(rid);
     }
 
     /// <summary>
     /// Sets a modified assembly reference row.
     /// </summary>
     public void SetAssemblyRefRow(uint rid, AssemblyRefRow row) =>
-        _assemblyRefMods[rid] = row;
+        assemblyRefMods[rid] = row;
 
     /// <summary>
     /// Gets the assembly reference row (modified or original).
     /// </summary>
     public AssemblyRefRow GetAssemblyRefRow(uint rid)
     {
-        if (_assemblyRefMods.TryGetValue(rid, out var modified))
+        if (assemblyRefMods.TryGetValue(rid, out var modified))
+        {
             return modified;
-        return _metadata.ReadAssemblyRefRow(rid);
+        }
+
+        return metadata.ReadAssemblyRefRow(rid);
     }
 
     /// <summary>
     /// Sets a modified type definition row.
     /// </summary>
     public void SetTypeDefRow(uint rid, TypeDefRow row) =>
-        _typeDefMods[rid] = row;
+        typeDefMods[rid] = row;
 
     /// <summary>
     /// Gets the type definition row (modified or original).
     /// </summary>
     public TypeDefRow GetTypeDefRow(uint rid)
     {
-        if (_typeDefMods.TryGetValue(rid, out var modified))
+        if (typeDefMods.TryGetValue(rid, out var modified))
+        {
             return modified;
-        return _metadata.ReadTypeDefRow(rid);
+        }
+
+        return metadata.ReadTypeDefRow(rid);
     }
 
     /// <summary>
@@ -118,8 +96,8 @@ public sealed class ModificationPlan
     /// </summary>
     public void AddCustomAttribute(CustomAttributeRow row)
     {
-        _newCustomAttributes.Add(row);
-        _hasNewRows = true;
+        newCustomAttributes.Add(row);
+        hasNewRows = true;
     }
 
     /// <summary>
@@ -128,9 +106,9 @@ public sealed class ModificationPlan
     /// </summary>
     public uint AddTypeRef(TypeRefRow row)
     {
-        _newTypeRefs.Add(row);
-        _hasNewRows = true;
-        return (uint)(_metadata.GetRowCount(TableIndex.TypeRef) + _newTypeRefs.Count);
+        newTypeRefs.Add(row);
+        hasNewRows = true;
+        return (uint) (metadata.GetRowCount(TableIndex.TypeRef) + newTypeRefs.Count);
     }
 
     /// <summary>
@@ -139,9 +117,9 @@ public sealed class ModificationPlan
     /// </summary>
     public uint AddMemberRef(MemberRefRow row)
     {
-        _newMemberRefs.Add(row);
-        _hasNewRows = true;
-        return (uint)(_metadata.GetRowCount(TableIndex.MemberRef) + _newMemberRefs.Count);
+        newMemberRefs.Add(row);
+        hasNewRows = true;
+        return (uint) (metadata.GetRowCount(TableIndex.MemberRef) + newMemberRefs.Count);
     }
 
     #endregion
@@ -155,21 +133,25 @@ public sealed class ModificationPlan
     public uint GetOrAddString(string value)
     {
         if (string.IsNullOrEmpty(value))
+        {
             return 0;
+        }
 
         // Check if we already added it
-        if (_newStrings.TryGetValue(value, out var existing))
+        if (newStrings.TryGetValue(value, out var existing))
+        {
             return existing;
+        }
 
         // TODO: Could search existing heap, but for now just add new
         // This is a simplification - production code should search first
 
-        var index = _nextStringIndex;
+        var index = nextStringIndex;
         var bytes = System.Text.Encoding.UTF8.GetBytes(value);
-        _nextStringIndex += (uint)bytes.Length + 1; // +1 for null terminator
+        nextStringIndex += (uint) bytes.Length + 1; // +1 for null terminator
 
-        _newStrings[value] = index;
-        _hasNewStrings = true;
+        newStrings[value] = index;
+        hasNewStrings = true;
 
         return index;
     }
@@ -181,22 +163,30 @@ public sealed class ModificationPlan
     public uint GetOrAddBlob(byte[] value)
     {
         if (value.Length == 0)
+        {
             return 0;
+        }
 
         // Calculate compressed length header size
         int headerSize;
         if (value.Length < 0x80)
+        {
             headerSize = 1;
+        }
         else if (value.Length < 0x4000)
+        {
             headerSize = 2;
+        }
         else
+        {
             headerSize = 4;
+        }
 
-        var index = _nextBlobIndex;
-        _nextBlobIndex += (uint)(headerSize + value.Length);
+        var index = nextBlobIndex;
+        nextBlobIndex += (uint) (headerSize + value.Length);
 
-        _newBlobs.Add((value, index));
-        _hasNewBlobs = true;
+        newBlobs.Add((value, index));
+        hasNewBlobs = true;
 
         return index;
     }
@@ -208,52 +198,52 @@ public sealed class ModificationPlan
     /// <summary>
     /// Gets the new strings added to the plan.
     /// </summary>
-    public IReadOnlyDictionary<string, uint> NewStrings => _newStrings;
+    public IReadOnlyDictionary<string, uint> NewStrings => newStrings;
 
     /// <summary>
     /// Gets the new blobs added to the plan.
     /// </summary>
-    public IReadOnlyList<(byte[] data, uint index)> NewBlobs => _newBlobs;
+    public IReadOnlyList<(byte[] data, uint index)> NewBlobs => newBlobs;
 
     /// <summary>
     /// Gets the new custom attributes added to the plan.
     /// </summary>
-    public IReadOnlyList<CustomAttributeRow> NewCustomAttributes => _newCustomAttributes;
+    public IReadOnlyList<CustomAttributeRow> NewCustomAttributes => newCustomAttributes;
 
     /// <summary>
     /// Gets the new type references added to the plan.
     /// </summary>
-    public IReadOnlyList<TypeRefRow> NewTypeRefs => _newTypeRefs;
+    public IReadOnlyList<TypeRefRow> NewTypeRefs => newTypeRefs;
 
     /// <summary>
     /// Gets the new member references added to the plan.
     /// </summary>
-    public IReadOnlyList<MemberRefRow> NewMemberRefs => _newMemberRefs;
+    public IReadOnlyList<MemberRefRow> NewMemberRefs => newMemberRefs;
 
     /// <summary>
     /// Gets modified assembly rows.
     /// </summary>
-    public IReadOnlyDictionary<uint, AssemblyRow> ModifiedAssemblyRows => _assemblyMods;
+    public IReadOnlyDictionary<uint, AssemblyRow> ModifiedAssemblyRows => assemblyMods;
 
     /// <summary>
     /// Gets modified assembly reference rows.
     /// </summary>
-    public IReadOnlyDictionary<uint, AssemblyRefRow> ModifiedAssemblyRefRows => _assemblyRefMods;
+    public IReadOnlyDictionary<uint, AssemblyRefRow> ModifiedAssemblyRefRows => assemblyRefMods;
 
     /// <summary>
     /// Gets modified type definition rows.
     /// </summary>
-    public IReadOnlyDictionary<uint, TypeDefRow> ModifiedTypeDefRows => _typeDefMods;
+    public IReadOnlyDictionary<uint, TypeDefRow> ModifiedTypeDefRows => typeDefMods;
 
     /// <summary>
     /// Returns true if modifications require adding new heap data.
     /// </summary>
-    public bool RequiresHeapGrowth => _hasNewStrings || _hasNewBlobs;
+    public bool RequiresHeapGrowth => hasNewStrings || hasNewBlobs;
 
     /// <summary>
     /// Returns true if modifications require adding new table rows.
     /// </summary>
-    public bool RequiresNewRows => _hasNewRows;
+    public bool RequiresNewRows => hasNewRows;
 
     /// <summary>
     /// Returns true if only in-place byte patches are needed (no size changes).
@@ -266,32 +256,34 @@ public sealed class ModificationPlan
     public int EstimateNewMetadataSize()
     {
         // Start with current size
-        var size = (int)_metadata.PEFile.MetadataSize;
+        var size = (int) metadata.PEFile.MetadataSize;
 
         // Add new string heap data
-        foreach (var kvp in _newStrings)
+        foreach (var kvp in newStrings)
         {
             size += System.Text.Encoding.UTF8.GetByteCount(kvp.Key) + 1;
         }
 
         // Add new blob heap data
-        foreach (var (data, _) in _newBlobs)
+        foreach (var (data, _) in newBlobs)
         {
             size += data.Length + 4; // max header size
         }
 
         // Add new table rows
-        if (_newCustomAttributes.Count > 0)
+        if (newCustomAttributes.Count > 0)
         {
-            size += _newCustomAttributes.Count * _metadata.GetRowSize(TableIndex.CustomAttribute);
+            size += newCustomAttributes.Count * metadata.GetRowSize(TableIndex.CustomAttribute);
         }
-        if (_newTypeRefs.Count > 0)
+
+        if (newTypeRefs.Count > 0)
         {
-            size += _newTypeRefs.Count * _metadata.GetRowSize(TableIndex.TypeRef);
+            size += newTypeRefs.Count * metadata.GetRowSize(TableIndex.TypeRef);
         }
-        if (_newMemberRefs.Count > 0)
+
+        if (newMemberRefs.Count > 0)
         {
-            size += _newMemberRefs.Count * _metadata.GetRowSize(TableIndex.MemberRef);
+            size += newMemberRefs.Count * metadata.GetRowSize(TableIndex.MemberRef);
         }
 
         // Account for table row count field growth (4 bytes per new table that wasn't there)
@@ -306,18 +298,20 @@ public sealed class ModificationPlan
     public ModificationStrategy GetStrategy()
     {
         if (CanPatchInPlace)
+        {
             return ModificationStrategy.InPlacePatch;
+        }
 
         // Check if new metadata fits in existing section with padding
-        var currentSize = (int)_metadata.PEFile.MetadataSize;
+        var currentSize = (int) metadata.PEFile.MetadataSize;
         var estimatedSize = EstimateNewMetadataSize();
 
         // Get the section containing metadata
-        var metadataSection = _metadata.PEFile.GetSectionAtRva(_metadata.PEFile.MetadataRva);
+        var metadataSection = metadata.PEFile.GetSectionAtRva(metadata.PEFile.MetadataRva);
         if (metadataSection != null)
         {
             // Calculate available padding in section
-            var metadataEndInSection = _metadata.PEFile.MetadataRva - metadataSection.VirtualAddress + currentSize;
+            var metadataEndInSection = metadata.PEFile.MetadataRva - metadataSection.VirtualAddress + currentSize;
             var availableSpace = metadataSection.SizeOfRawData - metadataEndInSection;
 
             if (estimatedSize <= currentSize + availableSpace)
@@ -368,7 +362,7 @@ public sealed class ModificationPlan
     /// </summary>
     public bool RedirectAssemblyRef(string sourceName, string targetName, byte[]? publicKeyToken)
     {
-        var found = _metadata.FindAssemblyRef(sourceName);
+        var found = metadata.FindAssemblyRef(sourceName);
         if (found == null)
             return false;
 
@@ -382,6 +376,7 @@ public sealed class ModificationPlan
         {
             row.PublicKeyOrTokenIndex = 0;
         }
+
         SetAssemblyRefRow(rid, row);
         return true;
     }
@@ -391,7 +386,7 @@ public sealed class ModificationPlan
     /// </summary>
     public void MakeTypesInternal()
     {
-        var count = _metadata.GetRowCount(TableIndex.TypeDef);
+        var count = metadata.GetRowCount(TableIndex.TypeDef);
         for (uint rid = 1; rid <= count; rid++)
         {
             var row = GetTypeDefRow(rid);
