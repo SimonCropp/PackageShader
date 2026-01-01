@@ -59,7 +59,7 @@ public readonly struct MetadataToken
 /// </summary>
 public static class CodedIndexHelper
 {
-    private const int TableCount = 58;
+    const int TableCount = 58;
 
     /// <summary>
     /// Gets the size (2 or 4 bytes) of a coded index based on table row counts.

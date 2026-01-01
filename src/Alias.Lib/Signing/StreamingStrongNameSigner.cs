@@ -6,8 +6,8 @@ namespace Alias.Lib.Signing;
 /// </summary>
 public static class StreamingStrongNameSigner
 {
-    private const int BufferSize = 81920; // 80KB buffer
-    private const int ChecksumOffsetInOptionalHeader = 64;
+    const int BufferSize = 81920; // 80KB buffer
+    const int ChecksumOffsetInOptionalHeader = 64;
 
     /// <summary>
     /// Signs a PE file in place using streaming hash computation.
@@ -69,7 +69,7 @@ public static class StreamingStrongNameSigner
         return true;
     }
 
-    private static long ResolveRvaToFileOffset(PEHeaders headers, int rva)
+    static long ResolveRvaToFileOffset(PEHeaders headers, int rva)
     {
         foreach (var section in headers.SectionHeaders)
         {
@@ -82,7 +82,7 @@ public static class StreamingStrongNameSigner
         return 0;
     }
 
-    private static byte[] ComputeStrongNameHashStreaming(FileStream stream, int checksumOffset, long signatureOffset, int signatureSize)
+    static byte[] ComputeStrongNameHashStreaming(FileStream stream, int checksumOffset, long signatureOffset, int signatureSize)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA1);
         var buffer = new byte[BufferSize];

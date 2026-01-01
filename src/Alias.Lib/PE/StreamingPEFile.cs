@@ -8,9 +8,9 @@ namespace Alias.Lib.PE;
 /// </summary>
 public sealed class StreamingPEFile : IDisposable
 {
-    private readonly FileStream _stream;
-    private readonly PEReader _peReader;
-    private bool _disposed;
+    FileStream _stream;
+    PEReader _peReader;
+    bool _disposed;
 
     // Cached from PEHeaders for convenience
     public bool IsPE64 { get; }
@@ -49,7 +49,7 @@ public sealed class StreamingPEFile : IDisposable
     /// </summary>
     public PEHeaders Headers => _peReader.PEHeaders;
 
-    private StreamingPEFile(string path, FileStream stream, PEReader peReader)
+    StreamingPEFile(string path, FileStream stream, PEReader peReader)
     {
         FilePath = path;
         _stream = stream;
@@ -73,10 +73,10 @@ public sealed class StreamingPEFile : IDisposable
 
         // Convert section headers
         Sections = new SectionInfo[headers.SectionHeaders.Length];
-        for (int i = 0; i < headers.SectionHeaders.Length; i++)
+        for (var i = 0; i < headers.SectionHeaders.Length; i++)
         {
             var sh = headers.SectionHeaders[i];
-            Sections[i] = new SectionInfo
+            Sections[i] = new()
             {
                 Name = sh.Name,
                 VirtualSize = (uint)sh.VirtualSize,
@@ -103,7 +103,9 @@ public sealed class StreamingPEFile : IDisposable
 
         // Parse metadata stream headers (PEReader doesn't expose these)
         if (MetadataRva > 0)
+        {
             ParseMetadataStreamHeaders();
+        }
     }
 
     /// <summary>
@@ -128,7 +130,7 @@ public sealed class StreamingPEFile : IDisposable
         }
     }
 
-    private void ParseMetadataStreamHeaders()
+    void ParseMetadataStreamHeaders()
     {
         _stream.Position = MetadataFileOffset;
         using var reader = new BinaryReader(_stream, Encoding.ASCII, leaveOpen: true);

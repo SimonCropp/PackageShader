@@ -47,12 +47,16 @@ public struct AssemblyRow
         WriteIndex(writer, CultureIndex, stringIndexSize);
     }
 
-    private static void WriteIndex(BinaryWriter writer, uint value, int size)
+    static void WriteIndex(BinaryWriter writer, uint value, int size)
     {
         if (size == 2)
-            writer.Write((ushort)value);
+        {
+            writer.Write((ushort) value);
+        }
         else
+        {
             writer.Write(value);
+        }
     }
 }
 
@@ -101,12 +105,16 @@ public struct AssemblyRefRow
         WriteIndex(writer, HashValueIndex, blobIndexSize);
     }
 
-    private static void WriteIndex(BinaryWriter writer, uint value, int size)
+    static void WriteIndex(BinaryWriter writer, uint value, int size)
     {
         if (size == 2)
+        {
             writer.Write((ushort)value);
+        }
         else
+        {
             writer.Write(value);
+        }
     }
 }
 
@@ -177,12 +185,16 @@ public struct TypeDefRow
         }
     }
 
-    private static void WriteIndex(BinaryWriter writer, uint value, int size)
+    static void WriteIndex(BinaryWriter writer, uint value, int size)
     {
         if (size == 2)
+        {
             writer.Write((ushort)value);
+        }
         else
+        {
             writer.Write(value);
+        }
     }
 }
 
@@ -215,12 +227,16 @@ public struct CustomAttributeRow
         WriteIndex(writer, ValueIndex, blobIndexSize);
     }
 
-    private static void WriteIndex(BinaryWriter writer, uint value, int size)
+    static void WriteIndex(BinaryWriter writer, uint value, int size)
     {
         if (size == 2)
+        {
             writer.Write((ushort)value);
+        }
         else
+        {
             writer.Write(value);
+        }
     }
 }
 
@@ -251,12 +267,16 @@ public struct TypeRefRow
         WriteIndex(writer, NamespaceIndex, stringIndexSize);
     }
 
-    private static void WriteIndex(BinaryWriter writer, uint value, int size)
+    static void WriteIndex(BinaryWriter writer, uint value, int size)
     {
         if (size == 2)
+        {
             writer.Write((ushort)value);
+        }
         else
+        {
             writer.Write(value);
+        }
     }
 }
 
@@ -289,12 +309,16 @@ public struct MemberRefRow
         WriteIndex(writer, SignatureIndex, blobIndexSize);
     }
 
-    private static void WriteIndex(BinaryWriter writer, uint value, int size)
+    static void WriteIndex(BinaryWriter writer, uint value, int size)
     {
         if (size == 2)
+        {
             writer.Write((ushort)value);
+        }
         else
+        {
             writer.Write(value);
+        }
     }
 }
 
@@ -303,7 +327,7 @@ public struct MemberRefRow
 /// </summary>
 public class TableRowReader(byte[] data)
 {
-    private int position = 0;
+    int position = 0;
 
     public ushort ReadUInt16()
     {

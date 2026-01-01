@@ -34,7 +34,7 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
     /// Writes by copying the file and applying in-place patches.
     /// Used when no heap growth is needed.
     /// </summary>
-    private void WriteWithInPlacePatches(Stream output)
+    void WriteWithInPlacePatches(Stream output)
     {
         // Copy entire file first
         source.CopyRegion(0, source.FileLength, output);
@@ -53,7 +53,7 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
     /// <summary>
     /// Writes by streaming unchanged parts and inserting rebuilt metadata.
     /// </summary>
-    private void WriteWithMetadataRebuild(Stream output)
+    void WriteWithMetadataRebuild(Stream output)
     {
         var metadataSection = source.GetSectionAtRva(source.MetadataRva)
             ?? throw new InvalidOperationException("Metadata section not found");
@@ -144,7 +144,7 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
         PatchHeaders(output, metadataSection, sizeDiff, rawSizeDiff, (uint)newRawSize, (uint)newMetadataSize);
     }
 
-    private List<(long offset, byte[] data)> BuildInPlacePatches()
+    List<(long offset, byte[] data)> BuildInPlacePatches()
     {
         var patches = new List<(long offset, byte[] data)>();
 
@@ -184,8 +184,13 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
         return patches;
     }
 
-    private void PatchHeaders(Stream output, SectionInfo metadataSection,
-        int sizeDiff, int rawSizeDiff, uint newRawSize, uint newMetadataSize)
+    void PatchHeaders(
+        Stream output,
+        SectionInfo metadataSection,
+        int sizeDiff,
+        int rawSizeDiff,
+        uint newRawSize,
+        uint newMetadataSize)
     {
         // Patch CLI header with new metadata size
         output.Position = source.CLIHeaderFileOffset + 12;
@@ -546,14 +551,14 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
         }
     }
 
-    private uint GetFileAlignment()
+    uint GetFileAlignment()
     {
         var buffer = new byte[4];
         source.ReadAt(source.OptionalHeaderOffset + 36, buffer, 0, 4);
         return BitConverter.ToUInt32(buffer, 0);
     }
 
-    private long GetFirstSectionOffset()
+    long GetFirstSectionOffset()
     {
         long minOffset = long.MaxValue;
         foreach (var section in source.Sections)
@@ -564,10 +569,10 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
         return minOffset;
     }
 
-    private static uint AlignUp(uint value, uint alignment) =>
+    static uint AlignUp(uint value, uint alignment) =>
         (value + alignment - 1) & ~(alignment - 1);
 
-    private static void WriteUInt32(Stream stream, uint value)
+    static void WriteUInt32(Stream stream, uint value)
     {
         stream.WriteByte((byte)(value & 0xFF));
         stream.WriteByte((byte)((value >> 8) & 0xFF));
@@ -575,7 +580,7 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
         stream.WriteByte((byte)((value >> 24) & 0xFF));
     }
 
-    private static void WriteInt32(Stream stream, int value)
+    static void WriteInt32(Stream stream, int value)
     {
         stream.WriteByte((byte)(value & 0xFF));
         stream.WriteByte((byte)((value >> 8) & 0xFF));
@@ -583,13 +588,13 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
         stream.WriteByte((byte)((value >> 24) & 0xFF));
     }
 
-    private static void WriteUInt16(Stream stream, ushort value)
+    static void WriteUInt16(Stream stream, ushort value)
     {
         stream.WriteByte((byte)(value & 0xFF));
         stream.WriteByte((byte)((value >> 8) & 0xFF));
     }
 
-    private static ushort ReadUInt16(Stream stream)
+    static ushort ReadUInt16(Stream stream)
     {
         var buffer = new byte[2];
         var totalRead = 0;
@@ -602,7 +607,7 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
         return BitConverter.ToUInt16(buffer, 0);
     }
 
-    private static uint ReadUInt32(Stream stream)
+    static uint ReadUInt32(Stream stream)
     {
         var buffer = new byte[4];
         var totalRead = 0;
@@ -615,7 +620,7 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
         return BitConverter.ToUInt32(buffer, 0);
     }
 
-    private static ulong ReadUInt64(Stream stream)
+    static ulong ReadUInt64(Stream stream)
     {
         var buffer = new byte[8];
         var totalRead = 0;
@@ -628,7 +633,7 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
         return BitConverter.ToUInt64(buffer, 0);
     }
 
-    private static void WriteUInt64(Stream stream, ulong value)
+    static void WriteUInt64(Stream stream, ulong value)
     {
         stream.WriteByte((byte)(value & 0xFF));
         stream.WriteByte((byte)((value >> 8) & 0xFF));
@@ -640,7 +645,7 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
         stream.WriteByte((byte)((value >> 56) & 0xFF));
     }
 
-    private void PatchImportTableEntries(Stream output, long tableFileOffset, int entrySize,
+    void PatchImportTableEntries(Stream output, long tableFileOffset, int entrySize,
         uint metadataSectionRvaStart, uint metadataSectionRvaEnd, uint oldMetadataRvaEnd, int sizeDiff)
     {
         for (int i = 0; i < 100; i++)  // Safety limit

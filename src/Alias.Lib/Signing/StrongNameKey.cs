@@ -20,11 +20,17 @@ public sealed class StrongNameKey
     /// </summary>
     public byte[] PublicKeyToken { get; }
 
-    private StrongNameKey(RSA rsa, byte[] publicKey, byte[] publicKeyToken)
+    /// <summary>
+    /// The raw key pair blob (for Cecil strong naming).
+    /// </summary>
+    public byte[] KeyPair { get; }
+
+    private StrongNameKey(RSA rsa, byte[] publicKey, byte[] publicKeyToken, byte[] keyPair)
     {
         Rsa = rsa;
         PublicKey = publicKey;
         PublicKeyToken = publicKeyToken;
+        KeyPair = keyPair;
     }
 
     /// <summary>
@@ -44,7 +50,7 @@ public sealed class StrongNameKey
         var rsa = FromCapiKeyBlob(blob);
         var publicKey = BuildPublicKeyBlob(rsa);
         var publicKeyToken = ComputePublicKeyToken(publicKey);
-        return new(rsa, publicKey, publicKeyToken);
+        return new(rsa, publicKey, publicKeyToken, blob);
     }
 
     static RSA FromCapiKeyBlob(byte[] blob)
@@ -176,7 +182,7 @@ public sealed class StrongNameKey
         return result;
     }
 
-    private static byte[] BuildPublicKeyBlob(RSA rsa)
+    static byte[] BuildPublicKeyBlob(RSA rsa)
     {
         var parameters = rsa.ExportParameters(false);
         var keyLength = parameters.Modulus!.Length;
@@ -206,7 +212,9 @@ public sealed class StrongNameKey
         // Public exponent (little-endian)
         var exp = parameters.Exponent!;
         for (int i = 0; i < exp.Length && i < 4; i++)
+        {
             capiBlob[16 + i] = exp[exp.Length - 1 - i];
+        }
 
         // Modulus (little-endian)
         var modulus = (byte[])parameters.Modulus.Clone();
@@ -249,7 +257,9 @@ public sealed class StrongNameKey
         // Take last 8 bytes, reversed
         var token = new byte[8];
         for (int i = 0; i < 8; i++)
+        {
             token[i] = hash[hash.Length - 1 - i];
+        }
 
         return token;
     }

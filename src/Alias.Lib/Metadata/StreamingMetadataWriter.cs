@@ -104,7 +104,7 @@ public sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modi
         }
     }
 
-    private void WriteMetadataRoot(BinaryWriter writer)
+    void WriteMetadataRoot(BinaryWriter writer)
     {
         // BSJB signature
         writer.Write(0x424a5342u);
@@ -131,7 +131,7 @@ public sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modi
         writer.Write((ushort)source.PEFile.StreamHeaders.Length);
     }
 
-    private uint WriteTableHeap(BinaryWriter writer)
+    uint WriteTableHeap(BinaryWriter writer)
     {
         var startPos = writer.BaseStream.Position;
 
@@ -197,7 +197,7 @@ public sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modi
         return (uint)(writer.BaseStream.Position - startPos);
     }
 
-    private void WriteTableData(BinaryWriter writer, TableIndex table)
+    void WriteTableData(BinaryWriter writer, TableIndex table)
     {
         var rowCount = source.GetRowCount(table);
 
@@ -279,7 +279,7 @@ public sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modi
         }
     }
 
-    private void WriteCustomAttributeTable(BinaryWriter writer, int existingCount)
+    void WriteCustomAttributeTable(BinaryWriter writer, int existingCount)
     {
         // CustomAttribute table must be sorted by Parent
         var allRows = new List<CustomAttributeRow>();
@@ -306,7 +306,7 @@ public sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modi
         }
     }
 
-    private uint WriteStringHeap(BinaryWriter writer)
+    uint WriteStringHeap(BinaryWriter writer)
     {
         var startPos = writer.BaseStream.Position;
 
@@ -326,7 +326,7 @@ public sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modi
         return (uint)(writer.BaseStream.Position - startPos);
     }
 
-    private uint WriteBlobHeap(BinaryWriter writer)
+    uint WriteBlobHeap(BinaryWriter writer)
     {
         var startPos = writer.BaseStream.Position;
 
@@ -345,7 +345,7 @@ public sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modi
         return (uint)(writer.BaseStream.Position - startPos);
     }
 
-    private uint WriteGuidHeap(BinaryWriter writer)
+    uint WriteGuidHeap(BinaryWriter writer)
     {
         var startPos = writer.BaseStream.Position;
 
@@ -357,7 +357,7 @@ public sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modi
         return (uint)(writer.BaseStream.Position - startPos);
     }
 
-    private static void WriteCompressedLength(BinaryWriter writer, int length)
+    static void WriteCompressedLength(BinaryWriter writer, int length)
     {
         if (length < 0x80)
         {
@@ -377,7 +377,7 @@ public sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modi
         }
     }
 
-    private static void WriteAlignedString(BinaryWriter writer, string value)
+    static void WriteAlignedString(BinaryWriter writer, string value)
     {
         var bytes = Encoding.ASCII.GetBytes(value);
         writer.Write(bytes);
@@ -387,14 +387,18 @@ public sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modi
         var totalLen = bytes.Length + 1;
         var aligned = (totalLen + 3) & ~3;
         for (int i = totalLen; i < aligned; i++)
+        {
             writer.Write((byte)0);
+        }
     }
 
-    private static void AlignTo4(BinaryWriter writer)
+    static void AlignTo4(BinaryWriter writer)
     {
         var pos = writer.BaseStream.Position;
         var aligned = (pos + 3) & ~3;
         while (writer.BaseStream.Position < aligned)
+        {
             writer.Write((byte)0);
+        }
     }
 }

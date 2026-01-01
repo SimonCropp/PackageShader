@@ -13,25 +13,25 @@ namespace Alias.Lib.Metadata;
 /// </summary>
 public sealed class StreamingMetadataReader : IDisposable
 {
-    private readonly StreamingPEFile _peFile;
-    private readonly SrmMetadataReader _reader;
-    private readonly long _metadataBaseOffset;
-    private bool _disposed;
+    StreamingPEFile peFile;
+    SrmMetadataReader reader;
+    long metadataBaseOffset;
+    bool disposed;
 
     // Heap locations (file offsets) - needed for streaming copy
-    private long _stringHeapOffset;
-    private uint _stringHeapSize;
-    private long _blobHeapOffset;
-    private uint _blobHeapSize;
-    private long _guidHeapOffset;
-    private uint _guidHeapSize;
-    private long _tableHeapOffset;
-    private uint _tableHeapSize;
+    long stringHeapOffset;
+    uint stringHeapSize;
+    long blobHeapOffset;
+    uint blobHeapSize;
+    long guidHeapOffset;
+    uint guidHeapSize;
+    long tableHeapOffset;
+    uint tableHeapSize;
 
     // Table heap info - needed for writing
-    private readonly TableInfo[] _tables = new TableInfo[64];
-    private readonly int[] _codedIndexSizes = new int[14];
-    private long _tableDataOffset;
+    TableInfo[] tables = new TableInfo[64];
+    int[] codedIndexSizes = new int[14];
+    long tableDataOffset;
 
     // Index sizes - needed for writing
     public int StringIndexSize { get; private set; } = 2;
@@ -44,11 +44,11 @@ public sealed class StreamingMetadataReader : IDisposable
 
     public StreamingMetadataReader(StreamingPEFile peFile)
     {
-        _peFile = peFile;
-        _metadataBaseOffset = peFile.MetadataFileOffset;
+        this.peFile = peFile;
+        metadataBaseOffset = peFile.MetadataFileOffset;
 
         // Use PEReader from StreamingPEFile (avoids duplicate file handles)
-        _reader = peFile.PEReader.GetMetadataReader();
+        reader = peFile.PEReader.GetMetadataReader();
 
         // Parse stream headers for heap locations (needed for streaming copy)
         ParseStreamLocations();
@@ -60,42 +60,44 @@ public sealed class StreamingMetadataReader : IDisposable
     /// <summary>
     /// Gets the underlying System.Reflection.Metadata reader for direct access.
     /// </summary>
-    public SrmMetadataReader Reader => _reader;
+    public SrmMetadataReader Reader => reader;
 
-    private void ParseStreamLocations()
+    void ParseStreamLocations()
     {
-        foreach (var header in _peFile.StreamHeaders)
+        foreach (var header in peFile.StreamHeaders)
         {
-            var offset = _metadataBaseOffset + header.Offset;
+            var offset = metadataBaseOffset + header.Offset;
             switch (header.Name)
             {
                 case "#Strings":
-                    _stringHeapOffset = offset;
-                    _stringHeapSize = header.Size;
+                    stringHeapOffset = offset;
+                    stringHeapSize = header.Size;
                     break;
                 case "#Blob":
-                    _blobHeapOffset = offset;
-                    _blobHeapSize = header.Size;
+                    blobHeapOffset = offset;
+                    blobHeapSize = header.Size;
                     break;
                 case "#GUID":
-                    _guidHeapOffset = offset;
-                    _guidHeapSize = header.Size;
+                    guidHeapOffset = offset;
+                    guidHeapSize = header.Size;
                     break;
                 case "#~":
                 case "#-":
-                    _tableHeapOffset = offset;
-                    _tableHeapSize = header.Size;
+                    tableHeapOffset = offset;
+                    tableHeapSize = header.Size;
                     break;
             }
         }
     }
 
-    private void ParseTableLayout()
+    void ParseTableLayout()
     {
-        if (_tableHeapSize < 24)
+        if (tableHeapSize < 24)
+        {
             throw new BadImageFormatException("Table heap too small");
+        }
 
-        var header = _peFile.ReadBytesAt(_tableHeapOffset, 24);
+        var header = peFile.ReadBytesAt(tableHeapOffset, 24);
         int position = 6; // Skip reserved (4), MajorVersion (1), MinorVersion (1)
 
         // HeapSizes
@@ -122,22 +124,22 @@ public sealed class StreamingMetadataReader : IDisposable
         }
 
         // Read row counts
-        var rowCountsData = _peFile.ReadBytesAt(_tableHeapOffset + 24, presentTableCount * 4);
+        var rowCountsData = peFile.ReadBytesAt(tableHeapOffset + 24, presentTableCount * 4);
         int rowCountPos = 0;
         for (int i = 0; i < 64; i++)
         {
             if ((Valid & (1L << i)) == 0)
                 continue;
-            _tables[i].RowCount = BitConverter.ToUInt32(rowCountsData, rowCountPos);
+            tables[i].RowCount = BitConverter.ToUInt32(rowCountsData, rowCountPos);
             rowCountPos += 4;
         }
 
         // Compute table row sizes and offsets
-        _tableDataOffset = _tableHeapOffset + 24 + presentTableCount * 4;
+        tableDataOffset = tableHeapOffset + 24 + presentTableCount * 4;
         ComputeTableInfo();
     }
 
-    private void ComputeTableInfo()
+    void ComputeTableInfo()
     {
         uint offset = 0;
 
@@ -148,13 +150,13 @@ public sealed class StreamingMetadataReader : IDisposable
                 continue;
 
             int rowSize = ComputeRowSize(table);
-            _tables[i].RowSize = (uint)rowSize;
-            _tables[i].Offset = offset;
-            offset += (uint)(rowSize * _tables[i].RowCount);
+            tables[i].RowSize = (uint)rowSize;
+            tables[i].Offset = offset;
+            offset += (uint)(rowSize * tables[i].RowCount);
         }
     }
 
-    private int ComputeRowSize(TableIndex table) =>
+    int ComputeRowSize(TableIndex table) =>
         table switch
         {
             TableIndex.Module => 2 + StringIndexSize + GuidIndexSize * 3,
@@ -225,7 +227,7 @@ public sealed class StreamingMetadataReader : IDisposable
         (int)table < 64 && (Valid & (1L << (int)table)) != 0;
 
     public int GetRowCount(TableIndex table) =>
-        (int)table < 64 ? (int)_tables[(int)table].RowCount : 0;
+        (int)table < 64 ? (int)tables[(int)table].RowCount : 0;
 
     public int GetTableIndexSize(TableIndex table) =>
         GetRowCount(table) < 65536 ? 2 : 4;
@@ -233,10 +235,10 @@ public sealed class StreamingMetadataReader : IDisposable
     public int GetCodedIndexSize(CodedIndex codedIndex)
     {
         var index = (int)codedIndex;
-        if (_codedIndexSizes[index] != 0)
-            return _codedIndexSizes[index];
+        if (codedIndexSizes[index] != 0)
+            return codedIndexSizes[index];
 
-        return _codedIndexSizes[index] = CodedIndexHelper.GetSize(codedIndex, t => GetRowCount(t));
+        return codedIndexSizes[index] = CodedIndexHelper.GetSize(codedIndex, t => GetRowCount(t));
     }
 
     /// <summary>
@@ -244,12 +246,12 @@ public sealed class StreamingMetadataReader : IDisposable
     /// </summary>
     public byte[] ReadRow(TableIndex table, uint rid)
     {
-        if ((int)table >= 64 || rid == 0 || rid > _tables[(int)table].RowCount)
+        if ((int)table >= 64 || rid == 0 || rid > tables[(int)table].RowCount)
             return Array.Empty<byte>();
 
-        var info = _tables[(int)table];
-        var offset = _tableDataOffset + info.Offset + (rid - 1) * info.RowSize;
-        return _peFile.ReadBytesAt(offset, (int)info.RowSize);
+        var info = tables[(int)table];
+        var offset = tableDataOffset + info.Offset + (rid - 1) * info.RowSize;
+        return peFile.ReadBytesAt(offset, (int)info.RowSize);
     }
 
     /// <summary>
@@ -257,14 +259,14 @@ public sealed class StreamingMetadataReader : IDisposable
     /// </summary>
     public long GetRowOffset(TableIndex table, uint rid)
     {
-        var info = _tables[(int)table];
-        return _tableDataOffset + info.Offset + (rid - 1) * info.RowSize;
+        var info = tables[(int)table];
+        return tableDataOffset + info.Offset + (rid - 1) * info.RowSize;
     }
 
     /// <summary>
     /// Gets the row size for a table.
     /// </summary>
-    public int GetRowSize(TableIndex table) => (int)_tables[(int)table].RowSize;
+    public int GetRowSize(TableIndex table) => (int)tables[(int)table].RowSize;
 
     #endregion
 
@@ -277,18 +279,18 @@ public sealed class StreamingMetadataReader : IDisposable
     {
         if (index == 0) return string.Empty;
         var handle = MetadataTokens.StringHandle((int)index);
-        return _reader.GetString(handle);
+        return reader.GetString(handle);
     }
 
     /// <summary>
     /// Gets the string heap size.
     /// </summary>
-    public uint StringHeapSize => _stringHeapSize;
+    public uint StringHeapSize => stringHeapSize;
 
     /// <summary>
     /// Gets the blob heap size.
     /// </summary>
-    public uint BlobHeapSize => _blobHeapSize;
+    public uint BlobHeapSize => blobHeapSize;
 
     /// <summary>
     /// Reads an assembly row.
@@ -298,7 +300,7 @@ public sealed class StreamingMetadataReader : IDisposable
         if (!HasTable(TableIndex.Assembly) || rid == 0 || rid > GetRowCount(TableIndex.Assembly))
             throw new InvalidOperationException($"No Assembly row found at rid {rid}. HasTable={HasTable(TableIndex.Assembly)}, RowCount={GetRowCount(TableIndex.Assembly)}");
 
-        var asm = _reader.GetAssemblyDefinition();
+        var asm = reader.GetAssemblyDefinition();
         return new AssemblyRow
         {
             HashAlgId = (uint)asm.HashAlgorithm,
@@ -319,7 +321,7 @@ public sealed class StreamingMetadataReader : IDisposable
     public AssemblyRefRow ReadAssemblyRefRow(uint rid)
     {
         var handle = MetadataTokens.AssemblyReferenceHandle((int)rid);
-        var asmRef = _reader.GetAssemblyReference(handle);
+        var asmRef = reader.GetAssemblyReference(handle);
         return new AssemblyRefRow
         {
             MajorVersion = (ushort)asmRef.Version.Major,
@@ -389,10 +391,10 @@ public sealed class StreamingMetadataReader : IDisposable
     public (uint rid, AssemblyRefRow row)? FindAssemblyRef(string name)
     {
         uint rid = 1;
-        foreach (var handle in _reader.AssemblyReferences)
+        foreach (var handle in reader.AssemblyReferences)
         {
-            var asmRef = _reader.GetAssemblyReference(handle);
-            var refName = _reader.GetString(asmRef.Name);
+            var asmRef = reader.GetAssemblyReference(handle);
+            var refName = reader.GetString(asmRef.Name);
             if (string.Equals(refName, name, StringComparison.OrdinalIgnoreCase))
             {
                 return (rid, new AssemblyRefRow
@@ -419,11 +421,11 @@ public sealed class StreamingMetadataReader : IDisposable
     public uint? FindTypeRef(string name, string @namespace)
     {
         uint rid = 1;
-        foreach (var handle in _reader.TypeReferences)
+        foreach (var handle in reader.TypeReferences)
         {
-            var typeRef = _reader.GetTypeReference(handle);
-            var typeName = _reader.GetString(typeRef.Name);
-            var typeNamespace = _reader.GetString(typeRef.Namespace);
+            var typeRef = reader.GetTypeReference(handle);
+            var typeName = reader.GetString(typeRef.Name);
+            var typeNamespace = reader.GetString(typeRef.Namespace);
             if (string.Equals(typeName, name, StringComparison.Ordinal) &&
                 string.Equals(typeNamespace, @namespace, StringComparison.Ordinal))
                 return rid;
@@ -440,15 +442,15 @@ public sealed class StreamingMetadataReader : IDisposable
         var typeRefHandle = MetadataTokens.TypeReferenceHandle((int)typeRefRid);
 
         uint rid = 1;
-        foreach (var handle in _reader.MemberReferences)
+        foreach (var handle in reader.MemberReferences)
         {
-            var memberRef = _reader.GetMemberReference(handle);
+            var memberRef = reader.GetMemberReference(handle);
             if (memberRef.Parent.Kind == HandleKind.TypeReference)
             {
                 var parentHandle = (TypeReferenceHandle)memberRef.Parent;
                 if (parentHandle == typeRefHandle)
                 {
-                    var memberName = _reader.GetString(memberRef.Name);
+                    var memberName = reader.GetString(memberRef.Name);
                     if (string.Equals(memberName, name, StringComparison.Ordinal))
                         return rid;
                 }
@@ -466,44 +468,44 @@ public sealed class StreamingMetadataReader : IDisposable
     /// Copies the string heap to an output stream.
     /// </summary>
     public void CopyStringHeap(Stream destination) =>
-        _peFile.CopyRegion(_stringHeapOffset, _stringHeapSize, destination);
+        peFile.CopyRegion(stringHeapOffset, stringHeapSize, destination);
 
     /// <summary>
     /// Copies the blob heap to an output stream.
     /// </summary>
     public void CopyBlobHeap(Stream destination) =>
-        _peFile.CopyRegion(_blobHeapOffset, _blobHeapSize, destination);
+        peFile.CopyRegion(blobHeapOffset, blobHeapSize, destination);
 
     /// <summary>
     /// Copies the GUID heap to an output stream.
     /// </summary>
     public void CopyGuidHeap(Stream destination) =>
-        _peFile.CopyRegion(_guidHeapOffset, _guidHeapSize, destination);
+        peFile.CopyRegion(guidHeapOffset, guidHeapSize, destination);
 
     /// <summary>
     /// Copies a table's data to an output stream.
     /// </summary>
     public void CopyTableData(TableIndex table, Stream destination)
     {
-        var info = _tables[(int)table];
+        var info = tables[(int)table];
         if (info.RowCount == 0) return;
 
         var size = info.RowSize * info.RowCount;
-        var offset = _tableDataOffset + info.Offset;
-        _peFile.CopyRegion(offset, size, destination);
+        var offset = tableDataOffset + info.Offset;
+        peFile.CopyRegion(offset, size, destination);
     }
 
     /// <summary>
     /// Gets the underlying PE file.
     /// </summary>
-    public StreamingPEFile PEFile => _peFile;
+    public StreamingPEFile PEFile => peFile;
 
     #endregion
 
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
+        if (disposed) return;
+        disposed = true;
         // Don't dispose _peFile - caller owns it
         // PEReader is owned by StreamingPEFile
     }
