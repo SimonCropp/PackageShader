@@ -362,6 +362,7 @@ public sealed class StreamingAssemblyModifier : IDisposable
         if (isSameFile && tempPath != null)
         {
             // Close source file and replace with temp
+            _metadata.Dispose();
             _peFile.Dispose();
             File.Delete(path);
             File.Move(tempPath, path);
@@ -381,6 +382,7 @@ public sealed class StreamingAssemblyModifier : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        _metadata.Dispose();
         _peFile.Dispose();
     }
 }

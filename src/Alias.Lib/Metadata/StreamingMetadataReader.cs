@@ -1,20 +1,27 @@
-using System.Text;
+using System.Reflection.Metadata;
+using System.Reflection.Metadata.Ecma335;
+using System.Reflection.PortableExecutable;
 using Alias.Lib.Metadata.Tables;
 using Alias.Lib.PE;
+using SrmMetadataReader = System.Reflection.Metadata.MetadataReader;
+using CodedIndex = Alias.Lib.Metadata.Tables.CodedIndex;
 
 namespace Alias.Lib.Metadata;
 
 /// <summary>
-/// Reads metadata on-demand without loading entire heaps into memory.
-/// Uses lazy access with small LRU caching for frequently accessed data.
+/// Reads metadata using System.Reflection.Metadata for parsing,
+/// while maintaining layout information needed for writing modifications.
 /// </summary>
 public sealed class StreamingMetadataReader : IDisposable
 {
     private readonly StreamingPEFile _peFile;
+    private readonly FileStream _fileStream;
+    private readonly PEReader _peReader;
+    private readonly SrmMetadataReader _reader;
     private readonly long _metadataBaseOffset;
     private bool _disposed;
 
-    // Heap locations (file offsets)
+    // Heap locations (file offsets) - needed for streaming copy
     private long _stringHeapOffset;
     private uint _stringHeapSize;
     private long _blobHeapOffset;
@@ -24,12 +31,12 @@ public sealed class StreamingMetadataReader : IDisposable
     private long _tableHeapOffset;
     private uint _tableHeapSize;
 
-    // Table heap info (parsed on construction - small)
-    private readonly TableInfo[] _tables = new TableInfo[58];
+    // Table heap info - needed for writing
+    private readonly TableInfo[] _tables = new TableInfo[64];
     private readonly int[] _codedIndexSizes = new int[14];
     private long _tableDataOffset;
 
-    // Index sizes
+    // Index sizes - needed for writing
     public int StringIndexSize { get; private set; } = 2;
     public int GuidIndexSize { get; private set; } = 2;
     public int BlobIndexSize { get; private set; } = 2;
@@ -38,22 +45,27 @@ public sealed class StreamingMetadataReader : IDisposable
     public long Valid { get; private set; }
     public long Sorted { get; private set; }
 
-    // Small LRU caches
-    private readonly Dictionary<uint, string> _stringCache = new();
-    private readonly Dictionary<uint, byte[]> _blobCache = new();
-    private const int MaxCacheSize = 128;
-
     public StreamingMetadataReader(StreamingPEFile peFile)
     {
         _peFile = peFile;
         _metadataBaseOffset = peFile.MetadataFileOffset;
 
-        // Parse stream headers to find heap locations
+        // Open file for SRM
+        _fileStream = new FileStream(peFile.FilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        _peReader = new PEReader(_fileStream);
+        _reader = _peReader.GetMetadataReader();
+
+        // Parse stream headers for heap locations (needed for streaming copy)
         ParseStreamLocations();
 
-        // Parse table heap header (required to know row sizes)
-        ParseTableHeapHeader();
+        // Parse table layout (needed for writing)
+        ParseTableLayout();
     }
+
+    /// <summary>
+    /// Gets the underlying System.Reflection.Metadata reader for direct access.
+    /// </summary>
+    public SrmMetadataReader Reader => _reader;
 
     private void ParseStreamLocations()
     {
@@ -83,7 +95,7 @@ public sealed class StreamingMetadataReader : IDisposable
         }
     }
 
-    private void ParseTableHeapHeader()
+    private void ParseTableLayout()
     {
         if (_tableHeapSize < 24)
             throw new BadImageFormatException("Table heap too small");
@@ -108,7 +120,7 @@ public sealed class StreamingMetadataReader : IDisposable
 
         // Count present tables to read row counts
         int presentTableCount = 0;
-        for (int i = 0; i < 58; i++)
+        for (int i = 0; i < 64; i++)
         {
             if ((Valid & (1L << i)) != 0)
                 presentTableCount++;
@@ -117,7 +129,7 @@ public sealed class StreamingMetadataReader : IDisposable
         // Read row counts
         var rowCountsData = _peFile.ReadBytesAt(_tableHeapOffset + 24, presentTableCount * 4);
         int rowCountPos = 0;
-        for (int i = 0; i < 58; i++)
+        for (int i = 0; i < 64; i++)
         {
             if ((Valid & (1L << i)) == 0)
                 continue;
@@ -134,7 +146,7 @@ public sealed class StreamingMetadataReader : IDisposable
     {
         uint offset = 0;
 
-        for (int i = 0; i < 58; i++)
+        for (int i = 0; i < 64; i++)
         {
             var table = (Table)i;
             if (!HasTable(table))
@@ -209,16 +221,16 @@ public sealed class StreamingMetadataReader : IDisposable
             Table.StateMachineMethod => GetTableIndexSize(Table.Method) * 2,
             Table.CustomDebugInformation => GetCodedIndexSize(CodedIndex.HasCustomDebugInformation)
                                             + GuidIndexSize + BlobIndexSize,
-            _ => throw new NotSupportedException($"Unknown table: {table}")
+            _ => 0 // Unknown tables - return 0
         };
 
     #region Table Access
 
     public bool HasTable(Table table) =>
-        (Valid & (1L << (int)table)) != 0;
+        (int)table < 64 && (Valid & (1L << (int)table)) != 0;
 
     public int GetRowCount(Table table) =>
-        (int)_tables[(int)table].RowCount;
+        (int)table < 64 ? (int)_tables[(int)table].RowCount : 0;
 
     public int GetTableIndexSize(Table table) =>
         GetRowCount(table) < 65536 ? 2 : 4;
@@ -237,7 +249,7 @@ public sealed class StreamingMetadataReader : IDisposable
     /// </summary>
     public byte[] ReadRow(Table table, uint rid)
     {
-        if (rid == 0 || rid > _tables[(int)table].RowCount)
+        if ((int)table >= 64 || rid == 0 || rid > _tables[(int)table].RowCount)
             return Array.Empty<byte>();
 
         var info = _tables[(int)table];
@@ -261,58 +273,16 @@ public sealed class StreamingMetadataReader : IDisposable
 
     #endregion
 
-    #region String Heap Access
+    #region High-Level API using SRM
 
     /// <summary>
-    /// Reads a string at the given index.
+    /// Reads a string from the string heap.
     /// </summary>
     public string ReadString(uint index)
     {
-        if (index == 0)
-            return string.Empty;
-
-        if (_stringCache.TryGetValue(index, out var cached))
-            return cached;
-
-        if (index >= _stringHeapSize)
-            return string.Empty;
-
-        // Read the string from file
-        var offset = _stringHeapOffset + index;
-
-        // Read in chunks to find null terminator
-        var buffer = new byte[256];
-        var sb = new StringBuilder();
-        long currentOffset = offset;
-
-        while (currentOffset < _stringHeapOffset + _stringHeapSize)
-        {
-            var toRead = (int)Math.Min(buffer.Length, _stringHeapOffset + _stringHeapSize - currentOffset);
-            var read = _peFile.ReadAt(currentOffset, buffer, 0, toRead);
-            if (read == 0) break;
-
-            // Find null terminator
-            var nullIndex = Array.IndexOf(buffer, (byte)0, 0, read);
-            if (nullIndex >= 0)
-            {
-                sb.Append(Encoding.UTF8.GetString(buffer, 0, nullIndex));
-                break;
-            }
-            else
-            {
-                sb.Append(Encoding.UTF8.GetString(buffer, 0, read));
-                currentOffset += read;
-            }
-        }
-
-        var str = sb.ToString();
-
-        // Add to cache (with eviction if too large)
-        if (_stringCache.Count >= MaxCacheSize)
-            _stringCache.Clear();
-        _stringCache[index] = str;
-
-        return str;
+        if (index == 0) return string.Empty;
+        var handle = MetadataTokens.StringHandle((int)index);
+        return _reader.GetString(handle);
     }
 
     /// <summary>
@@ -320,18 +290,10 @@ public sealed class StreamingMetadataReader : IDisposable
     /// </summary>
     public uint StringHeapSize => _stringHeapSize;
 
-    #endregion
-
-    #region Blob Heap Access
-
     /// <summary>
     /// Gets the blob heap size.
     /// </summary>
     public uint BlobHeapSize => _blobHeapSize;
-
-    #endregion
-
-    #region High-Level API
 
     /// <summary>
     /// Reads an assembly row.
@@ -341,8 +303,19 @@ public sealed class StreamingMetadataReader : IDisposable
         if (!HasTable(Table.Assembly) || rid == 0 || rid > GetRowCount(Table.Assembly))
             throw new InvalidOperationException($"No Assembly row found at rid {rid}. HasTable={HasTable(Table.Assembly)}, RowCount={GetRowCount(Table.Assembly)}");
 
-        var data = ReadRow(Table.Assembly, rid);
-        return AssemblyRow.Read(data, BlobIndexSize, StringIndexSize);
+        var asm = _reader.GetAssemblyDefinition();
+        return new AssemblyRow
+        {
+            HashAlgId = (uint)asm.HashAlgorithm,
+            MajorVersion = (ushort)asm.Version.Major,
+            MinorVersion = (ushort)asm.Version.Minor,
+            BuildNumber = (ushort)asm.Version.Build,
+            RevisionNumber = (ushort)asm.Version.Revision,
+            Flags = (uint)asm.Flags,
+            PublicKeyIndex = (uint)MetadataTokens.GetHeapOffset(asm.PublicKey),
+            NameIndex = (uint)MetadataTokens.GetHeapOffset(asm.Name),
+            CultureIndex = (uint)MetadataTokens.GetHeapOffset(asm.Culture)
+        };
     }
 
     /// <summary>
@@ -350,8 +323,20 @@ public sealed class StreamingMetadataReader : IDisposable
     /// </summary>
     public AssemblyRefRow ReadAssemblyRefRow(uint rid)
     {
-        var data = ReadRow(Table.AssemblyRef, rid);
-        return AssemblyRefRow.Read(data, BlobIndexSize, StringIndexSize);
+        var handle = MetadataTokens.AssemblyReferenceHandle((int)rid);
+        var asmRef = _reader.GetAssemblyReference(handle);
+        return new AssemblyRefRow
+        {
+            MajorVersion = (ushort)asmRef.Version.Major,
+            MinorVersion = (ushort)asmRef.Version.Minor,
+            BuildNumber = (ushort)asmRef.Version.Build,
+            RevisionNumber = (ushort)asmRef.Version.Revision,
+            Flags = (uint)asmRef.Flags,
+            PublicKeyOrTokenIndex = (uint)MetadataTokens.GetHeapOffset(asmRef.PublicKeyOrToken),
+            NameIndex = (uint)MetadataTokens.GetHeapOffset(asmRef.Name),
+            CultureIndex = (uint)MetadataTokens.GetHeapOffset(asmRef.Culture),
+            HashValueIndex = (uint)MetadataTokens.GetHeapOffset(asmRef.HashValue)
+        };
     }
 
     /// <summary>
@@ -359,6 +344,7 @@ public sealed class StreamingMetadataReader : IDisposable
     /// </summary>
     public TypeDefRow ReadTypeDefRow(uint rid)
     {
+        // Use raw reading since we need the exact index values for potential modification
         var data = ReadRow(Table.TypeDef, rid);
         return TypeDefRow.Read(data,
             StringIndexSize,
@@ -379,18 +365,6 @@ public sealed class StreamingMetadataReader : IDisposable
     }
 
     /// <summary>
-    /// Reads a custom attribute row.
-    /// </summary>
-    public CustomAttributeRow ReadCustomAttributeRow(uint rid)
-    {
-        var data = ReadRow(Table.CustomAttribute, rid);
-        return CustomAttributeRow.Read(data,
-            GetCodedIndexSize(CodedIndex.HasCustomAttribute),
-            GetCodedIndexSize(CodedIndex.CustomAttributeType),
-            BlobIndexSize);
-    }
-
-    /// <summary>
     /// Reads a member reference row.
     /// </summary>
     public MemberRefRow ReadMemberRefRow(uint rid)
@@ -403,17 +377,43 @@ public sealed class StreamingMetadataReader : IDisposable
     }
 
     /// <summary>
+    /// Reads a custom attribute row.
+    /// </summary>
+    public CustomAttributeRow ReadCustomAttributeRow(uint rid)
+    {
+        var data = ReadRow(Table.CustomAttribute, rid);
+        return CustomAttributeRow.Read(data,
+            GetCodedIndexSize(CodedIndex.HasCustomAttribute),
+            GetCodedIndexSize(CodedIndex.CustomAttributeType),
+            BlobIndexSize);
+    }
+
+    /// <summary>
     /// Finds an assembly reference by name.
     /// </summary>
     public (uint rid, AssemblyRefRow row)? FindAssemblyRef(string name)
     {
-        var count = GetRowCount(Table.AssemblyRef);
-        for (uint i = 1; i <= count; i++)
+        uint rid = 1;
+        foreach (var handle in _reader.AssemblyReferences)
         {
-            var row = ReadAssemblyRefRow(i);
-            var refName = ReadString(row.NameIndex);
+            var asmRef = _reader.GetAssemblyReference(handle);
+            var refName = _reader.GetString(asmRef.Name);
             if (string.Equals(refName, name, StringComparison.OrdinalIgnoreCase))
-                return (i, row);
+            {
+                return (rid, new AssemblyRefRow
+                {
+                    MajorVersion = (ushort)asmRef.Version.Major,
+                    MinorVersion = (ushort)asmRef.Version.Minor,
+                    BuildNumber = (ushort)asmRef.Version.Build,
+                    RevisionNumber = (ushort)asmRef.Version.Revision,
+                    Flags = (uint)asmRef.Flags,
+                    PublicKeyOrTokenIndex = (uint)MetadataTokens.GetHeapOffset(asmRef.PublicKeyOrToken),
+                    NameIndex = (uint)MetadataTokens.GetHeapOffset(asmRef.Name),
+                    CultureIndex = (uint)MetadataTokens.GetHeapOffset(asmRef.Culture),
+                    HashValueIndex = (uint)MetadataTokens.GetHeapOffset(asmRef.HashValue)
+                });
+            }
+            rid++;
         }
         return null;
     }
@@ -423,15 +423,16 @@ public sealed class StreamingMetadataReader : IDisposable
     /// </summary>
     public uint? FindTypeRef(string name, string @namespace)
     {
-        var count = GetRowCount(Table.TypeRef);
-        for (uint i = 1; i <= count; i++)
+        uint rid = 1;
+        foreach (var handle in _reader.TypeReferences)
         {
-            var row = ReadTypeRefRow(i);
-            var typeName = ReadString(row.NameIndex);
-            var typeNamespace = ReadString(row.NamespaceIndex);
+            var typeRef = _reader.GetTypeReference(handle);
+            var typeName = _reader.GetString(typeRef.Name);
+            var typeNamespace = _reader.GetString(typeRef.Namespace);
             if (string.Equals(typeName, name, StringComparison.Ordinal) &&
                 string.Equals(typeNamespace, @namespace, StringComparison.Ordinal))
-                return i;
+                return rid;
+            rid++;
         }
         return null;
     }
@@ -441,20 +442,23 @@ public sealed class StreamingMetadataReader : IDisposable
     /// </summary>
     public uint? FindMemberRef(uint typeRefRid, string name)
     {
-        // Encode the TypeRef token for comparison
-        var parentToken = new MetadataToken(TokenType.TypeRef, typeRefRid);
-        var expectedParent = CodedIndexHelper.EncodeToken(CodedIndex.MemberRefParent, parentToken);
+        var typeRefHandle = MetadataTokens.TypeReferenceHandle((int)typeRefRid);
 
-        var count = GetRowCount(Table.MemberRef);
-        for (uint i = 1; i <= count; i++)
+        uint rid = 1;
+        foreach (var handle in _reader.MemberReferences)
         {
-            var row = ReadMemberRefRow(i);
-            if (row.ClassIndex == expectedParent)
+            var memberRef = _reader.GetMemberReference(handle);
+            if (memberRef.Parent.Kind == HandleKind.TypeReference)
             {
-                var memberName = ReadString(row.NameIndex);
-                if (string.Equals(memberName, name, StringComparison.Ordinal))
-                    return i;
+                var parentHandle = (TypeReferenceHandle)memberRef.Parent;
+                if (parentHandle == typeRefHandle)
+                {
+                    var memberName = _reader.GetString(memberRef.Name);
+                    if (string.Equals(memberName, name, StringComparison.Ordinal))
+                        return rid;
+                }
             }
+            rid++;
         }
         return null;
     }
@@ -505,6 +509,8 @@ public sealed class StreamingMetadataReader : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        _peReader.Dispose();
+        _fileStream.Dispose();
         // Don't dispose _peFile - caller owns it
     }
 }
