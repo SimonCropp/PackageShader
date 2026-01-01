@@ -83,42 +83,6 @@ public enum CodedIndex
 }
 
 /// <summary>
-/// Token types for metadata tokens.
-/// </summary>
-public enum TokenType : uint
-{
-    Module = 0x00000000,
-    TypeRef = 0x01000000,
-    TypeDef = 0x02000000,
-    Field = 0x04000000,
-    Method = 0x06000000,
-    Param = 0x08000000,
-    InterfaceImpl = 0x09000000,
-    MemberRef = 0x0a000000,
-    CustomAttribute = 0x0c000000,
-    Permission = 0x0e000000,
-    Signature = 0x11000000,
-    Event = 0x14000000,
-    Property = 0x17000000,
-    ModuleRef = 0x1a000000,
-    TypeSpec = 0x1b000000,
-    Assembly = 0x20000000,
-    AssemblyRef = 0x23000000,
-    File = 0x26000000,
-    ExportedType = 0x27000000,
-    ManifestResource = 0x28000000,
-    GenericParam = 0x2a000000,
-    MethodSpec = 0x2b000000,
-    GenericParamConstraint = 0x2c000000,
-    Document = 0x30000000,
-    LocalScope = 0x32000000,
-    LocalVariable = 0x33000000,
-    LocalConstant = 0x34000000,
-    ImportScope = 0x35000000,
-    String = 0x70000000,
-}
-
-/// <summary>
 /// Information about a metadata table.
 /// </summary>
 public struct TableInfo
@@ -139,10 +103,10 @@ public readonly struct MetadataToken
 
     public MetadataToken(uint value) => Value = value;
 
-    public MetadataToken(TokenType type, uint rid) => Value = (uint)type | rid;
+    public MetadataToken(Table table, uint rid) => Value = ((uint)table << 24) | rid;
 
     public uint RID => Value & 0x00ffffff;
-    public TokenType TokenType => (TokenType)(Value & 0xff000000);
+    public Table Table => (Table)(Value >> 24);
 
     public static MetadataToken Zero => new(0);
 
@@ -232,8 +196,7 @@ public static class CodedIndexHelper
         if ((byte)table == 0xFF)
             return MetadataToken.Zero;
 
-        var tokenType = TableToTokenType(table);
-        return new(tokenType, rid);
+        return new(table, rid);
     }
 
     /// <summary>
@@ -245,82 +208,13 @@ public static class CodedIndexHelper
             return 0;
 
         var (bits, tables) = GetCodedIndexInfo(codedIndex);
-        var table = TokenTypeToTable(token.TokenType);
 
         for (int i = 0; i < tables.Length; i++)
         {
-            if (tables[i] == table)
+            if (tables[i] == token.Table)
                 return (token.RID << bits) | (uint)i;
         }
 
-        throw new ArgumentException($"Token type {token.TokenType} not valid for coded index {codedIndex}");
+        throw new ArgumentException($"Table {token.Table} not valid for coded index {codedIndex}");
     }
-
-    private static TokenType TableToTokenType(Table table) =>
-        table switch
-        {
-            Table.Module => TokenType.Module,
-            Table.TypeRef => TokenType.TypeRef,
-            Table.TypeDef => TokenType.TypeDef,
-            Table.Field => TokenType.Field,
-            Table.Method => TokenType.Method,
-            Table.Param => TokenType.Param,
-            Table.InterfaceImpl => TokenType.InterfaceImpl,
-            Table.MemberRef => TokenType.MemberRef,
-            Table.CustomAttribute => TokenType.CustomAttribute,
-            Table.DeclSecurity => TokenType.Permission,
-            Table.StandAloneSig => TokenType.Signature,
-            Table.Event => TokenType.Event,
-            Table.Property => TokenType.Property,
-            Table.ModuleRef => TokenType.ModuleRef,
-            Table.TypeSpec => TokenType.TypeSpec,
-            Table.Assembly => TokenType.Assembly,
-            Table.AssemblyRef => TokenType.AssemblyRef,
-            Table.File => TokenType.File,
-            Table.ExportedType => TokenType.ExportedType,
-            Table.ManifestResource => TokenType.ManifestResource,
-            Table.GenericParam => TokenType.GenericParam,
-            Table.MethodSpec => TokenType.MethodSpec,
-            Table.GenericParamConstraint => TokenType.GenericParamConstraint,
-            Table.Document => TokenType.Document,
-            Table.LocalScope => TokenType.LocalScope,
-            Table.LocalVariable => TokenType.LocalVariable,
-            Table.LocalConstant => TokenType.LocalConstant,
-            Table.ImportScope => TokenType.ImportScope,
-            _ => throw new ArgumentException($"No token type for table {table}")
-        };
-
-    private static Table TokenTypeToTable(TokenType tokenType) =>
-        tokenType switch
-        {
-            TokenType.Module => Table.Module,
-            TokenType.TypeRef => Table.TypeRef,
-            TokenType.TypeDef => Table.TypeDef,
-            TokenType.Field => Table.Field,
-            TokenType.Method => Table.Method,
-            TokenType.Param => Table.Param,
-            TokenType.InterfaceImpl => Table.InterfaceImpl,
-            TokenType.MemberRef => Table.MemberRef,
-            TokenType.CustomAttribute => Table.CustomAttribute,
-            TokenType.Permission => Table.DeclSecurity,
-            TokenType.Signature => Table.StandAloneSig,
-            TokenType.Event => Table.Event,
-            TokenType.Property => Table.Property,
-            TokenType.ModuleRef => Table.ModuleRef,
-            TokenType.TypeSpec => Table.TypeSpec,
-            TokenType.Assembly => Table.Assembly,
-            TokenType.AssemblyRef => Table.AssemblyRef,
-            TokenType.File => Table.File,
-            TokenType.ExportedType => Table.ExportedType,
-            TokenType.ManifestResource => Table.ManifestResource,
-            TokenType.GenericParam => Table.GenericParam,
-            TokenType.MethodSpec => Table.MethodSpec,
-            TokenType.GenericParamConstraint => Table.GenericParamConstraint,
-            TokenType.Document => Table.Document,
-            TokenType.LocalScope => Table.LocalScope,
-            TokenType.LocalVariable => Table.LocalVariable,
-            TokenType.LocalConstant => Table.LocalConstant,
-            TokenType.ImportScope => Table.ImportScope,
-            _ => throw new ArgumentException($"No table for token type {tokenType}")
-        };
 }

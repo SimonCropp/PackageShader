@@ -106,11 +106,11 @@ public sealed class StreamingAssemblyModifier : IDisposable
 
         // Create custom attribute row
         // Parent = Assembly (token 0x20000001, encoded as HasCustomAttribute)
-        var assemblyToken = new MetadataToken(TokenType.Assembly, 1);
+        var assemblyToken = new MetadataToken(Table.Assembly, 1);
         var parentEncoded = CodedIndexHelper.EncodeToken(CodedIndex.HasCustomAttribute, assemblyToken);
 
         // Type = MemberRef to constructor (encoded as CustomAttributeType)
-        var constructorToken = new MetadataToken(TokenType.MemberRef, constructorRid);
+        var constructorToken = new MetadataToken(Table.MemberRef, constructorRid);
         var typeEncoded = CodedIndexHelper.EncodeToken(CodedIndex.CustomAttributeType, constructorToken);
 
         var attributeRow = new CustomAttributeRow
@@ -150,7 +150,7 @@ public sealed class StreamingAssemblyModifier : IDisposable
         {
             ResolutionScopeIndex = CodedIndexHelper.EncodeToken(
                 CodedIndex.ResolutionScope,
-                new(TokenType.AssemblyRef, resolutionScope.Value)),
+                new(Table.AssemblyRef, resolutionScope.Value)),
             NameIndex = _plan.GetOrAddString("InternalsVisibleToAttribute"),
             NamespaceIndex = _plan.GetOrAddString("System.Runtime.CompilerServices")
         };
@@ -185,7 +185,7 @@ public sealed class StreamingAssemblyModifier : IDisposable
         {
             ClassIndex = CodedIndexHelper.EncodeToken(
                 CodedIndex.MemberRefParent,
-                new(TokenType.TypeRef, typeRefRid)),
+                new(Table.TypeRef, typeRefRid)),
             NameIndex = _plan.GetOrAddString(".ctor"),
             SignatureIndex = _plan.GetOrAddBlob(ctorSignature)
         };
