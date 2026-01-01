@@ -11,7 +11,6 @@
     <File Path="global.json" />
     <File Path="mdsnippets.json" />
   </Folder>
-  <Project Path="Alias.Lib/Alias.Lib.csproj" />
   <Project Path="Alias/Alias.csproj">
     <Build Solution="IncludeTask|*" Project="false" />
   </Project>
@@ -28,6 +27,7 @@
   <Project Path="DummyAssembly/DummyAssembly.csproj">
     <Build Solution="IncludeTask|*" Project="false" />
   </Project>
+  <Project Path="PackageShader.Lib/PackageShader.Lib.csproj" />
   <Project Path="PackageShader.MsBuild/PackageShader.MsBuild.csproj" />
   <Project Path="SampleApp/SampleApp.csproj">
     <BuildDependency Project="Alias/Alias.csproj" />

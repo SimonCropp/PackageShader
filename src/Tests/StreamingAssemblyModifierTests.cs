@@ -1,4 +1,6 @@
-﻿[Collection("Sequential")]
+﻿using PackageShader;
+
+[Collection("Sequential")]
 public class StreamingAssemblyModifierTests
 {
     static string binDirectory = Path.GetDirectoryName(typeof(StreamingAssemblyModifierTests).Assembly.Location)!;
@@ -9,7 +11,7 @@ public class StreamingAssemblyModifierTests
     {
         var assemblyPath = Path.Combine(binDirectory, "DummyAssembly.dll");
 
-        using var modifier = Alias.Lib.StreamingAssemblyModifier.Open(assemblyPath);
+        using var modifier = StreamingAssemblyModifier.Open(assemblyPath);
 
         Assert.NotNull(modifier);
         Assert.Equal(assemblyPath, modifier.SourcePath);
@@ -23,7 +25,7 @@ public class StreamingAssemblyModifierTests
         using var tempDir = new TempDirectory();
         var outputPath = Path.Combine(tempDir, "Renamed.dll");
 
-        using (var modifier = Alias.Lib.StreamingAssemblyModifier.Open(assemblyPath))
+        using (var modifier = StreamingAssemblyModifier.Open(assemblyPath))
         {
             modifier.SetAssemblyName("RenamedAssembly");
             modifier.Save(outputPath);
@@ -46,7 +48,7 @@ public class StreamingAssemblyModifierTests
         using var tempDir = new TempDirectory();
         var outputPath = Path.Combine(tempDir, "Internalized.dll");
 
-        using (var modifier = Alias.Lib.StreamingAssemblyModifier.Open(assemblyPath))
+        using (var modifier = StreamingAssemblyModifier.Open(assemblyPath))
         {
             modifier.MakeTypesInternal();
             modifier.Save(outputPath);
@@ -80,9 +82,9 @@ public class StreamingAssemblyModifierTests
         using var tempDir = new TempDirectory();
         var outputPath = Path.Combine(tempDir, "Signed.dll");
 
-        var key = Alias.Lib.Signing.StrongNameKey.FromFile(keyFilePath);
+        var key = StrongNameKey.FromFile(keyFilePath);
 
-        using (var modifier = Alias.Lib.StreamingAssemblyModifier.Open(assemblyPath))
+        using (var modifier = StreamingAssemblyModifier.Open(assemblyPath))
         {
             modifier.SetAssemblyPublicKey(key.PublicKey);
             modifier.Save(outputPath, key);
@@ -105,7 +107,7 @@ public class StreamingAssemblyModifierTests
         using var tempDir = new TempDirectory();
         var outputPath = Path.Combine(tempDir, "WithIVT.dll");
 
-        using (var modifier = Alias.Lib.StreamingAssemblyModifier.Open(assemblyPath))
+        using (var modifier = StreamingAssemblyModifier.Open(assemblyPath))
         {
             modifier.AddInternalsVisibleTo("TestFriendAssembly");
             modifier.Save(outputPath);
@@ -147,7 +149,7 @@ public class StreamingAssemblyModifierTests
         using var tempDir = new TempDirectory();
         var outputPath = Path.Combine(tempDir, "Modified.dll");
 
-        using (var modifier = Alias.Lib.StreamingAssemblyModifier.Open(assemblyPath))
+        using (var modifier = StreamingAssemblyModifier.Open(assemblyPath))
         {
             modifier.SetAssemblyName("ModifiedAssembly");
             modifier.MakeTypesInternal();
@@ -184,7 +186,7 @@ public class StreamingAssemblyModifierTests
         using var tempDir = new TempDirectory();
         var outputPath = Path.Combine(tempDir, "WithSymbols.dll");
 
-        using (var modifier = Alias.Lib.StreamingAssemblyModifier.Open(assemblyPath))
+        using (var modifier = StreamingAssemblyModifier.Open(assemblyPath))
         {
             modifier.SetAssemblyName("WithSymbols");
             modifier.Save(outputPath);
@@ -203,7 +205,7 @@ public class StreamingAssemblyModifierTests
         using var tempDir = new TempDirectory();
         var outputPath = Path.Combine(tempDir, "Patched.dll");
 
-        using (var modifier = Alias.Lib.StreamingAssemblyModifier.Open(assemblyPath))
+        using (var modifier = StreamingAssemblyModifier.Open(assemblyPath))
         {
             // Just making types internal should be an in-place patch
             modifier.MakeTypesInternal();

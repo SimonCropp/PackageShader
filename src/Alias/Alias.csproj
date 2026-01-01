@@ -16,6 +16,6 @@
   <ItemGroup>
     <None Include="$(SolutionDir)icon.png" Pack="true" PackagePath="\" />
     <PackageReference Include="CommandLineParser" Version="2.9.1" />
-    <ProjectReference Include="..\Alias.Lib\Alias.Lib.csproj" />
+    <ProjectReference Include="..\PackageShader.Lib\PackageShader.Lib.csproj" />
   </ItemGroup>
 </Project>

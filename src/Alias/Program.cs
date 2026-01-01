@@ -1,7 +1,3 @@
-using System.Text;
-using Alias;
-using Alias.Lib.Signing;
-
 public static class Program
 {
     static int Main(string[] args)

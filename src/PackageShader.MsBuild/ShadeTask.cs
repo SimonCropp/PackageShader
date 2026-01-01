@@ -1,4 +1,3 @@
-using Alias;
 using Task = Microsoft.Build.Utilities.Task;
 
 namespace PackageShader;
@@ -44,12 +43,12 @@ public class ShadeTask :
         }
         catch (ErrorException exception)
         {
-            Log.LogError($"AssemblyAlias: {exception}");
+            Log.LogError($"PackageShader: {exception}");
             return false;
         }
         finally
         {
-            Log.LogMessageFromText($"Finished AssemblyAlias {stopwatch.ElapsedMilliseconds}ms", MessageImportance.Normal);
+            Log.LogMessageFromText($"Finished PackageShader {stopwatch.ElapsedMilliseconds}ms", MessageImportance.Normal);
         }
     }
 
@@ -141,7 +140,7 @@ public class ShadeTask :
                       StrongName: {strongNameKey != null}
                       AssembliesToAlias:{separator}{string.Join(separator, assembliesToAlias.Select(Path.GetFileNameWithoutExtension))}
                       AssembliesToTarget:{separator}{string.Join(separator, assembliesToTarget.Select(Path.GetFileNameWithoutExtension))}
-                      TargetInfos:{separator}{string.Join(separator, sourceTargetInfos.Select(x => $"{x.SourceName} => {x.TargetName}"))}
+                      TargetInfos:{separator}{string.Join(separator, sourceTargetInfos.Select(_ => $"{_.SourceName} => {_.TargetName}"))}
                       ReferenceCopyLocalPaths:{separator}{string.Join(separator, referenceCopyLocalPaths.Select(x=> SolutionDir != null ? x.Replace(SolutionDir, "{SolutionDir}") : x))}
 
                       """;
