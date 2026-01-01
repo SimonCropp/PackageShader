@@ -1,12 +1,12 @@
 ﻿<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
-    <AliasAssembly>$(MSBuildThisFileDirectory)..\task\Alias.MsBuild.dll</AliasAssembly>
-    <AliasAssembly Condition="!Exists($(AliasAssembly))">$(MSBuildThisFileDirectory)..\bin\IncludeTask\Alias.MsBuild.dll</AliasAssembly>
+    <ShaderAssembly>$(MSBuildThisFileDirectory)..\task\Alias.MsBuild.dll</ShaderAssembly>
+    <ShaderAssembly Condition="!Exists($(ShaderAssembly))">$(MSBuildThisFileDirectory)..\bin\IncludeTask\Alias.MsBuild.dll</ShaderAssembly>
   </PropertyGroup>
 
   <UsingTask
     TaskName="PackageShader.ShadeTask"
-    AssemblyFile="$(AliasAssembly)" />
+    AssemblyFile="$(ShaderAssembly)" />
   <Target
     Name="ShadeTarget"
     AfterTargets="AfterCompile"
