@@ -1,11 +1,16 @@
+using System.Reflection.PortableExecutable;
+using System.Security.Cryptography;
+
 namespace Alias.Lib.Signing;
 
 /// <summary>
 /// Signs assemblies with a strong name using streaming to avoid loading the entire file into memory.
+/// Uses System.Reflection.PortableExecutable for header parsing.
 /// </summary>
 public static class StreamingStrongNameSigner
 {
     private const int BufferSize = 81920; // 80KB buffer
+    private const int ChecksumOffsetInOptionalHeader = 64;
 
     /// <summary>
     /// Signs a PE file in place using streaming hash computation.
@@ -23,11 +28,25 @@ public static class StreamingStrongNameSigner
     /// <returns>True if signing was successful, false if assembly has no signature placeholder.</returns>
     public static bool SignStream(FileStream stream, StrongNameKey key)
     {
-        // Find strong name signature location by reading header
-        var (signatureOffset, signatureSize, checksumOffset) = FindStrongNameSignature(stream);
+        // Use PEReader to get header information
+        stream.Position = 0;
+        using var peReader = new PEReader(stream, PEStreamOptions.LeaveOpen);
+        var headers = peReader.PEHeaders;
 
-        // Assembly doesn't have a strong name signature placeholder - skip signing
-        if (signatureOffset == 0 || signatureSize == 0)
+        // Check if assembly has strong name signature
+        if (headers.CorHeader == null)
+            return false;
+
+        var snDirectory = headers.CorHeader.StrongNameSignatureDirectory;
+        if (snDirectory.RelativeVirtualAddress == 0 || snDirectory.Size == 0)
+            return false;
+
+        // Calculate offsets
+        var checksumOffset = headers.PEHeaderStartOffset + ChecksumOffsetInOptionalHeader;
+        var signatureOffset = ResolveRvaToFileOffset(headers, snDirectory.RelativeVirtualAddress);
+        var signatureSize = snDirectory.Size;
+
+        if (signatureOffset == 0)
             return false;
 
         // Zero out the signature area
@@ -53,89 +72,14 @@ public static class StreamingStrongNameSigner
         return true;
     }
 
-    private static (long signatureOffset, int signatureSize, int checksumOffset) FindStrongNameSignature(FileStream stream)
+    private static long ResolveRvaToFileOffset(PEHeaders headers, int rva)
     {
-        var buffer = new byte[512]; // Enough for headers
-
-        // Read DOS header
-        stream.Position = 0;
-        if (stream.Read(buffer, 0, 64) < 64)
-            return (0, 0, 0);
-
-        var peOffset = BitConverter.ToInt32(buffer, 60);
-
-        // Read PE header
-        stream.Position = peOffset;
-        if (stream.Read(buffer, 0, 256) < 256)
-            return (0, 0, 0);
-
-        // Check PE signature
-        if (BitConverter.ToUInt32(buffer, 0) != 0x00004550)
-            return (0, 0, 0);
-
-        var optionalHeaderOffset = 24;
-        var magic = BitConverter.ToUInt16(buffer, optionalHeaderOffset);
-        var isPE64 = magic == 0x20b;
-
-        // Checksum offset in file
-        var checksumOffset = peOffset + optionalHeaderOffset + 64;
-
-        // Find CLI header data directory (index 14)
-        var dataDirectoriesOffset = optionalHeaderOffset + (isPE64 ? 112 : 96);
-        var cliHeaderDirOffset = dataDirectoriesOffset + 14 * 8;
-
-        if (cliHeaderDirOffset + 8 > buffer.Length)
-            return (0, 0, 0);
-
-        var cliHeaderRva = BitConverter.ToUInt32(buffer, cliHeaderDirOffset);
-        if (cliHeaderRva == 0)
-            return (0, 0, 0);
-
-        // Read section headers to resolve RVA
-        var numberOfSections = BitConverter.ToUInt16(buffer, 6);
-        var optionalHeaderSize = BitConverter.ToUInt16(buffer, 20);
-        var sectionHeadersOffset = peOffset + 24 + optionalHeaderSize;
-
-        // Read section headers
-        stream.Position = sectionHeadersOffset;
-        var sectionData = new byte[numberOfSections * 40];
-        if (stream.Read(sectionData, 0, sectionData.Length) < sectionData.Length)
-            return (0, 0, 0);
-
-        // Resolve CLI header RVA to file offset
-        var cliHeaderOffset = ResolveRvaFromSections(sectionData, numberOfSections, cliHeaderRva);
-        if (cliHeaderOffset == 0)
-            return (0, 0, 0);
-
-        // Read CLI header (just the parts we need)
-        stream.Position = cliHeaderOffset;
-        var cliHeader = new byte[48];
-        if (stream.Read(cliHeader, 0, 48) < 48)
-            return (0, 0, 0);
-
-        // Strong name signature is at offset 32 in CLI header
-        var snRva = BitConverter.ToUInt32(cliHeader, 32);
-        var snSize = BitConverter.ToUInt32(cliHeader, 36);
-
-        if (snRva == 0 || snSize == 0)
-            return (0, 0, 0);
-
-        var snOffset = ResolveRvaFromSections(sectionData, numberOfSections, snRva);
-        return (snOffset, (int)snSize, checksumOffset);
-    }
-
-    private static long ResolveRvaFromSections(byte[] sectionData, int numberOfSections, uint rva)
-    {
-        for (int i = 0; i < numberOfSections; i++)
+        foreach (var section in headers.SectionHeaders)
         {
-            var offset = i * 40;
-            var virtualAddress = BitConverter.ToUInt32(sectionData, offset + 12);
-            var sizeOfRawData = BitConverter.ToUInt32(sectionData, offset + 16);
-            var pointerToRawData = BitConverter.ToUInt32(sectionData, offset + 20);
-
-            if (rva >= virtualAddress && rva < virtualAddress + sizeOfRawData)
+            if (rva >= section.VirtualAddress &&
+                rva < section.VirtualAddress + section.SizeOfRawData)
             {
-                return rva - virtualAddress + pointerToRawData;
+                return rva - section.VirtualAddress + section.PointerToRawData;
             }
         }
         return 0;
@@ -150,10 +94,10 @@ public static class StreamingStrongNameSigner
         long position = 0;
         var fileLength = stream.Length;
 
-        // Define regions to skip
+        // Define regions to skip (checksum and signature)
         var skipRegions = new[]
         {
-            (start: checksumOffset, end: checksumOffset + 4),
+            (start: (long)checksumOffset, end: (long)(checksumOffset + 4)),
             (start: signatureOffset, end: signatureOffset + signatureSize)
         };
 
