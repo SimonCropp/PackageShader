@@ -1,8 +1,9 @@
+using Alias;
 using Task = Microsoft.Build.Utilities.Task;
 
-namespace Alias;
+namespace PackageShader;
 
-public class AliasTask :
+public class ShadeTask :
     Task,
     ICancelableTask
 {

@@ -431,7 +431,7 @@ public class AliasTests
         var solutionDir = ProjectFiles.SolutionDirectory.Path;
 
         var buildResult = await Cli.Wrap("dotnet")
-            .WithArguments("build --configuration IncludeAliasTask --no-restore")
+            .WithArguments("build --configuration IncludeTask --no-restore")
             .WithWorkingDirectory(solutionDir)
             .WithValidation(CommandResultValidation.None)
             .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
@@ -450,7 +450,7 @@ public class AliasTests
             throw new(buildResult.StandardOutput.Replace(solutionDir, ""));
         }
 
-        var appPath = Path.Combine(solutionDir, "SampleAppForMsBuild/bin/IncludeAliasTask/SampleAppForMsBuild.dll");
+        var appPath = Path.Combine(solutionDir, "SampleAppForMsBuild/bin/IncludeTask/SampleAppForMsBuild.dll");
         var runResult = await Cli.Wrap("dotnet")
             .WithArguments(appPath)
             .WithValidation(CommandResultValidation.None)

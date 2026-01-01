@@ -28,17 +28,17 @@
   	AssemblyToInclude => AssemblyToInclude
   ReferenceCopyLocalPaths:
   	Newtonsoft.Json.dll
-  	{SolutionDir}AssemblyToInclude/bin/IncludeAliasTask/net8.0/AssemblyToInclude.dll
-  	{SolutionDir}AssemblyWithEmbeddedSymbols/bin/IncludeAliasTask/net8.0/AssemblyWithEmbeddedSymbols.dll
-  	{SolutionDir}AssemblyWithNoStrongName/bin/IncludeAliasTask/net8.0/AssemblyWithNoStrongName.dll
-  	{SolutionDir}AssemblyWithNoSymbols/bin/IncludeAliasTask/net8.0/AssemblyWithNoSymbols.dll
-  	{SolutionDir}AssemblyWithPdb/bin/IncludeAliasTask/net8.0/AssemblyWithPdb.dll
-  	{SolutionDir}AssemblyWithResources/bin/IncludeAliasTask/net8.0/AssemblyWithResources.dll
-  	{SolutionDir}AssemblyWithStrongName/bin/IncludeAliasTask/net8.0/AssemblyWithStrongName.dll
-  	{SolutionDir}AssemblyWithNoStrongName/bin/IncludeAliasTask/net8.0/AssemblyWithNoStrongName.pdb
-  	{SolutionDir}AssemblyWithPdb/bin/IncludeAliasTask/net8.0/AssemblyWithPdb.pdb
-  	{SolutionDir}AssemblyWithResources/bin/IncludeAliasTask/net8.0/AssemblyWithResources.pdb
-  	{SolutionDir}AssemblyWithStrongName/bin/IncludeAliasTask/net8.0/AssemblyWithStrongName.pdb
+  	{SolutionDir}AssemblyToInclude/bin/IncludeTask/net8.0/AssemblyToInclude.dll
+  	{SolutionDir}AssemblyWithEmbeddedSymbols/bin/IncludeTask/net8.0/AssemblyWithEmbeddedSymbols.dll
+  	{SolutionDir}AssemblyWithNoStrongName/bin/IncludeTask/net8.0/AssemblyWithNoStrongName.dll
+  	{SolutionDir}AssemblyWithNoSymbols/bin/IncludeTask/net8.0/AssemblyWithNoSymbols.dll
+  	{SolutionDir}AssemblyWithPdb/bin/IncludeTask/net8.0/AssemblyWithPdb.dll
+  	{SolutionDir}AssemblyWithResources/bin/IncludeTask/net8.0/AssemblyWithResources.dll
+  	{SolutionDir}AssemblyWithStrongName/bin/IncludeTask/net8.0/AssemblyWithStrongName.dll
+  	{SolutionDir}AssemblyWithNoStrongName/bin/IncludeTask/net8.0/AssemblyWithNoStrongName.pdb
+  	{SolutionDir}AssemblyWithPdb/bin/IncludeTask/net8.0/AssemblyWithPdb.pdb
+  	{SolutionDir}AssemblyWithResources/bin/IncludeTask/net8.0/AssemblyWithResources.pdb
+  	{SolutionDir}AssemblyWithStrongName/bin/IncludeTask/net8.0/AssemblyWithStrongName.pdb
   
 
 Build succeeded.

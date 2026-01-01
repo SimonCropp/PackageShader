@@ -19,5 +19,5 @@
     <ProjectReference Include="..\AssemblyToInclude\AssemblyToInclude.csproj" />
     <Alias_AssembliesToSkipRename Include="AssemblyToInclude" />
   </ItemGroup>
-  <Import Condition="$(Configuration) == 'IncludeAliasTask'" Project="$(ProjectDir)..\Alias.MsBuild\build\Alias.MsBuild.targets" />
+  <Import Condition="$(Configuration) == 'IncludeTask'" Project="$(ProjectDir)..\Alias.MsBuild\build\Alias.MsBuild.targets" />
 </Project>

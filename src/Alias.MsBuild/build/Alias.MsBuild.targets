@@ -1,17 +1,17 @@
 ﻿<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <AliasAssembly>$(MSBuildThisFileDirectory)..\task\Alias.MsBuild.dll</AliasAssembly>
-    <AliasAssembly Condition="!Exists($(AliasAssembly))">$(MSBuildThisFileDirectory)..\bin\IncludeAliasTask\Alias.MsBuild.dll</AliasAssembly>
+    <AliasAssembly Condition="!Exists($(AliasAssembly))">$(MSBuildThisFileDirectory)..\bin\IncludeTask\Alias.MsBuild.dll</AliasAssembly>
   </PropertyGroup>
 
   <UsingTask
-    TaskName="Alias.AliasTask"
+    TaskName="PackageShader.ShadeTask"
     AssemblyFile="$(AliasAssembly)" />
   <Target
-    Name="AliasTarget"
+    Name="ShadeTarget"
     AfterTargets="AfterCompile"
     Condition="Exists(@(IntermediateAssembly)) And ($(DesignTimeBuild) != true Or $(BuildingForLiveUnitTesting) == true)" >
-    <Alias.AliasTask
+    <PackageShader.ShadeTask
       IntermediateAssembly="@(IntermediateAssembly)"
       IntermediateDirectory="$(ProjectDir)$(IntermediateOutputPath)"
       ReferencePath="@(ReferencePath)"
@@ -31,7 +31,7 @@
         TaskParameter="CopyLocalPathsToRemove"
         ItemName="CopyLocalPathsToRemove" />
 
-    </Alias.AliasTask>
+    </PackageShader.ShadeTask>
 
     <ItemGroup>
       <ReferenceCopyLocalPaths Remove="@(CopyLocalPathsToRemove)" />

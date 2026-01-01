@@ -1,7 +1,7 @@
 <Solution>
   <Configurations>
     <BuildType Name="Debug" />
-    <BuildType Name="IncludeAliasTask" />
+    <BuildType Name="IncludeTask" />
     <BuildType Name="Release" />
   </Configurations>
   <Folder Name="/Solution Items/">
@@ -14,7 +14,7 @@
   <Project Path="Alias.Lib/Alias.Lib.csproj" />
   <Project Path="Alias.MsBuild/Alias.MsBuild.csproj" />
   <Project Path="Alias/Alias.csproj">
-    <Build Solution="IncludeAliasTask|*" Project="false" />
+    <Build Solution="IncludeTask|*" Project="false" />
   </Project>
   <Project Path="AssemblyToInclude/AssemblyToInclude.csproj" />
   <Project Path="AssemblyToProcess/AssemblyToProcess.csproj">
@@ -27,18 +27,18 @@
   <Project Path="AssemblyWithResources/AssemblyWithResources.csproj" />
   <Project Path="AssemblyWithStrongName/AssemblyWithStrongName.csproj" />
   <Project Path="DummyAssembly/DummyAssembly.csproj">
-    <Build Solution="IncludeAliasTask|*" Project="false" />
+    <Build Solution="IncludeTask|*" Project="false" />
   </Project>
   <Project Path="SampleApp/SampleApp.csproj">
     <BuildDependency Project="Alias/Alias.csproj" />
-    <Build Solution="IncludeAliasTask|*" Project="false" />
+    <Build Solution="IncludeTask|*" Project="false" />
   </Project>
   <Project Path="SampleAppForMsBuild/SampleAppForMsBuild.csproj">
     <BuildDependency Project="Alias.MsBuild/Alias.MsBuild.csproj" />
   </Project>
   <Project Path="Tests/Tests.csproj">
     <BuildDependency Project="SampleApp/SampleApp.csproj" />
-    <Build Solution="IncludeAliasTask|*" Project="false" />
+    <Build Solution="IncludeTask|*" Project="false" />
   </Project>
   <Properties Name="MonoDevelopProperties">
     <Property Name="StartupItem" Value="Fody\Fody.csproj" />

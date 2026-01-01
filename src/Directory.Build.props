@@ -16,7 +16,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <PackageOutputPath>$(SolutionDir)..\nugets</PackageOutputPath>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
-    <Configurations>Debug;Release;IncludeAliasTask</Configurations>
+    <Configurations>Debug;Release;IncludeTask</Configurations>
     <ResolveAssemblyReferencesSilent>true</ResolveAssemblyReferencesSilent>
   </PropertyGroup>
 </Project>

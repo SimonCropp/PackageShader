@@ -1,6 +1,6 @@
 using System.Collections;
-using Alias;
 using Microsoft.Build.Framework;
+using PackageShader;
 
 [Collection("Sequential")]
 public class TaskTests
@@ -148,7 +148,7 @@ public class TaskTests
     [Fact]
     public void Cancel_DoesNotThrow()
     {
-        var task = new AliasTask();
+        var task = new ShadeTask();
         var exception = Record.Exception(() => task.Cancel());
         Assert.Null(exception);
     }
@@ -159,7 +159,7 @@ public class TaskTests
         using var tempDir = new TempDirectory();
         SetupIntermediateAssembly(tempDir);
 
-        var task = new AliasTask
+        var task = new ShadeTask
         {
             BuildEngine = new MockBuildEngine(),
             IntermediateAssembly = Path.Combine(tempDir, "Target.dll"),
@@ -174,14 +174,14 @@ public class TaskTests
         Assert.True(result);
     }
 
-    static AliasTask CreateTask(string tempDir, bool sign, bool internalize)
+    static ShadeTask CreateTask(string tempDir, bool sign, bool internalize)
     {
         SetupTestAssemblies(tempDir);
 
         var assemblyPaths = GetTestAssemblyPaths(tempDir);
         var referenceCopyLocalPaths = assemblyPaths.Select(p => new MockTaskItem(p)).ToArray();
 
-        var task = new AliasTask
+        var task = new ShadeTask
         {
             BuildEngine = new MockBuildEngine(),
             IntermediateAssembly = Path.Combine(tempDir, "AssemblyToProcess.dll"),
