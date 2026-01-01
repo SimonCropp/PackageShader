@@ -319,28 +319,21 @@ public struct MemberRefRow
 /// <summary>
 /// Helper for reading values from table rows.
 /// </summary>
-public class TableRowReader
+public class TableRowReader(byte[] data)
 {
-    private readonly byte[] _data;
-    private int _position;
-
-    public TableRowReader(byte[] data)
-    {
-        _data = data;
-        _position = 0;
-    }
+    private int position = 0;
 
     public ushort ReadUInt16()
     {
-        var value = BitConverter.ToUInt16(_data, _position);
-        _position += 2;
+        var value = BitConverter.ToUInt16(data, position);
+        position += 2;
         return value;
     }
 
     public uint ReadUInt32()
     {
-        var value = BitConverter.ToUInt32(_data, _position);
-        _position += 4;
+        var value = BitConverter.ToUInt32(data, position);
+        position += 4;
         return value;
     }
 
@@ -352,5 +345,5 @@ public class TableRowReader
     }
 
     public void Skip(int bytes) =>
-        _position += bytes;
+        position += bytes;
 }

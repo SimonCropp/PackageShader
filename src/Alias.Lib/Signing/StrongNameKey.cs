@@ -47,15 +47,12 @@ public sealed class StrongNameKey
         return new(rsa, publicKey, publicKeyToken);
     }
 
-    /// <summary>
-    /// Gets the public key as a hex string for InternalsVisibleTo attributes.
-    /// </summary>
-    public string PublicKeyString => Convert.ToHexString(PublicKey);
-
-    private static RSA FromCapiKeyBlob(byte[] blob)
+    static RSA FromCapiKeyBlob(byte[] blob)
     {
         if (blob == null || blob.Length < 12)
+        {
             throw new CryptographicException("Invalid key blob");
+        }
 
         // Check blob type
         return blob[0] switch

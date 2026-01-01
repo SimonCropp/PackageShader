@@ -14,13 +14,12 @@ public static class Aliaser
     {
         var infoList = infos.ToList();
 
-        // First pass: Modify all assemblies
-        var modifiers = new List<(AssemblyModifier modifier, SourceTargetInfo info, bool hasSymbols)>();
-
+        // Process each assembly using streaming modifier (memory efficient)
         foreach (var info in infoList)
         {
-            var modifier = AssemblyModifier.Open(info.SourcePath);
             var hasSymbols = PdbHandler.HasSymbols(info.SourcePath);
+
+            using var modifier = StreamingAssemblyModifier.Open(info.SourcePath);
 
             // Rename assembly
             modifier.SetAssemblyName(info.TargetName);
@@ -57,15 +56,10 @@ public static class Aliaser
                 modifier.RedirectAssemblyRef(refInfo.SourceName, refInfo.TargetName, key?.PublicKeyToken);
             }
 
-            modifiers.Add((modifier, info, hasSymbols));
-        }
-
-        // Second pass: Write all assemblies
-        foreach (var (modifier, info, hasSymbols) in modifiers)
-        {
+            // Save the modified assembly
             if (hasSymbols)
             {
-                modifier.SaveWithSymbols(info.SourcePath, info.TargetPath, key);
+                modifier.SaveWithSymbols(info.TargetPath, key);
             }
             else
             {

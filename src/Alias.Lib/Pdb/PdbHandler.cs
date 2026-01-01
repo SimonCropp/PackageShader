@@ -1,5 +1,3 @@
-using System.IO.Compression;
-
 namespace Alias.Lib.Pdb;
 
 /// <summary>
@@ -17,7 +15,9 @@ public static class PdbHandler
 
         // Skip if source and target are the same file
         if (string.Equals(Path.GetFullPath(sourcePdb), Path.GetFullPath(targetPdb), StringComparison.OrdinalIgnoreCase))
+        {
             return;
+        }
 
         if (File.Exists(sourcePdb))
         {
