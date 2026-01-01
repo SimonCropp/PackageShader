@@ -1,9 +1,4 @@
-using System.Reflection.Metadata.Ecma335;
-using System.Text;
-using Alias.Lib.Metadata;
-using Alias.Lib.Metadata.Tables;
 using CodedIndex = Alias.Lib.Metadata.Tables.CodedIndex;
-using Alias.Lib.Modification;
 using Alias.Lib.Pdb;
 using Alias.Lib.PE;
 using Alias.Lib.Signing;

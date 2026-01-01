@@ -1,6 +1,4 @@
 using System.Reflection.Metadata;
-using System.Reflection.Metadata.Ecma335;
-using Alias.Lib.Metadata.Tables;
 using Alias.Lib.PE;
 using SrmMetadataReader = System.Reflection.Metadata.MetadataReader;
 using CodedIndex = Alias.Lib.Metadata.Tables.CodedIndex;
@@ -145,14 +143,14 @@ public sealed class StreamingMetadataReader : IDisposable
 
         for (int i = 0; i < 64; i++)
         {
-            var table = (TableIndex)i;
+            var table = (TableIndex) i;
             if (!HasTable(table))
                 continue;
 
             int rowSize = ComputeRowSize(table);
-            tables[i].RowSize = (uint)rowSize;
+            tables[i].RowSize = (uint) rowSize;
             tables[i].Offset = offset;
-            offset += (uint)(rowSize * tables[i].RowCount);
+            offset += (uint) (rowSize * tables[i].RowCount);
         }
     }
 
@@ -162,7 +160,7 @@ public sealed class StreamingMetadataReader : IDisposable
             TableIndex.Module => 2 + StringIndexSize + GuidIndexSize * 3,
             TableIndex.TypeRef => GetCodedIndexSize(CodedIndex.ResolutionScope) + StringIndexSize * 2,
             TableIndex.TypeDef => 4 + StringIndexSize * 2 + GetCodedIndexSize(CodedIndex.TypeDefOrRef)
-                             + GetTableIndexSize(TableIndex.Field) + GetTableIndexSize(TableIndex.MethodDef),
+                                  + GetTableIndexSize(TableIndex.Field) + GetTableIndexSize(TableIndex.MethodDef),
             TableIndex.FieldPtr => GetTableIndexSize(TableIndex.Field),
             TableIndex.Field => 2 + StringIndexSize + BlobIndexSize,
             TableIndex.MethodPtr => GetTableIndexSize(TableIndex.MethodDef),
@@ -173,7 +171,7 @@ public sealed class StreamingMetadataReader : IDisposable
             TableIndex.MemberRef => GetCodedIndexSize(CodedIndex.MemberRefParent) + StringIndexSize + BlobIndexSize,
             TableIndex.Constant => 2 + GetCodedIndexSize(CodedIndex.HasConstant) + BlobIndexSize,
             TableIndex.CustomAttribute => GetCodedIndexSize(CodedIndex.HasCustomAttribute)
-                                     + GetCodedIndexSize(CodedIndex.CustomAttributeType) + BlobIndexSize,
+                                          + GetCodedIndexSize(CodedIndex.CustomAttributeType) + BlobIndexSize,
             TableIndex.FieldMarshal => GetCodedIndexSize(CodedIndex.HasFieldMarshal) + BlobIndexSize,
             TableIndex.DeclSecurity => 2 + GetCodedIndexSize(CodedIndex.HasDeclSecurity) + BlobIndexSize,
             TableIndex.ClassLayout => 6 + GetTableIndexSize(TableIndex.TypeDef),
@@ -187,11 +185,11 @@ public sealed class StreamingMetadataReader : IDisposable
             TableIndex.Property => 2 + StringIndexSize + BlobIndexSize,
             TableIndex.MethodSemantics => 2 + GetTableIndexSize(TableIndex.MethodDef) + GetCodedIndexSize(CodedIndex.HasSemantics),
             TableIndex.MethodImpl => GetTableIndexSize(TableIndex.TypeDef)
-                                + GetCodedIndexSize(CodedIndex.MethodDefOrRef) + GetCodedIndexSize(CodedIndex.MethodDefOrRef),
+                                     + GetCodedIndexSize(CodedIndex.MethodDefOrRef) + GetCodedIndexSize(CodedIndex.MethodDefOrRef),
             TableIndex.ModuleRef => StringIndexSize,
             TableIndex.TypeSpec => BlobIndexSize,
             TableIndex.ImplMap => 2 + GetCodedIndexSize(CodedIndex.MemberForwarded)
-                               + StringIndexSize + GetTableIndexSize(TableIndex.ModuleRef),
+                                    + StringIndexSize + GetTableIndexSize(TableIndex.ModuleRef),
             TableIndex.FieldRva => 4 + GetTableIndexSize(TableIndex.Field),
             TableIndex.EncLog => 8,
             TableIndex.EncMap => 4,
@@ -211,30 +209,30 @@ public sealed class StreamingMetadataReader : IDisposable
             TableIndex.Document => BlobIndexSize + GuidIndexSize + BlobIndexSize + GuidIndexSize,
             TableIndex.MethodDebugInformation => GetTableIndexSize(TableIndex.Document) + BlobIndexSize,
             TableIndex.LocalScope => GetTableIndexSize(TableIndex.MethodDef) + GetTableIndexSize(TableIndex.ImportScope)
-                                + GetTableIndexSize(TableIndex.LocalVariable) + GetTableIndexSize(TableIndex.LocalConstant) + 8,
+                                                                             + GetTableIndexSize(TableIndex.LocalVariable) + GetTableIndexSize(TableIndex.LocalConstant) + 8,
             TableIndex.LocalVariable => 4 + StringIndexSize,
             TableIndex.LocalConstant => StringIndexSize + BlobIndexSize,
             TableIndex.ImportScope => GetTableIndexSize(TableIndex.ImportScope) + BlobIndexSize,
             TableIndex.StateMachineMethod => GetTableIndexSize(TableIndex.MethodDef) * 2,
             TableIndex.CustomDebugInformation => GetCodedIndexSize(CodedIndex.HasCustomDebugInformation)
-                                            + GuidIndexSize + BlobIndexSize,
+                                                 + GuidIndexSize + BlobIndexSize,
             _ => 0 // Unknown tables - return 0
         };
 
     #region Table Access
 
     public bool HasTable(TableIndex table) =>
-        (int)table < 64 && (Valid & (1L << (int)table)) != 0;
+        (int) table < 64 && (Valid & (1L << (int) table)) != 0;
 
     public int GetRowCount(TableIndex table) =>
-        (int)table < 64 ? (int)tables[(int)table].RowCount : 0;
+        (int) table < 64 ? (int) tables[(int) table].RowCount : 0;
 
     public int GetTableIndexSize(TableIndex table) =>
         GetRowCount(table) < 65536 ? 2 : 4;
 
     public int GetCodedIndexSize(CodedIndex codedIndex)
     {
-        var index = (int)codedIndex;
+        var index = (int) codedIndex;
         if (codedIndexSizes[index] != 0)
             return codedIndexSizes[index];
 
@@ -246,12 +244,12 @@ public sealed class StreamingMetadataReader : IDisposable
     /// </summary>
     public byte[] ReadRow(TableIndex table, uint rid)
     {
-        if ((int)table >= 64 || rid == 0 || rid > tables[(int)table].RowCount)
+        if ((int) table >= 64 || rid == 0 || rid > tables[(int) table].RowCount)
             return Array.Empty<byte>();
 
-        var info = tables[(int)table];
+        var info = tables[(int) table];
         var offset = tableDataOffset + info.Offset + (rid - 1) * info.RowSize;
-        return peFile.ReadBytesAt(offset, (int)info.RowSize);
+        return peFile.ReadBytesAt(offset, (int) info.RowSize);
     }
 
     /// <summary>
@@ -259,14 +257,14 @@ public sealed class StreamingMetadataReader : IDisposable
     /// </summary>
     public long GetRowOffset(TableIndex table, uint rid)
     {
-        var info = tables[(int)table];
+        var info = tables[(int) table];
         return tableDataOffset + info.Offset + (rid - 1) * info.RowSize;
     }
 
     /// <summary>
     /// Gets the row size for a table.
     /// </summary>
-    public int GetRowSize(TableIndex table) => (int)tables[(int)table].RowSize;
+    public int GetRowSize(TableIndex table) => (int) tables[(int) table].RowSize;
 
     #endregion
 
@@ -278,7 +276,7 @@ public sealed class StreamingMetadataReader : IDisposable
     public string ReadString(uint index)
     {
         if (index == 0) return string.Empty;
-        var handle = MetadataTokens.StringHandle((int)index);
+        var handle = MetadataTokens.StringHandle((int) index);
         return reader.GetString(handle);
     }
 
@@ -301,17 +299,17 @@ public sealed class StreamingMetadataReader : IDisposable
             throw new InvalidOperationException($"No Assembly row found at rid {rid}. HasTable={HasTable(TableIndex.Assembly)}, RowCount={GetRowCount(TableIndex.Assembly)}");
 
         var asm = reader.GetAssemblyDefinition();
-        return new AssemblyRow
+        return new()
         {
-            HashAlgId = (uint)asm.HashAlgorithm,
-            MajorVersion = (ushort)asm.Version.Major,
-            MinorVersion = (ushort)asm.Version.Minor,
-            BuildNumber = (ushort)asm.Version.Build,
-            RevisionNumber = (ushort)asm.Version.Revision,
-            Flags = (uint)asm.Flags,
-            PublicKeyIndex = (uint)MetadataTokens.GetHeapOffset(asm.PublicKey),
-            NameIndex = (uint)MetadataTokens.GetHeapOffset(asm.Name),
-            CultureIndex = (uint)MetadataTokens.GetHeapOffset(asm.Culture)
+            HashAlgId = (uint) asm.HashAlgorithm,
+            MajorVersion = (ushort) asm.Version.Major,
+            MinorVersion = (ushort) asm.Version.Minor,
+            BuildNumber = (ushort) asm.Version.Build,
+            RevisionNumber = (ushort) asm.Version.Revision,
+            Flags = (uint) asm.Flags,
+            PublicKeyIndex = (uint) MetadataTokens.GetHeapOffset(asm.PublicKey),
+            NameIndex = (uint) MetadataTokens.GetHeapOffset(asm.Name),
+            CultureIndex = (uint) MetadataTokens.GetHeapOffset(asm.Culture)
         };
     }
 
@@ -320,19 +318,19 @@ public sealed class StreamingMetadataReader : IDisposable
     /// </summary>
     public AssemblyRefRow ReadAssemblyRefRow(uint rid)
     {
-        var handle = MetadataTokens.AssemblyReferenceHandle((int)rid);
+        var handle = MetadataTokens.AssemblyReferenceHandle((int) rid);
         var asmRef = reader.GetAssemblyReference(handle);
-        return new AssemblyRefRow
+        return new()
         {
-            MajorVersion = (ushort)asmRef.Version.Major,
-            MinorVersion = (ushort)asmRef.Version.Minor,
-            BuildNumber = (ushort)asmRef.Version.Build,
-            RevisionNumber = (ushort)asmRef.Version.Revision,
-            Flags = (uint)asmRef.Flags,
-            PublicKeyOrTokenIndex = (uint)MetadataTokens.GetHeapOffset(asmRef.PublicKeyOrToken),
-            NameIndex = (uint)MetadataTokens.GetHeapOffset(asmRef.Name),
-            CultureIndex = (uint)MetadataTokens.GetHeapOffset(asmRef.Culture),
-            HashValueIndex = (uint)MetadataTokens.GetHeapOffset(asmRef.HashValue)
+            MajorVersion = (ushort) asmRef.Version.Major,
+            MinorVersion = (ushort) asmRef.Version.Minor,
+            BuildNumber = (ushort) asmRef.Version.Build,
+            RevisionNumber = (ushort) asmRef.Version.Revision,
+            Flags = (uint) asmRef.Flags,
+            PublicKeyOrTokenIndex = (uint) MetadataTokens.GetHeapOffset(asmRef.PublicKeyOrToken),
+            NameIndex = (uint) MetadataTokens.GetHeapOffset(asmRef.Name),
+            CultureIndex = (uint) MetadataTokens.GetHeapOffset(asmRef.Culture),
+            HashValueIndex = (uint) MetadataTokens.GetHeapOffset(asmRef.HashValue)
         };
     }
 
@@ -397,21 +395,25 @@ public sealed class StreamingMetadataReader : IDisposable
             var refName = reader.GetString(asmRef.Name);
             if (string.Equals(refName, name, StringComparison.OrdinalIgnoreCase))
             {
-                return (rid, new AssemblyRefRow
-                {
-                    MajorVersion = (ushort)asmRef.Version.Major,
-                    MinorVersion = (ushort)asmRef.Version.Minor,
-                    BuildNumber = (ushort)asmRef.Version.Build,
-                    RevisionNumber = (ushort)asmRef.Version.Revision,
-                    Flags = (uint)asmRef.Flags,
-                    PublicKeyOrTokenIndex = (uint)MetadataTokens.GetHeapOffset(asmRef.PublicKeyOrToken),
-                    NameIndex = (uint)MetadataTokens.GetHeapOffset(asmRef.Name),
-                    CultureIndex = (uint)MetadataTokens.GetHeapOffset(asmRef.Culture),
-                    HashValueIndex = (uint)MetadataTokens.GetHeapOffset(asmRef.HashValue)
-                });
+                return (
+                    rid,
+                    new()
+                    {
+                        MajorVersion = (ushort) asmRef.Version.Major,
+                        MinorVersion = (ushort) asmRef.Version.Minor,
+                        BuildNumber = (ushort) asmRef.Version.Build,
+                        RevisionNumber = (ushort) asmRef.Version.Revision,
+                        Flags = (uint) asmRef.Flags,
+                        PublicKeyOrTokenIndex = (uint) MetadataTokens.GetHeapOffset(asmRef.PublicKeyOrToken),
+                        NameIndex = (uint) MetadataTokens.GetHeapOffset(asmRef.Name),
+                        CultureIndex = (uint) MetadataTokens.GetHeapOffset(asmRef.Culture),
+                        HashValueIndex = (uint) MetadataTokens.GetHeapOffset(asmRef.HashValue)
+                    });
             }
+
             rid++;
         }
+
         return null;
     }
 
@@ -431,6 +433,7 @@ public sealed class StreamingMetadataReader : IDisposable
                 return rid;
             rid++;
         }
+
         return null;
     }
 
@@ -439,7 +442,7 @@ public sealed class StreamingMetadataReader : IDisposable
     /// </summary>
     public uint? FindMemberRef(uint typeRefRid, string name)
     {
-        var typeRefHandle = MetadataTokens.TypeReferenceHandle((int)typeRefRid);
+        var typeRefHandle = MetadataTokens.TypeReferenceHandle((int) typeRefRid);
 
         uint rid = 1;
         foreach (var handle in reader.MemberReferences)
@@ -447,7 +450,7 @@ public sealed class StreamingMetadataReader : IDisposable
             var memberRef = reader.GetMemberReference(handle);
             if (memberRef.Parent.Kind == HandleKind.TypeReference)
             {
-                var parentHandle = (TypeReferenceHandle)memberRef.Parent;
+                var parentHandle = (TypeReferenceHandle) memberRef.Parent;
                 if (parentHandle == typeRefHandle)
                 {
                     var memberName = reader.GetString(memberRef.Name);
@@ -455,8 +458,10 @@ public sealed class StreamingMetadataReader : IDisposable
                         return rid;
                 }
             }
+
             rid++;
         }
+
         return null;
     }
 
@@ -487,7 +492,7 @@ public sealed class StreamingMetadataReader : IDisposable
     /// </summary>
     public void CopyTableData(TableIndex table, Stream destination)
     {
-        var info = tables[(int)table];
+        var info = tables[(int) table];
         if (info.RowCount == 0) return;
 
         var size = info.RowSize * info.RowCount;

@@ -1,5 +1,3 @@
-using System.Text;
-
 namespace Alias.Lib.PE;
 
 /// <summary>
@@ -78,7 +76,6 @@ public sealed class StreamingPEFile : IDisposable
             var sh = headers.SectionHeaders[i];
             Sections[i] = new()
             {
-                Name = sh.Name,
                 VirtualSize = (uint)sh.VirtualSize,
                 VirtualAddress = (uint)sh.VirtualAddress,
                 SizeOfRawData = (uint)sh.SizeOfRawData,
@@ -119,9 +116,11 @@ public sealed class StreamingPEFile : IDisposable
             var peReader = new PEReader(stream, PEStreamOptions.LeaveOpen);
 
             if (peReader.PEHeaders.CorHeader == null)
+            {
                 throw new BadImageFormatException("Not a .NET assembly (no CLI header)");
+            }
 
-            return new StreamingPEFile(path, stream, peReader);
+            return new(path, stream, peReader);
         }
         catch
         {
@@ -137,7 +136,9 @@ public sealed class StreamingPEFile : IDisposable
 
         // Metadata signature: BSJB
         if (reader.ReadUInt32() != 0x424a5342)
+        {
             throw new BadImageFormatException("Invalid metadata signature");
+        }
 
         _stream.Position += 8; // Major/Minor version + Reserved
 
@@ -152,14 +153,14 @@ public sealed class StreamingPEFile : IDisposable
         var streamCount = reader.ReadUInt16();
 
         StreamHeaders = new StreamHeader[streamCount];
-        for (int i = 0; i < streamCount; i++)
+        for (var i = 0; i < streamCount; i++)
         {
             var offset = reader.ReadUInt32();
             var size = reader.ReadUInt32();
 
             // Read null-terminated, 4-byte aligned name
             var nameBuilder = new StringBuilder();
-            int bytesRead = 0;
+            var bytesRead = 0;
             while (bytesRead < 32)
             {
                 var b = reader.ReadByte();
@@ -171,7 +172,7 @@ public sealed class StreamingPEFile : IDisposable
             var aligned = (bytesRead + 3) & ~3;
             _stream.Position += aligned - bytesRead;
 
-            StreamHeaders[i] = new StreamHeader
+            StreamHeaders[i] = new()
             {
                 Offset = offset,
                 Size = size,
@@ -183,15 +184,8 @@ public sealed class StreamingPEFile : IDisposable
     /// <summary>
     /// Gets the stream header by name.
     /// </summary>
-    public StreamHeader? GetStreamHeader(string name)
-    {
-        foreach (var header in StreamHeaders)
-        {
-            if (header.Name == name)
-                return header;
-        }
-        return null;
-    }
+    public StreamHeader? GetStreamHeader(string name) =>
+        StreamHeaders.FirstOrDefault(_ => _.Name == name);
 
     /// <summary>
     /// Resolves a virtual address (RVA) to a file offset.
@@ -200,7 +194,10 @@ public sealed class StreamingPEFile : IDisposable
     {
         var section = GetSectionAtRva(rva);
         if (section == null)
+        {
             throw new BadImageFormatException($"RVA 0x{rva:X8} is not within any section");
+        }
+
         return rva - section.VirtualAddress + section.PointerToRawData;
     }
 
@@ -209,12 +206,9 @@ public sealed class StreamingPEFile : IDisposable
     /// </summary>
     public SectionInfo? GetSectionAtRva(uint rva)
     {
-        foreach (var section in Sections)
-        {
-            if (rva >= section.VirtualAddress && rva < section.VirtualAddress + section.SizeOfRawData)
-                return section;
-        }
-        return null;
+        return Sections.FirstOrDefault(_ =>
+            rva >= _.VirtualAddress &&
+            rva < _.VirtualAddress + _.SizeOfRawData);
     }
 
     /// <summary>
@@ -235,7 +229,10 @@ public sealed class StreamingPEFile : IDisposable
         var buffer = new byte[count];
         var read = _stream.Read(buffer, 0, count);
         if (read < count)
+        {
             Array.Resize(ref buffer, read);
+        }
+
         return buffer;
     }
 
@@ -255,7 +252,10 @@ public sealed class StreamingPEFile : IDisposable
         {
             var toRead = (int)Math.Min(remaining, bufferSize);
             var read = _stream.Read(buffer, 0, toRead);
-            if (read == 0) break;
+            if (read == 0)
+            {
+                break;
+            }
 
             destination.Write(buffer, 0, read);
             remaining -= read;
@@ -264,22 +264,13 @@ public sealed class StreamingPEFile : IDisposable
 
     public void Dispose()
     {
-        if (_disposed) return;
+        if (_disposed)
+        {
+            return;
+        }
+
         _disposed = true;
         _peReader.Dispose();
         _stream.Dispose();
     }
-}
-
-/// <summary>
-/// Information about a PE section.
-/// </summary>
-public class SectionInfo
-{
-    public string Name { get; init; } = "";
-    public uint VirtualSize { get; init; }
-    public uint VirtualAddress { get; init; }
-    public uint SizeOfRawData { get; init; }
-    public uint PointerToRawData { get; init; }
-    public uint Characteristics { get; init; }
 }

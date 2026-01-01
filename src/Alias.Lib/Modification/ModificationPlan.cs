@@ -1,7 +1,3 @@
-using System.Reflection.Metadata.Ecma335;
-using Alias.Lib.Metadata;
-using Alias.Lib.Metadata.Tables;
-
 namespace Alias.Lib.Modification;
 
 /// <summary>
@@ -238,17 +234,17 @@ public sealed class ModificationPlan(StreamingMetadataReader metadata)
     /// <summary>
     /// Returns true if modifications require adding new heap data.
     /// </summary>
-    public bool RequiresHeapGrowth => hasNewStrings || hasNewBlobs;
+    bool RequiresHeapGrowth => hasNewStrings || hasNewBlobs;
 
     /// <summary>
     /// Returns true if modifications require adding new table rows.
     /// </summary>
-    public bool RequiresNewRows => hasNewRows;
+    bool RequiresNewRows => hasNewRows;
 
     /// <summary>
     /// Returns true if only in-place byte patches are needed (no size changes).
     /// </summary>
-    public bool CanPatchInPlace => !RequiresHeapGrowth && !RequiresNewRows;
+    bool CanPatchInPlace => !RequiresHeapGrowth && !RequiresNewRows;
 
     /// <summary>
     /// Estimates the new metadata size after all modifications.
@@ -364,17 +360,19 @@ public sealed class ModificationPlan(StreamingMetadataReader metadata)
     {
         var found = metadata.FindAssemblyRef(sourceName);
         if (found == null)
+        {
             return false;
+        }
 
         var (rid, row) = found.Value;
         row.NameIndex = GetOrAddString(targetName);
-        if (publicKeyToken != null)
+        if (publicKeyToken == null)
         {
-            row.PublicKeyOrTokenIndex = GetOrAddBlob(publicKeyToken);
+            row.PublicKeyOrTokenIndex = 0;
         }
         else
         {
-            row.PublicKeyOrTokenIndex = 0;
+            row.PublicKeyOrTokenIndex = GetOrAddBlob(publicKeyToken);
         }
 
         SetAssemblyRefRow(rid, row);

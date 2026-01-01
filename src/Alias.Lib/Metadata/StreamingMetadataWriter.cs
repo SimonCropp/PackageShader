@@ -1,8 +1,4 @@
-using System.Reflection.Metadata.Ecma335;
-using System.Text;
-using Alias.Lib.Metadata.Tables;
 using CodedIndex = Alias.Lib.Metadata.Tables.CodedIndex;
-using Alias.Lib.Modification;
 
 namespace Alias.Lib.Metadata;
 
@@ -24,7 +20,7 @@ public sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modi
         // Write placeholder stream headers and track their positions
         var streamHeaders = source.PEFile.StreamHeaders;
         var headerPositions = new long[streamHeaders.Length];
-        for (int i = 0; i < streamHeaders.Length; i++)
+        for (var i = 0; i < streamHeaders.Length; i++)
         {
             headerPositions[i] = output.Position;
             writer.Write((uint)0); // Offset placeholder
@@ -34,7 +30,7 @@ public sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modi
 
         // Write each stream and patch headers immediately
         // Stream offsets are relative to the start of metadata (position 0)
-        for (int i = 0; i < streamHeaders.Length; i++)
+        for (var i = 0; i < streamHeaders.Length; i++)
         {
             var header = streamHeaders[i];
             var streamOffset = (uint)output.Position; // Offset from start of metadata
@@ -121,8 +117,10 @@ public sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modi
         var alignedLen = (versionBytes.Length + 3) & ~3;
         writer.Write(alignedLen);
         writer.Write(versionBytes);
-        for (int i = versionBytes.Length; i < alignedLen; i++)
+        for (var i = versionBytes.Length; i < alignedLen; i++)
+        {
             writer.Write((byte)0);
+        }
 
         // Flags
         writer.Write((ushort)0);
@@ -142,9 +140,21 @@ public sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modi
 
         // HeapSizes
         byte heapSizes = 0;
-        if (source.StringIndexSize == 4) heapSizes |= 0x01;
-        if (source.GuidIndexSize == 4) heapSizes |= 0x02;
-        if (source.BlobIndexSize == 4) heapSizes |= 0x04;
+        if (source.StringIndexSize == 4)
+        {
+            heapSizes |= 0x01;
+        }
+
+        if (source.GuidIndexSize == 4)
+        {
+            heapSizes |= 0x02;
+        }
+
+        if (source.BlobIndexSize == 4)
+        {
+            heapSizes |= 0x04;
+        }
+
         writer.Write(heapSizes);
 
         writer.Write((byte)1); // Reserved

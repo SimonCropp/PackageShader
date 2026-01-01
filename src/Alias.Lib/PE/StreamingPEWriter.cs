@@ -1,7 +1,4 @@
-using System.Reflection.Metadata.Ecma335;
-using Alias.Lib.Metadata;
 using CodedIndex = Alias.Lib.Metadata.Tables.CodedIndex;
-using Alias.Lib.Modification;
 
 namespace Alias.Lib.PE;
 
@@ -59,7 +56,6 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
             ?? throw new InvalidOperationException("Metadata section not found");
 
         var metadataOffsetInSection = source.MetadataRva - metadataSection.VirtualAddress;
-        var metadataFileOffset = metadataSection.PointerToRawData + metadataOffsetInSection;
 
         // Build new metadata
         using var newMetadataStream = new MemoryStream();
@@ -146,7 +142,10 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
 
     List<(long offset, byte[] data)> BuildInPlacePatches()
     {
-        var patches = new List<(long offset, byte[] data)>();
+        var patches = new List<(long offset, byte[] data)>(
+            plan.ModifiedAssemblyRows.Count +
+            plan.ModifiedAssemblyRefRows.Count +
+            plan.ModifiedTypeDefRows.Count);
 
         // Patch Assembly table row
         foreach (var (rid, row) in plan.ModifiedAssemblyRows)
@@ -206,11 +205,13 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
         var metadataSectionRvaEnd = metadataSection.VirtualAddress + metadataSection.VirtualSize;
 
         if (sizeDiff == 0)
+        {
             return;
+        }
 
         // Patch section header
         var sectionOffset = source.SectionHeadersOffset;
-        for (int i = 0; i < source.Sections.Length; i++)
+        for (var i = 0; i < source.Sections.Length; i++)
         {
             var section = source.Sections[i];
             var headerOffset = sectionOffset + i * 40;
@@ -237,9 +238,12 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
         output.Position = entryPointOffset;
         var entryPointRva = ReadUInt32(output);
         // Only patch if entry point is within metadata section and after the metadata
-        bool entryPointInMetadataSection = entryPointRva >= metadataSectionRvaStart && entryPointRva < metadataSectionRvaEnd;
-        bool entryPointAfterMetadata = entryPointRva >= oldMetadataRvaEnd;
-        if (entryPointInMetadataSection && entryPointAfterMetadata && entryPointRva > 0)
+        var entryPointInMetadataSection = entryPointRva >= metadataSectionRvaStart &&
+                                          entryPointRva < metadataSectionRvaEnd;
+        var entryPointAfterMetadata = entryPointRva >= oldMetadataRvaEnd;
+        if (entryPointInMetadataSection &&
+            entryPointAfterMetadata &&
+            entryPointRva > 0)
         {
             output.Position = entryPointOffset;
             WriteUInt32(output, (uint)(entryPointRva + sizeDiff));
@@ -251,18 +255,19 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
             if (source.IsPE64)
             {
                 // Calculate the file offset of the entry point stub (after shift)
-                long entryPointStubFileOffset = entryPointRva - metadataSection.VirtualAddress
-                    + metadataSection.PointerToRawData + sizeDiff;
+                var entryPointStubFileOffset = entryPointRva - metadataSection.VirtualAddress
+                                               + metadataSection.PointerToRawData + sizeDiff;
 
                 // Read the first two bytes to check for FF 25 (JMP [RIP+disp32])
                 output.Position = entryPointStubFileOffset;
                 var stubBytes = new byte[6];
                 _ = output.Read(stubBytes, 0, 6);
 
-                if (stubBytes[0] == 0xFF && stubBytes[1] == 0x25)
+                if (stubBytes[0] == 0xFF &&
+                    stubBytes[1] == 0x25)
                 {
-                    int disp32 = BitConverter.ToInt32(stubBytes, 2);
-                    int newDisp32 = disp32 - sizeDiff;
+                    var disp32 = BitConverter.ToInt32(stubBytes, 2);
+                    var newDisp32 = disp32 - sizeDiff;
 
                     output.Position = entryPointStubFileOffset + 2;
                     WriteInt32(output, newDisp32);
@@ -285,38 +290,46 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
         var importDirRva = ReadUInt32(output);
         var importDirSize = ReadUInt32(output);
 
-        for (int dirIndex = 0; dirIndex < 16; dirIndex++)
+        for (var dirIndex = 0; dirIndex < 16; dirIndex++)
         {
             var dirEntryOffset = dataDirectoriesOffset + dirIndex * 8;
             output.Position = dirEntryOffset;
             var dirRva = ReadUInt32(output);
 
             // Only patch if the RVA is within the metadata section and after metadata
-            bool inMetadataSection = dirRva >= metadataSectionRvaStart && dirRva < metadataSectionRvaEnd;
-            bool afterMetadata = dirRva >= oldMetadataRvaEnd;
-            bool shouldPatch = inMetadataSection && afterMetadata && dirRva > 0;
-            if (shouldPatch)
+            var inMetadataSection = dirRva >= metadataSectionRvaStart && dirRva < metadataSectionRvaEnd;
+            var afterMetadata = dirRva >= oldMetadataRvaEnd;
+            var shouldPatch = inMetadataSection &&
+                              afterMetadata &&
+                              dirRva > 0;
+            if (!shouldPatch)
             {
-                output.Position = dirEntryOffset;
-                WriteUInt32(output, (uint)(dirRva + sizeDiff));
+                continue;
             }
+
+            output.Position = dirEntryOffset;
+            WriteUInt32(output, (uint)(dirRva + sizeDiff));
         }
 
         // Patch Import directory internal RVAs
         // The Import Directory Table contains RVAs to Import Lookup Table, DLL name, and Import Address Table
         // Note: importDirRva and importDirSize were read BEFORE the patching loop above
-        bool importInMetadataSection = importDirRva >= metadataSectionRvaStart && importDirRva < metadataSectionRvaEnd;
-        if (importDirRva > 0 && importDirSize > 0 && importInMetadataSection)
+        var importInMetadataSection = importDirRva >= metadataSectionRvaStart && importDirRva < metadataSectionRvaEnd;
+        if (importDirRva > 0 &&
+            importDirSize > 0 &&
+            importInMetadataSection)
         {
             // Calculate the file offset of the Import Directory Table (may have shifted)
             long importFileOffset = importDirRva - metadataSection.VirtualAddress + metadataSection.PointerToRawData;
             if (importDirRva >= oldMetadataRvaEnd)
+            {
                 importFileOffset += sizeDiff;
+            }
 
             // Each IMAGE_IMPORT_DESCRIPTOR is 20 bytes
             // Structure: OriginalFirstThunk(4), TimeDateStamp(4), ForwarderChain(4), Name(4), FirstThunk(4)
-            int maxEntries = (int)(importDirSize / 20);
-            for (int i = 0; i < maxEntries; i++)
+            var maxEntries = (int)(importDirSize / 20);
+            for (var i = 0; i < maxEntries; i++)
             {
                 var entryOffset = importFileOffset + i * 20;
 
@@ -324,7 +337,9 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
                 output.Position = entryOffset;
                 var originalFirstThunk = ReadUInt32(output);
                 if (originalFirstThunk == 0)
-                    break;  // Null terminator
+                {
+                    break; // Null terminator
+                }
 
                 // Read other RVAs
                 output.Position = entryOffset + 12;  // Name field
@@ -332,7 +347,8 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
                 var firstThunk = ReadUInt32(output);
 
                 // Patch OriginalFirstThunk if it points to shifted data
-                bool oftInSection = originalFirstThunk >= metadataSectionRvaStart && originalFirstThunk < metadataSectionRvaEnd;
+                var oftInSection = originalFirstThunk >= metadataSectionRvaStart &&
+                                   originalFirstThunk < metadataSectionRvaEnd;
                 if (oftInSection && originalFirstThunk >= oldMetadataRvaEnd)
                 {
                     output.Position = entryOffset;
@@ -340,7 +356,8 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
                 }
 
                 // Patch Name if it points to shifted data
-                bool nameInSection = nameRva >= metadataSectionRvaStart && nameRva < metadataSectionRvaEnd;
+                var nameInSection = nameRva >= metadataSectionRvaStart &&
+                                    nameRva < metadataSectionRvaEnd;
                 if (nameInSection && nameRva >= oldMetadataRvaEnd && nameRva > 0)
                 {
                     output.Position = entryOffset + 12;
@@ -348,7 +365,8 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
                 }
 
                 // Patch FirstThunk if it points to shifted data
-                bool ftInSection = firstThunk >= metadataSectionRvaStart && firstThunk < metadataSectionRvaEnd;
+                var ftInSection = firstThunk >= metadataSectionRvaStart &&
+                                  firstThunk < metadataSectionRvaEnd;
                 if (ftInSection && firstThunk >= oldMetadataRvaEnd && firstThunk > 0)
                 {
                     output.Position = entryOffset + 16;
@@ -364,7 +382,7 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
             var patchedFt = ReadUInt32(output);
 
             // Each entry is 4 bytes (PE32) or 8 bytes (PE64)
-            int entrySize = source.IsPE64 ? 8 : 4;
+            var entrySize = source.IsPE64 ? 8 : 4;
 
             // Patch ILT entries if OriginalFirstThunk is valid
             // Note: patchedOft is the ALREADY-PATCHED RVA, so it already represents the new location.
@@ -388,17 +406,19 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
         // Patch debug directory entries (each entry is 28 bytes)
         // The entries contain AddressOfRawData (RVA at +20) and PointerToRawData (file offset at +24)
         // Only process if debug directory is within the metadata section
-        bool debugDirInMetadataSection = debugDirRva >= metadataSectionRvaStart && debugDirRva < metadataSectionRvaEnd;
+        var debugDirInMetadataSection = debugDirRva >= metadataSectionRvaStart && debugDirRva < metadataSectionRvaEnd;
         if (debugDirRva > 0 && debugDirSize > 0 && debugDirInMetadataSection)
         {
             // Calculate the new file offset of the debug directory
             long debugDirFileOffset = debugDirRva - metadataSection.VirtualAddress + metadataSection.PointerToRawData;
-            bool debugDirAfterMetadata = debugDirRva >= oldMetadataRvaEnd;
+            var debugDirAfterMetadata = debugDirRva >= oldMetadataRvaEnd;
             if (debugDirAfterMetadata)
+            {
                 debugDirFileOffset += sizeDiff;
+            }
 
-            int entryCount = (int)(debugDirSize / 28);
-            for (int i = 0; i < entryCount; i++)
+            var entryCount = (int)(debugDirSize / 28);
+            for (var i = 0; i < entryCount; i++)
             {
                 var entryOffset = debugDirFileOffset + i * 28;
 
@@ -410,7 +430,7 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
                 var pointerToRawData = ReadUInt32(output);
 
                 // Update if they point to data within metadata section past the old metadata end
-                bool addrInSection = addressOfRawData >= metadataSectionRvaStart && addressOfRawData < metadataSectionRvaEnd;
+                var addrInSection = addressOfRawData >= metadataSectionRvaStart && addressOfRawData < metadataSectionRvaEnd;
                 if (addrInSection && addressOfRawData >= oldMetadataRvaEnd && addressOfRawData > 0)
                 {
                     output.Position = entryOffset + 20;
@@ -419,7 +439,7 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
 
                 // For file offset, check if it's within the metadata section's file range
                 var metadataSectionFileEnd = metadataSection.PointerToRawData + metadataSection.SizeOfRawData;
-                bool ptrInSection = pointerToRawData >= metadataSection.PointerToRawData && pointerToRawData < metadataSectionFileEnd;
+                var ptrInSection = pointerToRawData >= metadataSection.PointerToRawData && pointerToRawData < metadataSectionFileEnd;
                 if (ptrInSection && pointerToRawData >= oldMetadataEnd && pointerToRawData > 0)
                 {
                     output.Position = entryOffset + 24;
@@ -431,7 +451,7 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
         // Patch CLI header's Resources RVA if in metadata section and after metadata
         output.Position = source.CLIHeaderFileOffset + 24;
         var resourcesRva = ReadUInt32(output);
-        bool resourcesInMetadataSection = resourcesRva >= metadataSectionRvaStart && resourcesRva < metadataSectionRvaEnd;
+        var resourcesInMetadataSection = resourcesRva >= metadataSectionRvaStart && resourcesRva < metadataSectionRvaEnd;
         if (resourcesInMetadataSection && resourcesRva >= oldMetadataRvaEnd && resourcesRva > 0)
         {
             output.Position = source.CLIHeaderFileOffset + 24;
@@ -452,11 +472,14 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
             SectionInfo? relocTableSection = null;
             foreach (var s in source.Sections)
             {
-                if (baseRelocRva >= s.VirtualAddress && baseRelocRva < s.VirtualAddress + s.VirtualSize)
+                if (baseRelocRva < s.VirtualAddress ||
+                    baseRelocRva >= s.VirtualAddress + s.VirtualSize)
                 {
-                    relocTableSection = s;
-                    break;
+                    continue;
                 }
+
+                relocTableSection = s;
+                break;
             }
 
             if (relocTableSection != null)
@@ -469,7 +492,9 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
 
                 // Only adjust if .reloc section comes after metadata section and section grew
                 if (relocTableSection.PointerToRawData > metadataSection.PointerToRawData && rawSizeDiff != 0)
+                {
                     relocTableFileOffset += rawSizeDiff;
+                }
 
                 // Process each relocation block
                 long blockOffset = 0;
@@ -480,18 +505,20 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
                     var blockSize = ReadUInt32(output);
 
                     if (blockSize == 0)
+                    {
                         break;
+                    }
 
                     // Check if this page overlaps with the shifted region
-                    bool pageOverlapsShiftedRegion = pageRva >= metadataSectionRvaStart &&
-                        pageRva < metadataSectionRvaEnd &&
-                        pageRva + 0x1000 > oldMetadataRvaEnd;
+                    var pageOverlapsShiftedRegion = pageRva >= metadataSectionRvaStart &&
+                                                    pageRva < metadataSectionRvaEnd &&
+                                                    pageRva + 0x1000 > oldMetadataRvaEnd;
 
                     if (pageOverlapsShiftedRegion)
                     {
                         // Process entries in this block
                         var entryCount = (blockSize - 8) / 2;
-                        for (int i = 0; i < entryCount; i++)
+                        for (var i = 0; i < entryCount; i++)
                         {
                             output.Position = relocTableFileOffset + blockOffset + 8 + i * 2;
                             var entry = ReadUInt16(output);
@@ -530,7 +557,7 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
         {
             output.Position = source.CLIHeaderFileOffset + 32;
             var snRva = ReadUInt32(output);
-            bool snInMetadataSection = snRva >= metadataSectionRvaStart && snRva < metadataSectionRvaEnd;
+            var snInMetadataSection = snRva >= metadataSectionRvaStart && snRva < metadataSectionRvaEnd;
             if (snInMetadataSection && snRva >= oldMetadataRvaEnd)
             {
                 output.Position = source.CLIHeaderFileOffset + 32;
@@ -541,13 +568,18 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
             // Only adjust offset if strong name is in metadata section and after metadata
             var snOffset = source.StrongNameFileOffset;
             var metadataSectionFileEnd = metadataSection.PointerToRawData + metadataSection.SizeOfRawData;
-            bool snOffsetInSection = snOffset >= metadataSection.PointerToRawData && snOffset < metadataSectionFileEnd;
+            var snOffsetInSection = snOffset >= metadataSection.PointerToRawData &&
+                                    snOffset < metadataSectionFileEnd;
             if (snOffsetInSection && snOffset >= oldMetadataEnd)
+            {
                 snOffset += sizeDiff;
+            }
 
             output.Position = snOffset;
-            for (int i = 0; i < source.StrongNameSize; i++)
+            for (var i = 0; i < source.StrongNameSize; i++)
+            {
                 output.WriteByte(0);
+            }
         }
     }
 
@@ -560,12 +592,16 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
 
     long GetFirstSectionOffset()
     {
-        long minOffset = long.MaxValue;
+        var minOffset = long.MaxValue;
         foreach (var section in source.Sections)
         {
-            if (section.PointerToRawData > 0 && section.PointerToRawData < minOffset)
+            if (section.PointerToRawData > 0 &&
+                section.PointerToRawData < minOffset)
+            {
                 minOffset = section.PointerToRawData;
+            }
         }
+
         return minOffset;
     }
 
@@ -601,9 +637,14 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
         while (totalRead < 2)
         {
             var read = stream.Read(buffer, totalRead, 2 - totalRead);
-            if (read == 0) break;
+            if (read == 0)
+            {
+                break;
+            }
+
             totalRead += read;
         }
+
         return BitConverter.ToUInt16(buffer, 0);
     }
 
@@ -614,9 +655,14 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
         while (totalRead < 4)
         {
             var read = stream.Read(buffer, totalRead, 4 - totalRead);
-            if (read == 0) break;
+            if (read == 0)
+            {
+                break;
+            }
+
             totalRead += read;
         }
+
         return BitConverter.ToUInt32(buffer, 0);
     }
 
@@ -627,9 +673,14 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
         while (totalRead < 8)
         {
             var read = stream.Read(buffer, totalRead, 8 - totalRead);
-            if (read == 0) break;
+            if (read == 0)
+            {
+                break;
+            }
+
             totalRead += read;
         }
+
         return BitConverter.ToUInt64(buffer, 0);
     }
 
@@ -648,28 +699,38 @@ public sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataR
     void PatchImportTableEntries(Stream output, long tableFileOffset, int entrySize,
         uint metadataSectionRvaStart, uint metadataSectionRvaEnd, uint oldMetadataRvaEnd, int sizeDiff)
     {
-        for (int i = 0; i < 100; i++)  // Safety limit
+        for (var i = 0; i < 100; i++)  // Safety limit
         {
             output.Position = tableFileOffset + i * entrySize;
             var entry = source.IsPE64 ? ReadUInt64(output) : ReadUInt32(output);
             if (entry == 0)
-                break;  // Null terminator
+            {
+                break; // Null terminator
+            }
 
             // Check if it's an ordinal import (high bit set) - skip those
-            bool isOrdinal = source.IsPE64 ? (entry & 0x8000000000000000UL) != 0 : (entry & 0x80000000U) != 0;
+            var isOrdinal = source.IsPE64 ? (entry & 0x8000000000000000UL) != 0 : (entry & 0x80000000U) != 0;
             if (isOrdinal)
+            {
                 continue;
+            }
 
             // It's a hint/name RVA
-            uint hintNameRva = (uint)(entry & 0x7FFFFFFF);
-            bool hnInSection = hintNameRva >= metadataSectionRvaStart && hintNameRva < metadataSectionRvaEnd;
-            if (hnInSection && hintNameRva >= oldMetadataRvaEnd)
+            var hintNameRva = (uint)(entry & 0x7FFFFFFF);
+            var hnInSection = hintNameRva >= metadataSectionRvaStart && hintNameRva < metadataSectionRvaEnd;
+            if (!hnInSection || hintNameRva < oldMetadataRvaEnd)
             {
-                output.Position = tableFileOffset + i * entrySize;
-                if (source.IsPE64)
-                    WriteUInt64(output, (ulong)(hintNameRva + sizeDiff));
-                else
-                    WriteUInt32(output, (uint)(hintNameRva + sizeDiff));
+                continue;
+            }
+
+            output.Position = tableFileOffset + i * entrySize;
+            if (source.IsPE64)
+            {
+                WriteUInt64(output, (ulong)(hintNameRva + sizeDiff));
+            }
+            else
+            {
+                WriteUInt32(output, (uint)(hintNameRva + sizeDiff));
             }
         }
     }
