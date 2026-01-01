@@ -1,3 +1,5 @@
+using System.Reflection;
+
 namespace Alias.Lib.Metadata.Tables;
 
 /// <summary>
@@ -120,17 +122,6 @@ public struct TypeDefRow
     public uint FieldListIndex;   // Field table index
     public uint MethodListIndex;  // Method table index
 
-    // Type attribute flags
-    public const uint VisibilityMask = 0x00000007;
-    public const uint NotPublic = 0x00000000;
-    public const uint Public = 0x00000001;
-    public const uint NestedPublic = 0x00000002;
-    public const uint NestedPrivate = 0x00000003;
-    public const uint NestedFamily = 0x00000004;
-    public const uint NestedAssembly = 0x00000005;
-    public const uint NestedFamANDAssem = 0x00000006;
-    public const uint NestedFamORAssem = 0x00000007;
-
     public static TypeDefRow Read(byte[] data, int stringIndexSize, int typeDefOrRefSize,
         int fieldIndexSize, int methodIndexSize)
     {
@@ -162,25 +153,16 @@ public struct TypeDefRow
     /// </summary>
     public void MakeInternal()
     {
-        var visibility = Flags & VisibilityMask;
+        const uint visibilityMask = (uint)TypeAttributes.VisibilityMask;
+        var visibility = (TypeAttributes)(Flags & visibilityMask);
 
-        // Only change if currently public (not nested)
-        if (visibility == Public)
+        Flags = visibility switch
         {
-            Flags = (Flags & ~VisibilityMask) | NotPublic;
-        }
-        else if (visibility == NestedPublic)
-        {
-            Flags = (Flags & ~VisibilityMask) | NestedAssembly;
-        }
-        else if (visibility == NestedFamily)
-        {
-            Flags = (Flags & ~VisibilityMask) | NestedAssembly;
-        }
-        else if (visibility == NestedFamORAssem)
-        {
-            Flags = (Flags & ~VisibilityMask) | NestedAssembly;
-        }
+            TypeAttributes.Public => (Flags & ~visibilityMask) | (uint)TypeAttributes.NotPublic,
+            TypeAttributes.NestedPublic or TypeAttributes.NestedFamily or TypeAttributes.NestedFamORAssem
+                => (Flags & ~visibilityMask) | (uint)TypeAttributes.NestedAssembly,
+            _ => Flags
+        };
     }
 
     /// <summary>
@@ -190,8 +172,8 @@ public struct TypeDefRow
     {
         get
         {
-            var visibility = Flags & VisibilityMask;
-            return visibility == Public || visibility == NestedPublic;
+            var visibility = (TypeAttributes)(Flags & (uint)TypeAttributes.VisibilityMask);
+            return visibility is TypeAttributes.Public or TypeAttributes.NestedPublic;
         }
     }
 

@@ -1,5 +1,7 @@
+using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using Alias.Lib.Metadata.Tables;
+using CodedIndex = Alias.Lib.Metadata.Tables.CodedIndex;
 using Alias.Lib.Modification;
 
 namespace Alias.Lib.Metadata;
@@ -164,12 +166,12 @@ public sealed class StreamingMetadataWriter
         var sorted = _source.Sorted;
 
         // Update Valid if we're adding rows to new tables
-        if (_plan.NewTypeRefs.Count > 0 && _source.GetRowCount(Table.TypeRef) == 0)
-            valid |= 1L << (int)Table.TypeRef;
-        if (_plan.NewMemberRefs.Count > 0 && _source.GetRowCount(Table.MemberRef) == 0)
-            valid |= 1L << (int)Table.MemberRef;
-        if (_plan.NewCustomAttributes.Count > 0 && _source.GetRowCount(Table.CustomAttribute) == 0)
-            valid |= 1L << (int)Table.CustomAttribute;
+        if (_plan.NewTypeRefs.Count > 0 && _source.GetRowCount(TableIndex.TypeRef) == 0)
+            valid |= 1L << (int)TableIndex.TypeRef;
+        if (_plan.NewMemberRefs.Count > 0 && _source.GetRowCount(TableIndex.MemberRef) == 0)
+            valid |= 1L << (int)TableIndex.MemberRef;
+        if (_plan.NewCustomAttributes.Count > 0 && _source.GetRowCount(TableIndex.CustomAttribute) == 0)
+            valid |= 1L << (int)TableIndex.CustomAttribute;
 
         writer.Write(valid);
         writer.Write(sorted);
@@ -179,15 +181,15 @@ public sealed class StreamingMetadataWriter
         {
             if ((valid & (1L << i)) == 0) continue;
 
-            var table = (Table)i;
+            var table = (TableIndex)i;
             var count = _source.GetRowCount(table);
 
             // Add new rows
-            if (table == Table.TypeRef)
+            if (table == TableIndex.TypeRef)
                 count += _plan.NewTypeRefs.Count;
-            else if (table == Table.MemberRef)
+            else if (table == TableIndex.MemberRef)
                 count += _plan.NewMemberRefs.Count;
-            else if (table == Table.CustomAttribute)
+            else if (table == TableIndex.CustomAttribute)
                 count += _plan.NewCustomAttributes.Count;
 
             writer.Write((uint)count);
@@ -198,7 +200,7 @@ public sealed class StreamingMetadataWriter
         {
             if ((valid & (1L << i)) == 0) continue;
 
-            var table = (Table)i;
+            var table = (TableIndex)i;
             WriteTableData(writer, table);
         }
 
@@ -207,14 +209,14 @@ public sealed class StreamingMetadataWriter
         return (uint)(writer.BaseStream.Position - startPos);
     }
 
-    private void WriteTableData(BinaryWriter writer, Table table)
+    private void WriteTableData(BinaryWriter writer, TableIndex table)
     {
         var rowCount = _source.GetRowCount(table);
         var rowSize = _source.GetRowSize(table);
 
         switch (table)
         {
-            case Table.Assembly:
+            case TableIndex.Assembly:
                 for (uint rid = 1; rid <= rowCount; rid++)
                 {
                     var row = _plan.GetAssemblyRow(rid);
@@ -222,7 +224,7 @@ public sealed class StreamingMetadataWriter
                 }
                 break;
 
-            case Table.AssemblyRef:
+            case TableIndex.AssemblyRef:
                 for (uint rid = 1; rid <= rowCount; rid++)
                 {
                     var row = _plan.GetAssemblyRefRow(rid);
@@ -230,18 +232,18 @@ public sealed class StreamingMetadataWriter
                 }
                 break;
 
-            case Table.TypeDef:
+            case TableIndex.TypeDef:
                 for (uint rid = 1; rid <= rowCount; rid++)
                 {
                     var row = _plan.GetTypeDefRow(rid);
                     row.Write(writer, _source.StringIndexSize,
                         _source.GetCodedIndexSize(CodedIndex.TypeDefOrRef),
-                        _source.GetTableIndexSize(Table.Field),
-                        _source.GetTableIndexSize(Table.Method));
+                        _source.GetTableIndexSize(TableIndex.Field),
+                        _source.GetTableIndexSize(TableIndex.MethodDef));
                 }
                 break;
 
-            case Table.TypeRef:
+            case TableIndex.TypeRef:
                 // Existing rows
                 for (uint rid = 1; rid <= rowCount; rid++)
                 {
@@ -259,7 +261,7 @@ public sealed class StreamingMetadataWriter
                 }
                 break;
 
-            case Table.MemberRef:
+            case TableIndex.MemberRef:
                 // Existing rows
                 for (uint rid = 1; rid <= rowCount; rid++)
                 {
@@ -279,7 +281,7 @@ public sealed class StreamingMetadataWriter
                 }
                 break;
 
-            case Table.CustomAttribute:
+            case TableIndex.CustomAttribute:
                 WriteCustomAttributeTable(writer, rowCount);
                 break;
 

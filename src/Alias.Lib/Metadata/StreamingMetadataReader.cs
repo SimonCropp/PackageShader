@@ -144,7 +144,7 @@ public sealed class StreamingMetadataReader : IDisposable
 
         for (int i = 0; i < 64; i++)
         {
-            var table = (Table)i;
+            var table = (TableIndex)i;
             if (!HasTable(table))
                 continue;
 
@@ -155,80 +155,80 @@ public sealed class StreamingMetadataReader : IDisposable
         }
     }
 
-    private int ComputeRowSize(Table table) =>
+    private int ComputeRowSize(TableIndex table) =>
         table switch
         {
-            Table.Module => 2 + StringIndexSize + GuidIndexSize * 3,
-            Table.TypeRef => GetCodedIndexSize(CodedIndex.ResolutionScope) + StringIndexSize * 2,
-            Table.TypeDef => 4 + StringIndexSize * 2 + GetCodedIndexSize(CodedIndex.TypeDefOrRef)
-                             + GetTableIndexSize(Table.Field) + GetTableIndexSize(Table.Method),
-            Table.FieldPtr => GetTableIndexSize(Table.Field),
-            Table.Field => 2 + StringIndexSize + BlobIndexSize,
-            Table.MethodPtr => GetTableIndexSize(Table.Method),
-            Table.Method => 8 + StringIndexSize + BlobIndexSize + GetTableIndexSize(Table.Param),
-            Table.ParamPtr => GetTableIndexSize(Table.Param),
-            Table.Param => 4 + StringIndexSize,
-            Table.InterfaceImpl => GetTableIndexSize(Table.TypeDef) + GetCodedIndexSize(CodedIndex.TypeDefOrRef),
-            Table.MemberRef => GetCodedIndexSize(CodedIndex.MemberRefParent) + StringIndexSize + BlobIndexSize,
-            Table.Constant => 2 + GetCodedIndexSize(CodedIndex.HasConstant) + BlobIndexSize,
-            Table.CustomAttribute => GetCodedIndexSize(CodedIndex.HasCustomAttribute)
+            TableIndex.Module => 2 + StringIndexSize + GuidIndexSize * 3,
+            TableIndex.TypeRef => GetCodedIndexSize(CodedIndex.ResolutionScope) + StringIndexSize * 2,
+            TableIndex.TypeDef => 4 + StringIndexSize * 2 + GetCodedIndexSize(CodedIndex.TypeDefOrRef)
+                             + GetTableIndexSize(TableIndex.Field) + GetTableIndexSize(TableIndex.MethodDef),
+            TableIndex.FieldPtr => GetTableIndexSize(TableIndex.Field),
+            TableIndex.Field => 2 + StringIndexSize + BlobIndexSize,
+            TableIndex.MethodPtr => GetTableIndexSize(TableIndex.MethodDef),
+            TableIndex.MethodDef => 8 + StringIndexSize + BlobIndexSize + GetTableIndexSize(TableIndex.Param),
+            TableIndex.ParamPtr => GetTableIndexSize(TableIndex.Param),
+            TableIndex.Param => 4 + StringIndexSize,
+            TableIndex.InterfaceImpl => GetTableIndexSize(TableIndex.TypeDef) + GetCodedIndexSize(CodedIndex.TypeDefOrRef),
+            TableIndex.MemberRef => GetCodedIndexSize(CodedIndex.MemberRefParent) + StringIndexSize + BlobIndexSize,
+            TableIndex.Constant => 2 + GetCodedIndexSize(CodedIndex.HasConstant) + BlobIndexSize,
+            TableIndex.CustomAttribute => GetCodedIndexSize(CodedIndex.HasCustomAttribute)
                                      + GetCodedIndexSize(CodedIndex.CustomAttributeType) + BlobIndexSize,
-            Table.FieldMarshal => GetCodedIndexSize(CodedIndex.HasFieldMarshal) + BlobIndexSize,
-            Table.DeclSecurity => 2 + GetCodedIndexSize(CodedIndex.HasDeclSecurity) + BlobIndexSize,
-            Table.ClassLayout => 6 + GetTableIndexSize(Table.TypeDef),
-            Table.FieldLayout => 4 + GetTableIndexSize(Table.Field),
-            Table.StandAloneSig => BlobIndexSize,
-            Table.EventMap => GetTableIndexSize(Table.TypeDef) + GetTableIndexSize(Table.Event),
-            Table.EventPtr => GetTableIndexSize(Table.Event),
-            Table.Event => 2 + StringIndexSize + GetCodedIndexSize(CodedIndex.TypeDefOrRef),
-            Table.PropertyMap => GetTableIndexSize(Table.TypeDef) + GetTableIndexSize(Table.Property),
-            Table.PropertyPtr => GetTableIndexSize(Table.Property),
-            Table.Property => 2 + StringIndexSize + BlobIndexSize,
-            Table.MethodSemantics => 2 + GetTableIndexSize(Table.Method) + GetCodedIndexSize(CodedIndex.HasSemantics),
-            Table.MethodImpl => GetTableIndexSize(Table.TypeDef)
+            TableIndex.FieldMarshal => GetCodedIndexSize(CodedIndex.HasFieldMarshal) + BlobIndexSize,
+            TableIndex.DeclSecurity => 2 + GetCodedIndexSize(CodedIndex.HasDeclSecurity) + BlobIndexSize,
+            TableIndex.ClassLayout => 6 + GetTableIndexSize(TableIndex.TypeDef),
+            TableIndex.FieldLayout => 4 + GetTableIndexSize(TableIndex.Field),
+            TableIndex.StandAloneSig => BlobIndexSize,
+            TableIndex.EventMap => GetTableIndexSize(TableIndex.TypeDef) + GetTableIndexSize(TableIndex.Event),
+            TableIndex.EventPtr => GetTableIndexSize(TableIndex.Event),
+            TableIndex.Event => 2 + StringIndexSize + GetCodedIndexSize(CodedIndex.TypeDefOrRef),
+            TableIndex.PropertyMap => GetTableIndexSize(TableIndex.TypeDef) + GetTableIndexSize(TableIndex.Property),
+            TableIndex.PropertyPtr => GetTableIndexSize(TableIndex.Property),
+            TableIndex.Property => 2 + StringIndexSize + BlobIndexSize,
+            TableIndex.MethodSemantics => 2 + GetTableIndexSize(TableIndex.MethodDef) + GetCodedIndexSize(CodedIndex.HasSemantics),
+            TableIndex.MethodImpl => GetTableIndexSize(TableIndex.TypeDef)
                                 + GetCodedIndexSize(CodedIndex.MethodDefOrRef) + GetCodedIndexSize(CodedIndex.MethodDefOrRef),
-            Table.ModuleRef => StringIndexSize,
-            Table.TypeSpec => BlobIndexSize,
-            Table.ImplMap => 2 + GetCodedIndexSize(CodedIndex.MemberForwarded)
-                               + StringIndexSize + GetTableIndexSize(Table.ModuleRef),
-            Table.FieldRVA => 4 + GetTableIndexSize(Table.Field),
-            Table.EncLog => 8,
-            Table.EncMap => 4,
-            Table.Assembly => 16 + BlobIndexSize + StringIndexSize * 2,
-            Table.AssemblyProcessor => 4,
-            Table.AssemblyOS => 12,
-            Table.AssemblyRef => 12 + BlobIndexSize * 2 + StringIndexSize * 2,
-            Table.AssemblyRefProcessor => 4 + GetTableIndexSize(Table.AssemblyRef),
-            Table.AssemblyRefOS => 12 + GetTableIndexSize(Table.AssemblyRef),
-            Table.File => 4 + StringIndexSize + BlobIndexSize,
-            Table.ExportedType => 8 + StringIndexSize * 2 + GetCodedIndexSize(CodedIndex.Implementation),
-            Table.ManifestResource => 8 + StringIndexSize + GetCodedIndexSize(CodedIndex.Implementation),
-            Table.NestedClass => GetTableIndexSize(Table.TypeDef) * 2,
-            Table.GenericParam => 4 + GetCodedIndexSize(CodedIndex.TypeOrMethodDef) + StringIndexSize,
-            Table.MethodSpec => GetCodedIndexSize(CodedIndex.MethodDefOrRef) + BlobIndexSize,
-            Table.GenericParamConstraint => GetTableIndexSize(Table.GenericParam) + GetCodedIndexSize(CodedIndex.TypeDefOrRef),
-            Table.Document => BlobIndexSize + GuidIndexSize + BlobIndexSize + GuidIndexSize,
-            Table.MethodDebugInformation => GetTableIndexSize(Table.Document) + BlobIndexSize,
-            Table.LocalScope => GetTableIndexSize(Table.Method) + GetTableIndexSize(Table.ImportScope)
-                                + GetTableIndexSize(Table.LocalVariable) + GetTableIndexSize(Table.LocalConstant) + 8,
-            Table.LocalVariable => 4 + StringIndexSize,
-            Table.LocalConstant => StringIndexSize + BlobIndexSize,
-            Table.ImportScope => GetTableIndexSize(Table.ImportScope) + BlobIndexSize,
-            Table.StateMachineMethod => GetTableIndexSize(Table.Method) * 2,
-            Table.CustomDebugInformation => GetCodedIndexSize(CodedIndex.HasCustomDebugInformation)
+            TableIndex.ModuleRef => StringIndexSize,
+            TableIndex.TypeSpec => BlobIndexSize,
+            TableIndex.ImplMap => 2 + GetCodedIndexSize(CodedIndex.MemberForwarded)
+                               + StringIndexSize + GetTableIndexSize(TableIndex.ModuleRef),
+            TableIndex.FieldRva => 4 + GetTableIndexSize(TableIndex.Field),
+            TableIndex.EncLog => 8,
+            TableIndex.EncMap => 4,
+            TableIndex.Assembly => 16 + BlobIndexSize + StringIndexSize * 2,
+            TableIndex.AssemblyProcessor => 4,
+            TableIndex.AssemblyOS => 12,
+            TableIndex.AssemblyRef => 12 + BlobIndexSize * 2 + StringIndexSize * 2,
+            TableIndex.AssemblyRefProcessor => 4 + GetTableIndexSize(TableIndex.AssemblyRef),
+            TableIndex.AssemblyRefOS => 12 + GetTableIndexSize(TableIndex.AssemblyRef),
+            TableIndex.File => 4 + StringIndexSize + BlobIndexSize,
+            TableIndex.ExportedType => 8 + StringIndexSize * 2 + GetCodedIndexSize(CodedIndex.Implementation),
+            TableIndex.ManifestResource => 8 + StringIndexSize + GetCodedIndexSize(CodedIndex.Implementation),
+            TableIndex.NestedClass => GetTableIndexSize(TableIndex.TypeDef) * 2,
+            TableIndex.GenericParam => 4 + GetCodedIndexSize(CodedIndex.TypeOrMethodDef) + StringIndexSize,
+            TableIndex.MethodSpec => GetCodedIndexSize(CodedIndex.MethodDefOrRef) + BlobIndexSize,
+            TableIndex.GenericParamConstraint => GetTableIndexSize(TableIndex.GenericParam) + GetCodedIndexSize(CodedIndex.TypeDefOrRef),
+            TableIndex.Document => BlobIndexSize + GuidIndexSize + BlobIndexSize + GuidIndexSize,
+            TableIndex.MethodDebugInformation => GetTableIndexSize(TableIndex.Document) + BlobIndexSize,
+            TableIndex.LocalScope => GetTableIndexSize(TableIndex.MethodDef) + GetTableIndexSize(TableIndex.ImportScope)
+                                + GetTableIndexSize(TableIndex.LocalVariable) + GetTableIndexSize(TableIndex.LocalConstant) + 8,
+            TableIndex.LocalVariable => 4 + StringIndexSize,
+            TableIndex.LocalConstant => StringIndexSize + BlobIndexSize,
+            TableIndex.ImportScope => GetTableIndexSize(TableIndex.ImportScope) + BlobIndexSize,
+            TableIndex.StateMachineMethod => GetTableIndexSize(TableIndex.MethodDef) * 2,
+            TableIndex.CustomDebugInformation => GetCodedIndexSize(CodedIndex.HasCustomDebugInformation)
                                             + GuidIndexSize + BlobIndexSize,
             _ => 0 // Unknown tables - return 0
         };
 
     #region Table Access
 
-    public bool HasTable(Table table) =>
+    public bool HasTable(TableIndex table) =>
         (int)table < 64 && (Valid & (1L << (int)table)) != 0;
 
-    public int GetRowCount(Table table) =>
+    public int GetRowCount(TableIndex table) =>
         (int)table < 64 ? (int)_tables[(int)table].RowCount : 0;
 
-    public int GetTableIndexSize(Table table) =>
+    public int GetTableIndexSize(TableIndex table) =>
         GetRowCount(table) < 65536 ? 2 : 4;
 
     public int GetCodedIndexSize(CodedIndex codedIndex)
@@ -243,7 +243,7 @@ public sealed class StreamingMetadataReader : IDisposable
     /// <summary>
     /// Reads raw bytes for a specific table row.
     /// </summary>
-    public byte[] ReadRow(Table table, uint rid)
+    public byte[] ReadRow(TableIndex table, uint rid)
     {
         if ((int)table >= 64 || rid == 0 || rid > _tables[(int)table].RowCount)
             return Array.Empty<byte>();
@@ -256,7 +256,7 @@ public sealed class StreamingMetadataReader : IDisposable
     /// <summary>
     /// Gets the file offset for a specific table row.
     /// </summary>
-    public long GetRowOffset(Table table, uint rid)
+    public long GetRowOffset(TableIndex table, uint rid)
     {
         var info = _tables[(int)table];
         return _tableDataOffset + info.Offset + (rid - 1) * info.RowSize;
@@ -265,7 +265,7 @@ public sealed class StreamingMetadataReader : IDisposable
     /// <summary>
     /// Gets the row size for a table.
     /// </summary>
-    public int GetRowSize(Table table) => (int)_tables[(int)table].RowSize;
+    public int GetRowSize(TableIndex table) => (int)_tables[(int)table].RowSize;
 
     #endregion
 
@@ -296,8 +296,8 @@ public sealed class StreamingMetadataReader : IDisposable
     /// </summary>
     public AssemblyRow ReadAssemblyRow(uint rid)
     {
-        if (!HasTable(Table.Assembly) || rid == 0 || rid > GetRowCount(Table.Assembly))
-            throw new InvalidOperationException($"No Assembly row found at rid {rid}. HasTable={HasTable(Table.Assembly)}, RowCount={GetRowCount(Table.Assembly)}");
+        if (!HasTable(TableIndex.Assembly) || rid == 0 || rid > GetRowCount(TableIndex.Assembly))
+            throw new InvalidOperationException($"No Assembly row found at rid {rid}. HasTable={HasTable(TableIndex.Assembly)}, RowCount={GetRowCount(TableIndex.Assembly)}");
 
         var asm = _reader.GetAssemblyDefinition();
         return new AssemblyRow
@@ -341,12 +341,12 @@ public sealed class StreamingMetadataReader : IDisposable
     public TypeDefRow ReadTypeDefRow(uint rid)
     {
         // Use raw reading since we need the exact index values for potential modification
-        var data = ReadRow(Table.TypeDef, rid);
+        var data = ReadRow(TableIndex.TypeDef, rid);
         return TypeDefRow.Read(data,
             StringIndexSize,
             GetCodedIndexSize(CodedIndex.TypeDefOrRef),
-            GetTableIndexSize(Table.Field),
-            GetTableIndexSize(Table.Method));
+            GetTableIndexSize(TableIndex.Field),
+            GetTableIndexSize(TableIndex.MethodDef));
     }
 
     /// <summary>
@@ -354,7 +354,7 @@ public sealed class StreamingMetadataReader : IDisposable
     /// </summary>
     public TypeRefRow ReadTypeRefRow(uint rid)
     {
-        var data = ReadRow(Table.TypeRef, rid);
+        var data = ReadRow(TableIndex.TypeRef, rid);
         return TypeRefRow.Read(data,
             GetCodedIndexSize(CodedIndex.ResolutionScope),
             StringIndexSize);
@@ -365,7 +365,7 @@ public sealed class StreamingMetadataReader : IDisposable
     /// </summary>
     public MemberRefRow ReadMemberRefRow(uint rid)
     {
-        var data = ReadRow(Table.MemberRef, rid);
+        var data = ReadRow(TableIndex.MemberRef, rid);
         return MemberRefRow.Read(data,
             GetCodedIndexSize(CodedIndex.MemberRefParent),
             StringIndexSize,
@@ -377,7 +377,7 @@ public sealed class StreamingMetadataReader : IDisposable
     /// </summary>
     public CustomAttributeRow ReadCustomAttributeRow(uint rid)
     {
-        var data = ReadRow(Table.CustomAttribute, rid);
+        var data = ReadRow(TableIndex.CustomAttribute, rid);
         return CustomAttributeRow.Read(data,
             GetCodedIndexSize(CodedIndex.HasCustomAttribute),
             GetCodedIndexSize(CodedIndex.CustomAttributeType),
@@ -484,7 +484,7 @@ public sealed class StreamingMetadataReader : IDisposable
     /// <summary>
     /// Copies a table's data to an output stream.
     /// </summary>
-    public void CopyTableData(Table table, Stream destination)
+    public void CopyTableData(TableIndex table, Stream destination)
     {
         var info = _tables[(int)table];
         if (info.RowCount == 0) return;

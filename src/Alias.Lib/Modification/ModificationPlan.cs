@@ -1,3 +1,4 @@
+using System.Reflection.Metadata.Ecma335;
 using Alias.Lib.Metadata;
 using Alias.Lib.Metadata.Tables;
 
@@ -129,7 +130,7 @@ public sealed class ModificationPlan
     {
         _newTypeRefs.Add(row);
         _hasNewRows = true;
-        return (uint)(_metadata.GetRowCount(Table.TypeRef) + _newTypeRefs.Count);
+        return (uint)(_metadata.GetRowCount(TableIndex.TypeRef) + _newTypeRefs.Count);
     }
 
     /// <summary>
@@ -140,7 +141,7 @@ public sealed class ModificationPlan
     {
         _newMemberRefs.Add(row);
         _hasNewRows = true;
-        return (uint)(_metadata.GetRowCount(Table.MemberRef) + _newMemberRefs.Count);
+        return (uint)(_metadata.GetRowCount(TableIndex.MemberRef) + _newMemberRefs.Count);
     }
 
     #endregion
@@ -282,15 +283,15 @@ public sealed class ModificationPlan
         // Add new table rows
         if (_newCustomAttributes.Count > 0)
         {
-            size += _newCustomAttributes.Count * _metadata.GetRowSize(Table.CustomAttribute);
+            size += _newCustomAttributes.Count * _metadata.GetRowSize(TableIndex.CustomAttribute);
         }
         if (_newTypeRefs.Count > 0)
         {
-            size += _newTypeRefs.Count * _metadata.GetRowSize(Table.TypeRef);
+            size += _newTypeRefs.Count * _metadata.GetRowSize(TableIndex.TypeRef);
         }
         if (_newMemberRefs.Count > 0)
         {
-            size += _newMemberRefs.Count * _metadata.GetRowSize(Table.MemberRef);
+            size += _newMemberRefs.Count * _metadata.GetRowSize(TableIndex.MemberRef);
         }
 
         // Account for table row count field growth (4 bytes per new table that wasn't there)
@@ -390,7 +391,7 @@ public sealed class ModificationPlan
     /// </summary>
     public void MakeTypesInternal()
     {
-        var count = _metadata.GetRowCount(Table.TypeDef);
+        var count = _metadata.GetRowCount(TableIndex.TypeDef);
         for (uint rid = 1; rid <= count; rid++)
         {
             var row = GetTypeDefRow(rid);

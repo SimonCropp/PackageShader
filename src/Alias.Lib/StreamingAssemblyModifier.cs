@@ -1,6 +1,8 @@
+using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using Alias.Lib.Metadata;
 using Alias.Lib.Metadata.Tables;
+using CodedIndex = Alias.Lib.Metadata.Tables.CodedIndex;
 using Alias.Lib.Modification;
 using Alias.Lib.Pdb;
 using Alias.Lib.PE;
@@ -106,11 +108,11 @@ public sealed class StreamingAssemblyModifier : IDisposable
 
         // Create custom attribute row
         // Parent = Assembly (token 0x20000001, encoded as HasCustomAttribute)
-        var assemblyToken = new MetadataToken(Table.Assembly, 1);
+        var assemblyToken = new MetadataToken(TableIndex.Assembly, 1);
         var parentEncoded = CodedIndexHelper.EncodeToken(CodedIndex.HasCustomAttribute, assemblyToken);
 
         // Type = MemberRef to constructor (encoded as CustomAttributeType)
-        var constructorToken = new MetadataToken(Table.MemberRef, constructorRid);
+        var constructorToken = new MetadataToken(TableIndex.MemberRef, constructorRid);
         var typeEncoded = CodedIndexHelper.EncodeToken(CodedIndex.CustomAttributeType, constructorToken);
 
         var attributeRow = new CustomAttributeRow
@@ -150,7 +152,7 @@ public sealed class StreamingAssemblyModifier : IDisposable
         {
             ResolutionScopeIndex = CodedIndexHelper.EncodeToken(
                 CodedIndex.ResolutionScope,
-                new(Table.AssemblyRef, resolutionScope.Value)),
+                new(TableIndex.AssemblyRef, resolutionScope.Value)),
             NameIndex = _plan.GetOrAddString("InternalsVisibleToAttribute"),
             NamespaceIndex = _plan.GetOrAddString("System.Runtime.CompilerServices")
         };
@@ -185,7 +187,7 @@ public sealed class StreamingAssemblyModifier : IDisposable
         {
             ClassIndex = CodedIndexHelper.EncodeToken(
                 CodedIndex.MemberRefParent,
-                new(Table.TypeRef, typeRefRid)),
+                new(TableIndex.TypeRef, typeRefRid)),
             NameIndex = _plan.GetOrAddString(".ctor"),
             SignatureIndex = _plan.GetOrAddBlob(ctorSignature)
         };
@@ -299,7 +301,7 @@ public sealed class StreamingAssemblyModifier : IDisposable
         // Patch Assembly table row
         foreach (var (rid, row) in _plan.ModifiedAssemblyRows)
         {
-            var offset = _metadata.GetRowOffset(Table.Assembly, rid);
+            var offset = _metadata.GetRowOffset(TableIndex.Assembly, rid);
             using var ms = new MemoryStream();
             using var writer = new BinaryWriter(ms);
             row.Write(writer, _metadata.BlobIndexSize, _metadata.StringIndexSize);
@@ -309,7 +311,7 @@ public sealed class StreamingAssemblyModifier : IDisposable
         // Patch AssemblyRef table rows
         foreach (var (rid, row) in _plan.ModifiedAssemblyRefRows)
         {
-            var offset = _metadata.GetRowOffset(Table.AssemblyRef, rid);
+            var offset = _metadata.GetRowOffset(TableIndex.AssemblyRef, rid);
             using var ms = new MemoryStream();
             using var writer = new BinaryWriter(ms);
             row.Write(writer, _metadata.BlobIndexSize, _metadata.StringIndexSize);
@@ -319,13 +321,13 @@ public sealed class StreamingAssemblyModifier : IDisposable
         // Patch TypeDef table rows
         foreach (var (rid, row) in _plan.ModifiedTypeDefRows)
         {
-            var offset = _metadata.GetRowOffset(Table.TypeDef, rid);
+            var offset = _metadata.GetRowOffset(TableIndex.TypeDef, rid);
             using var ms = new MemoryStream();
             using var writer = new BinaryWriter(ms);
             row.Write(writer, _metadata.StringIndexSize,
                 _metadata.GetCodedIndexSize(CodedIndex.TypeDefOrRef),
-                _metadata.GetTableIndexSize(Table.Field),
-                _metadata.GetTableIndexSize(Table.Method));
+                _metadata.GetTableIndexSize(TableIndex.Field),
+                _metadata.GetTableIndexSize(TableIndex.MethodDef));
             patches.Add((offset, ms.ToArray()));
         }
 
