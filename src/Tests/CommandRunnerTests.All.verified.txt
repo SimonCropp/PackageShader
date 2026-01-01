@@ -1,7 +1,7 @@
 ﻿{
   directory: {CurrentDirectory}directory,
-  prefix: Alias_,
-  suffix: _Alias,
+  prefix: Shaded_,
+  suffix: _Shaded,
   key: {CurrentDirectory}test.snk,
   assembliesToAlias: [
     assembly
@@ -9,8 +9,8 @@
   consoleOut:
 TargetDirectory: {CurrentDirectory}directory
 Internalize: False
-Prefix: Alias_
-Suffix: _Alias
+Prefix: Shaded_
+Suffix: _Shaded
 KeyFile: {CurrentDirectory}test.snk
 AssembliesToAlias:
  * assembly

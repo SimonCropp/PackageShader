@@ -43,7 +43,7 @@ public class AliasTests
         }
 
         var namesToAliases = assemblyFiles.Where(_ => _.StartsWith("AssemblyWith") || _ == "Newtonsoft.Json").ToList();
-        Program.Inner(tempPath, namesToAliases, new(), keyFile, new(), null, "_Alias", internalize, _ =>
+        Program.Inner(tempPath, namesToAliases, new(), keyFile, new(), null, "_Shaded", internalize, _ =>
         {
         });
 
@@ -384,8 +384,8 @@ public class AliasTests
         // copyPdbs=false but AssemblyWithEmbeddedSymbols has embedded PDB
         Run(copyPdbs: false, sign: false, internalize: false, directory);
 
-        var embeddedSymbolsPath = Path.Combine(directory, "AssemblyWithEmbeddedSymbols_Alias.dll");
-        Assert.True(File.Exists(embeddedSymbolsPath), "AssemblyWithEmbeddedSymbols_Alias.dll should exist");
+        var embeddedSymbolsPath = Path.Combine(directory, "AssemblyWithEmbeddedSymbols_Shaded.dll");
+        Assert.True(File.Exists(embeddedSymbolsPath), "AssemblyWithEmbeddedSymbols_Shaded.dll should exist");
         Assert.True(HasEmbeddedPdb(embeddedSymbolsPath), "Should have embedded PDB");
 
         using var dllStream = File.OpenRead(embeddedSymbolsPath);
@@ -419,7 +419,7 @@ public class AliasTests
     //    }
 
     //    var namesToAliases = assemblyFiles.Where(_ => _.StartsWith("AssemblyWith")).ToList();
-    //    Program.Inner(tempPath, namesToAliases, new(), null, new(), null, "_Alias", false);
+    //    Program.Inner(tempPath, namesToAliases, new(), null, new(), null, "_Shaded", false);
     //    var results = BuildResults();
 
     //    return Verifier.Verify(results);
@@ -503,7 +503,7 @@ public class AliasTests
                 "AssemblyToInclude",
                 "AssemblyToProcess"
             ],
-            prefix: "Alias_",
+            prefix: "Shaded_",
             suffix: null,
             internalize: true,
             _ =>
@@ -530,7 +530,7 @@ public class AliasTests
         var depsFile = Path.Combine(targetPath, "SampleApp.deps.json");
         var text = File.ReadAllText(depsFile);
         // Only replace assemblies that were actually aliased (AssemblyWith* but not AssemblyTo*)
-        text = text.Replace("AssemblyWith", "Alias_AssemblyWith");
+        text = text.Replace("AssemblyWith", "Shaded_AssemblyWith");
         File.Delete(depsFile);
         File.WriteAllText(depsFile, text);
     }

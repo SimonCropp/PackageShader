@@ -11,59 +11,59 @@
     HasSymbols: false,
     References: [
       AssemblyToInclude, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
-      AssemblyWithEmbeddedSymbols_Alias, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
-      AssemblyWithNoStrongName_Alias, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
-      AssemblyWithNoSymbols_Alias, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
-      AssemblyWithPdb_Alias, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
-      AssemblyWithStrongName_Alias, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
-      Newtonsoft.Json_Alias, Version=13.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
+      AssemblyWithEmbeddedSymbols_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
+      AssemblyWithNoStrongName_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
+      AssemblyWithNoSymbols_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
+      AssemblyWithPdb_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
+      AssemblyWithStrongName_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
+      Newtonsoft.Json_Shaded, Version=13.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
       System.Runtime, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
     ]
   },
   {
-    Name: AssemblyWithEmbeddedSymbols_Alias, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
+    Name: AssemblyWithEmbeddedSymbols_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
     HasSymbols: true,
     References: [
       System.Runtime, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
     ]
   },
   {
-    Name: AssemblyWithNoStrongName_Alias, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
+    Name: AssemblyWithNoStrongName_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
     HasSymbols: false,
     References: [
       System.Runtime, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
     ]
   },
   {
-    Name: AssemblyWithNoSymbols_Alias, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
+    Name: AssemblyWithNoSymbols_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
     HasSymbols: false,
     References: [
       System.Runtime, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
     ]
   },
   {
-    Name: AssemblyWithPdb_Alias, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
+    Name: AssemblyWithPdb_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
     HasSymbols: false,
     References: [
       System.Runtime, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
     ]
   },
   {
-    Name: AssemblyWithResources_Alias, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
+    Name: AssemblyWithResources_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
     HasSymbols: false,
     References: [
       System.Runtime, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
     ]
   },
   {
-    Name: AssemblyWithStrongName_Alias, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
+    Name: AssemblyWithStrongName_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
     HasSymbols: false,
     References: [
       System.Runtime, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
     ]
   },
   {
-    Name: Newtonsoft.Json_Alias, Version=13.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
+    Name: Newtonsoft.Json_Shaded, Version=13.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
     HasSymbols: false,
     References: [
       System.Collections, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a,

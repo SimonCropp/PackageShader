@@ -1,6 +1,6 @@
 ﻿{
   directory: {CurrentDirectory},
-  suffix: _Alias,
+  suffix: _Shaded,
   assembliesToAlias: [
     assembly
   ],
@@ -11,7 +11,7 @@
   consoleOut:
 TargetDirectory: {CurrentDirectory}
 Internalize: False
-Suffix: _Alias
+Suffix: _Shaded
 AssembliesToAlias:
  * assembly
 References:

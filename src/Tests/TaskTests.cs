@@ -100,7 +100,7 @@ public class TaskTests
         // The skipped assembly should be in output without the suffix
         var outputFiles = task.CopyLocalPathsToAdd.Select(i => Path.GetFileName(i.ItemSpec)).ToList();
         Assert.Contains("AssemblyWithNoSymbols.dll", outputFiles);
-        Assert.DoesNotContain("AssemblyWithNoSymbols_Alias.dll", outputFiles);
+        Assert.DoesNotContain("AssemblyWithNoSymbols_Shaded.dll", outputFiles);
     }
 
     [Fact]
@@ -166,7 +166,7 @@ public class TaskTests
             IntermediateDirectory = tempDir,
             ReferenceCopyLocalPaths = [],
             ReferencePath = [],
-            Suffix = "_Alias"
+            Suffix = "_Shaded"
         };
 
         var result = task.Execute();
@@ -188,7 +188,7 @@ public class TaskTests
             IntermediateDirectory = tempDir,
             ReferenceCopyLocalPaths = referenceCopyLocalPaths,
             ReferencePath = [],
-            Suffix = "_Alias",
+            Suffix = "_Shaded",
             SignAssembly = sign,
             AssemblyOriginatorKeyFile = sign ? testKeyFile : null,
             Internalize = internalize
