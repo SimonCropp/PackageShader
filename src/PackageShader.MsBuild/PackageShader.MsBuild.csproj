@@ -12,9 +12,10 @@
     <Nullable>enable</Nullable>
     <SignAssembly>True</SignAssembly>
     <AssemblyOriginatorKeyFile>$(SolutionDir)key.snk</AssemblyOriginatorKeyFile>
+    <RootNamespace>PackageShader.MsBuild</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <Content Include=".\bin\$(Configuration)\Alias.MsBuild.dll">
+    <Content Include=".\bin\$(Configuration)\PackageShader.MsBuild.dll">
       <Pack>true</Pack>
       <PackagePath>task</PackagePath>
     </Content>
@@ -22,7 +23,7 @@
       <Pack>true</Pack>
       <PackagePath>task</PackagePath>
     </Content>
-    <Content Include="build\Alias.MsBuild.targets">
+    <Content Include="build\PackageShader.MsBuild.targets">
       <Pack>true</Pack>
       <PackagePath>build</PackagePath>
     </Content>

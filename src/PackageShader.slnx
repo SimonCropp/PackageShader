@@ -12,13 +12,12 @@
     <File Path="mdsnippets.json" />
   </Folder>
   <Project Path="Alias.Lib/Alias.Lib.csproj" />
-  <Project Path="Alias.MsBuild/Alias.MsBuild.csproj" />
   <Project Path="Alias/Alias.csproj">
     <Build Solution="IncludeTask|*" Project="false" />
   </Project>
   <Project Path="AssemblyToInclude/AssemblyToInclude.csproj" />
   <Project Path="AssemblyToProcess/AssemblyToProcess.csproj">
-    <BuildDependency Project="Alias.MsBuild/Alias.MsBuild.csproj" />
+    <BuildDependency Project="PackageShader.MsBuild/PackageShader.MsBuild.csproj" />
   </Project>
   <Project Path="AssemblyWithEmbeddedSymbols/AssemblyWithEmbeddedSymbols.csproj" />
   <Project Path="AssemblyWithNoStrongName/AssemblyWithNoStrongName.csproj" />
@@ -29,12 +28,13 @@
   <Project Path="DummyAssembly/DummyAssembly.csproj">
     <Build Solution="IncludeTask|*" Project="false" />
   </Project>
+  <Project Path="PackageShader.MsBuild/PackageShader.MsBuild.csproj" />
   <Project Path="SampleApp/SampleApp.csproj">
     <BuildDependency Project="Alias/Alias.csproj" />
     <Build Solution="IncludeTask|*" Project="false" />
   </Project>
   <Project Path="SampleAppForMsBuild/SampleAppForMsBuild.csproj">
-    <BuildDependency Project="Alias.MsBuild/Alias.MsBuild.csproj" />
+    <BuildDependency Project="PackageShader.MsBuild/PackageShader.MsBuild.csproj" />
   </Project>
   <Project Path="Tests/Tests.csproj">
     <BuildDependency Project="SampleApp/SampleApp.csproj" />

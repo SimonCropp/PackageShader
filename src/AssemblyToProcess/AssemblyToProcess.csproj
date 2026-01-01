@@ -19,5 +19,5 @@
     <ProjectReference Include="..\AssemblyToInclude\AssemblyToInclude.csproj" />
     <Shader_AssembliesToSkipRename Include="AssemblyToInclude" />
   </ItemGroup>
-  <Import Condition="$(Configuration) == 'IncludeTask'" Project="$(ProjectDir)..\Alias.MsBuild\build\Alias.MsBuild.targets" />
+  <Import Condition="$(Configuration) == 'IncludeTask'" Project="$(ProjectDir)..\PackageShader.MsBuild\build\PackageShader.MsBuild.targets" />
 </Project>
