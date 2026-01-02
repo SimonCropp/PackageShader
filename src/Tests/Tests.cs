@@ -1,4 +1,5 @@
-﻿using CliWrap;
+﻿using System.Diagnostics;
+using CliWrap;
 using CliWrap.Buffered;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -331,53 +332,61 @@ public class ShaderTests
 
         foreach (var dllPath in Directory.GetFiles(directory, "*.dll"))
         {
-            var pdbPath = Path.ChangeExtension(dllPath, ".pdb");
-            var hasExternalPdb = File.Exists(pdbPath);
-            var hasEmbeddedPdb = HasEmbeddedPdb(dllPath);
+            bool hasExternalPdb;
+            bool hasEmbeddedPdb;
+            (hasExternalPdb, hasEmbeddedPdb) = ReadSmybolsInfo(dllPath);
 
-            if (!hasExternalPdb && !hasEmbeddedPdb)
+            Debug.WriteLine(hasExternalPdb);
+            Debug.WriteLine(hasEmbeddedPdb);
+            if (hasExternalPdb || hasEmbeddedPdb)
             {
-                continue;
+                assembliesWithSymbolsChecked++;
             }
 
-            assembliesWithSymbolsChecked++;
-
-            using var dllStream = File.OpenRead(dllPath);
-            using var peReader = new PEReader(dllStream);
-
-            MetadataReaderProvider? pdbReaderProvider = null;
-
-            try
-            {
-                if (hasEmbeddedPdb)
-                {
-                    // Read embedded PDB
-                    var embeddedEntries = peReader.ReadDebugDirectory()
-                        .Where(e => e.Type == DebugDirectoryEntryType.EmbeddedPortablePdb)
-                        .ToList();
-
-                    if (embeddedEntries.Count > 0)
-                    {
-                        pdbReaderProvider = peReader.ReadEmbeddedPortablePdbDebugDirectoryData(embeddedEntries[0]);
-                        ValidatePdbReader(pdbReaderProvider);
-                    }
-                }
-                else if (hasExternalPdb)
-                {
-                    // Read external PDB - load into memory to avoid stream disposal issues
-                    var pdbBytes = File.ReadAllBytes(pdbPath);
-                    using var pdbStream = new MemoryStream(pdbBytes);
-                    pdbReaderProvider = MetadataReaderProvider.FromPortablePdbStream(pdbStream);
-                    ValidatePdbReader(pdbReaderProvider);
-                }
-            }
-            finally
-            {
-                pdbReaderProvider?.Dispose();
-            }
         }
 
         Assert.True(assembliesWithSymbolsChecked > 0, "Should have checked at least one assembly with symbols");
+    }
+
+    static (bool hasExternalPdb, bool hasEmbeddedPdb) ReadSmybolsInfo(string dllPath) =>
+        (HasExternalSymbols(dllPath), HasEmbeddedSymbols(dllPath));
+
+    static bool HasExternalSymbols(string dllPath)
+    {
+        var pdbPath = Path.ChangeExtension(dllPath, ".pdb");
+        if (!File.Exists(pdbPath))
+        {
+            return false;
+        }
+
+        using var stream = File.OpenRead(pdbPath);
+        using var reader = MetadataReaderProvider.FromPortablePdbStream(stream);
+        ValidatePdbReader(reader);
+
+        return true;
+    }
+
+    static bool HasEmbeddedSymbols(string dllPath)
+    {
+        using var dllStream = File.OpenRead(dllPath);
+        using var peReader = new PEReader(dllStream);
+
+        var embeddedEntries = peReader.ReadDebugDirectory()
+            .Where(e => e.Type == DebugDirectoryEntryType.EmbeddedPortablePdb)
+            .ToList();
+
+        if (embeddedEntries.Count == 0)
+        {
+            return false;
+        }
+
+        foreach (var entry in embeddedEntries)
+        {
+            using var symbolReader = peReader.ReadEmbeddedPortablePdbDebugDirectoryData(entry);
+            ValidatePdbReader(symbolReader);
+        }
+
+        return true;
     }
 
     [Fact]
