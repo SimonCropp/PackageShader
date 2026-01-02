@@ -4,6 +4,10 @@
 /// </summary>
 sealed class StreamingAssemblyModifier : IDisposable
 {
+    // Constructor signature: HASTHIS (0x20) | ParamCount(1) | ReturnType:VOID(0x01) | Param:STRING(0x0E)
+    static readonly byte[] IvtCtorSignature = [0x20, 0x01, 0x01, 0x0E];
+    static readonly string[] RuntimeAssemblyNames = ["System.Runtime", "mscorlib", "netstandard", "System.Private.CoreLib"];
+
     StreamingPEFile peFile;
     StreamingMetadataReader metadata;
     ModificationPlan plan;
@@ -82,13 +86,7 @@ sealed class StreamingAssemblyModifier : IDisposable
         // Find or create reference to InternalsVisibleToAttribute
         var constructorRid = FindOrCreateInternalsVisibleToConstructor();
 
-        // Build attribute value
-        var value = publicKey is { Length: > 0 }
-            ? $"{assemblyName}, PublicKey={Convert.ToHexString(publicKey)}"
-            : assemblyName;
-
-        var valueBlob = CreateCustomAttributeBlob(value);
-        var valueBlobIndex = plan.GetOrAddBlob(valueBlob);
+        var valueBlobIndex = AddValueBlob(assemblyName, publicKey);
 
         // Create custom attribute row
         // Parent = Assembly (token 0x20000001, encoded as HasCustomAttribute)
@@ -109,6 +107,25 @@ sealed class StreamingAssemblyModifier : IDisposable
         plan.AddCustomAttribute(attributeRow);
     }
 
+    uint AddValueBlob(string assemblyName, byte[]? publicKey)
+    {
+        // Build attribute value
+
+        var builder = new BlobBuilder();
+        builder.WriteUInt16(0x0001); // Prolog
+        if (publicKey is {Length: > 0})
+        {
+            builder.WriteSerializedString($"{assemblyName}, PublicKey={Convert.ToHexString(publicKey)}");
+        }
+        else
+        {
+            builder.WriteSerializedString(assemblyName);
+        }
+        builder.WriteUInt16(0x0000); // No named arguments
+        var valueBlob = builder.ToArray();
+        return plan.GetOrAddBlob(valueBlob);
+    }
+
     uint FindOrCreateInternalsVisibleToConstructor()
     {
         // Look for existing TypeRef to InternalsVisibleToAttribute
@@ -116,111 +133,36 @@ sealed class StreamingAssemblyModifier : IDisposable
 
         if (typeRefRid.HasValue)
         {
-            // Look for existing MemberRef to .ctor
-            var memberRefRid = metadata.FindMemberRef(typeRefRid.Value, ".ctor");
-            if (memberRefRid.HasValue)
-            {
-                return memberRefRid.Value;
-            }
-
-            // TypeRef exists but no MemberRef - create one
-            return CreateConstructorMemberRef(typeRefRid.Value);
+            // Look for existing MemberRef to .ctor, or create one
+            return metadata.FindMemberRef(typeRefRid.Value, ".ctor") ?? CreateCtorMemberRef(typeRefRid.Value);
         }
 
-        // TypeRef doesn't exist - need to create both
-        // First find the resolution scope (System.Runtime or mscorlib)
-        var resolutionScope = FindSystemRuntimeAssemblyRef();
-        if (!resolutionScope.HasValue)
-        {
-            throw new InvalidOperationException("Could not find or create InternalsVisibleTo constructor reference");
-        }
+        // Find resolution scope (System.Runtime or mscorlib)
+        var scopeRid = RuntimeAssemblyNames
+                           .Select(name => metadata.FindAssemblyRef(name))
+                           .FirstOrDefault(r => r.HasValue)?.rid
+                       ?? throw new InvalidOperationException("Could not find runtime assembly reference for InternalsVisibleToAttribute");
 
         // Create TypeRef for InternalsVisibleToAttribute
-        var typeRefRow = new TypeRefRow
-        {
-            ResolutionScopeIndex = CodedIndexHelper.EncodeToken(
-                CodedIndex.ResolutionScope,
-                new(TableIndex.AssemblyRef, resolutionScope.Value)),
-            NameIndex = plan.GetOrAddString("InternalsVisibleToAttribute"),
-            NamespaceIndex = plan.GetOrAddString("System.Runtime.CompilerServices")
-        };
-        var newTypeRefRid = plan.AddTypeRef(typeRefRow);
+        var newTypeRefRid = plan.AddTypeRef(
+            new()
+            {
+                ResolutionScopeIndex = CodedIndexHelper.EncodeToken(CodedIndex.ResolutionScope, new(TableIndex.AssemblyRef, scopeRid)),
+                NameIndex = plan.GetOrAddString("InternalsVisibleToAttribute"),
+                NamespaceIndex = plan.GetOrAddString("System.Runtime.CompilerServices")
+            });
 
-        // Create MemberRef for .ctor(string)
-        return CreateConstructorMemberRef(newTypeRefRid);
+        return CreateCtorMemberRef(newTypeRefRid);
     }
 
-    uint? FindSystemRuntimeAssemblyRef()
-    {
-        // Look for common .NET runtime assembly references
-        string[] runtimeAssemblyNames = ["System.Runtime", "mscorlib", "netstandard", "System.Private.CoreLib"];
-
-        foreach (var name in runtimeAssemblyNames)
-        {
-            var found = metadata.FindAssemblyRef(name);
-            if (found.HasValue)
-                return found.Value.rid;
-        }
-
-        return null;
-    }
-
-    uint CreateConstructorMemberRef(uint typeRefRid)
-    {
-        // Constructor signature for InternalsVisibleToAttribute(string):
-        // HASTHIS (0x20) | ParamCount(1) | ReturnType:VOID(0x01) | Param:STRING(0x0E)
-        byte[] ctorSignature = [0x20, 0x01, 0x01, 0x0E];
-
-        var memberRefRow = new MemberRefRow
-        {
-            ClassIndex = CodedIndexHelper.EncodeToken(
-                CodedIndex.MemberRefParent,
-                new(TableIndex.TypeRef, typeRefRid)),
-            NameIndex = plan.GetOrAddString(".ctor"),
-            SignatureIndex = plan.GetOrAddBlob(ctorSignature)
-        };
-
-        return plan.AddMemberRef(memberRefRow);
-    }
-
-    static byte[] CreateCustomAttributeBlob(string value)
-    {
-        using var ms = new MemoryStream();
-        using var writer = new BinaryWriter(ms);
-
-        // Prolog
-        writer.Write((ushort)0x0001);
-
-        // String argument (SerString format)
-        var bytes = Encoding.UTF8.GetBytes(value);
-        WriteCompressedUInt32(writer, (uint)bytes.Length);
-        writer.Write(bytes);
-
-        // No named arguments
-        writer.Write((ushort)0x0000);
-
-        return ms.ToArray();
-    }
-
-    static void WriteCompressedUInt32(BinaryWriter writer, uint value)
-    {
-        if (value < 0x80)
-        {
-            writer.Write((byte)value);
-        }
-        else if (value < 0x4000)
-        {
-            writer.Write((byte)(0x80 | (value >> 8)));
-            writer.Write((byte)(value & 0xff));
-        }
-        else
-        {
-            writer.Write((byte)(0xc0 | (value >> 24)));
-            writer.Write((byte)((value >> 16) & 0xff));
-            writer.Write((byte)((value >> 8) & 0xff));
-            writer.Write((byte)(value & 0xff));
-        }
-    }
+    uint CreateCtorMemberRef(uint typeRefRid) =>
+        plan.AddMemberRef(
+            new()
+            {
+                ClassIndex = CodedIndexHelper.EncodeToken(CodedIndex.MemberRefParent, new(TableIndex.TypeRef, typeRefRid)),
+                NameIndex = plan.GetOrAddString(".ctor"),
+                SignatureIndex = plan.GetOrAddBlob(IvtCtorSignature)
+            });
 
     /// <summary>
     /// Saves the modified assembly using the most efficient strategy.
@@ -245,8 +187,10 @@ sealed class StreamingAssemblyModifier : IDisposable
             // Need to rebuild metadata section
             SaveWithMetadataRebuild(path, key, isSameFile);
         }
+
         CopyExternalPdb(peFile.FilePath, path);
     }
+
     public static void CopyExternalPdb(string sourceDll, string targetDll)
     {
         var sourcePdb = Path.ChangeExtension(sourceDll, ".pdb");
@@ -379,7 +323,6 @@ sealed class StreamingAssemblyModifier : IDisposable
             File.Move(tempPath, path);
         }
     }
-
 
     public void Dispose()
     {

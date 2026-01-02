@@ -1,4 +1,3 @@
-using System.Reflection.Metadata;
 using SrmMetadataReader = System.Reflection.Metadata.MetadataReader;
 
 /// <summary>
