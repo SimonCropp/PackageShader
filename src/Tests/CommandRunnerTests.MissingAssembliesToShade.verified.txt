@@ -1,0 +1,15 @@
+﻿{
+  errors: [
+    {
+      NameInfo: {
+        ShortName: a,
+        LongName: assemblies-to-shade,
+        NameText: a, assemblies-to-shade
+      },
+      Tag: MissingRequiredOptionError,
+      StopsProcessing: false
+    }
+  ],
+  consoleOut: ,
+  internalize: false
+}

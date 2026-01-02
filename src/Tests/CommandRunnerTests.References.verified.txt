@@ -1,7 +1,7 @@
 ﻿{
   directory: {CurrentDirectory},
-  suffix: _Alias,
-  assembliesToAlias: [
+  suffix: _Shaded,
+  assembliesToShade: [
     assembly
   ],
   references: [
@@ -10,8 +10,8 @@
   consoleOut:
 TargetDirectory: {CurrentDirectory}
 Internalize: False
-Suffix: _Alias
-AssembliesToAlias:
+Suffix: _Shaded
+AssembliesToShade:
  * assembly
 References:
  * reference1

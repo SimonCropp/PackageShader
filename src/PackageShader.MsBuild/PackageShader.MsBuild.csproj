@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <Description></Description>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <GeneratePackageOnBuild Condition="$(Configuration) == 'Release'">true</GeneratePackageOnBuild>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <NoPackageAnalysis>true</NoPackageAnalysis>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <SignAssembly>True</SignAssembly>
+    <AssemblyOriginatorKeyFile>$(SolutionDir)key.snk</AssemblyOriginatorKeyFile>
+    <RootNamespace>PackageShader.MsBuild</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include=".\bin\$(Configuration)\PackageShader.MsBuild.dll">
+      <Pack>true</Pack>
+      <PackagePath>task</PackagePath>
+    </Content>
+    <Content Include="$(SolutionDir)PackageShader\bin\$(Configuration)\netstandard2.0\PackageShader.dll">
+      <Pack>true</Pack>
+      <PackagePath>task</PackagePath>
+    </Content>
+    <Content Include="build\PackageShader.MsBuild.targets">
+      <Pack>true</Pack>
+      <PackagePath>build</PackagePath>
+    </Content>
+    <None Include="$(SolutionDir)icon.png" Pack="true" PackagePath="\" />
+    <PackageReference Include="Microsoft.Build.Tasks.Core" Version="18.0.2" />
+    <ProjectReference Include="..\PackageShader\PackageShader.csproj" PrivateAssets="All" />
+  </ItemGroup>
+</Project>

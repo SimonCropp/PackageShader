@@ -1,0 +1,43 @@
+﻿<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ShaderAssembly>$(MSBuildThisFileDirectory)..\task\PackageShader.MsBuild.dll</ShaderAssembly>
+    <ShaderAssembly Condition="!Exists($(ShaderAssembly))">$(MSBuildThisFileDirectory)..\bin\IncludeTask\PackageShader.MsBuild.dll</ShaderAssembly>
+  </PropertyGroup>
+
+  <UsingTask
+    TaskName="PackageShader.ShadeTask"
+    AssemblyFile="$(ShaderAssembly)" />
+  <Target
+    Name="ShadeTarget"
+    AfterTargets="AfterCompile"
+    Condition="Exists(@(IntermediateAssembly)) And ($(DesignTimeBuild) != true Or $(BuildingForLiveUnitTesting) == true)" >
+    <PackageShader.ShadeTask
+      IntermediateAssembly="@(IntermediateAssembly)"
+      IntermediateDirectory="$(ProjectDir)$(IntermediateOutputPath)"
+      ReferencePath="@(ReferencePath)"
+      SignAssembly="$(SignAssembly)"
+      Internalize="$(Shader_Internalize)"
+      AssembliesToSkipRename="@(Shader_AssembliesToSkipRename)"
+      Suffix="$(Shader_Suffix)"
+      Prefix="$(Shader_Prefix)"
+      SolutionDir="$(SolutionDir)"
+      ReferenceCopyLocalPaths="@(ReferenceCopyLocalPaths)"
+      AssemblyOriginatorKeyFile="$(AssemblyOriginatorKeyFile)">
+
+      <Output
+        TaskParameter="CopyLocalPathsToAdd"
+        ItemName="CopyLocalPathsToAdd" />
+      <Output
+        TaskParameter="CopyLocalPathsToRemove"
+        ItemName="CopyLocalPathsToRemove" />
+
+    </PackageShader.ShadeTask>
+
+    <ItemGroup>
+      <ReferenceCopyLocalPaths Remove="@(CopyLocalPathsToRemove)" />
+      <ReferenceCopyLocalPaths Include="@(CopyLocalPathsToAdd)" />
+    </ItemGroup>
+
+    <!--<Message Text="@(ReferenceCopyLocalPaths,'%0a')" Importance="high" />-->
+  </Target>
+</Project>

@@ -1,10 +1,10 @@
-# <img src='/src/icon.png' height='30px'> Alias
+# <img src='/src/icon.png' height='30px'> PackageShader
 
-[![Build status](https://ci.appveyor.com/api/projects/status/s3agb6fiax7pgwls/branch/main?svg=true)](https://ci.appveyor.com/project/SimonCropp/dotnet-assembly-alias)
-[![NuGet Status](https://img.shields.io/nuget/v/Alias.svg?label=Alias%20nuget)](https://www.nuget.org/packages/Alias/)
-[![NuGet Status](https://img.shields.io/nuget/v/Alias.Lib.svg?label=Alias.Lib%20nuget)](https://www.nuget.org/packages/Alias.Lib/)
+[![Build status](https://ci.appveyor.com/api/projects/status/s3agb6fiax7pgwls/branch/main?svg=true)](https://ci.appveyor.com/project/SimonCropp/package-shader)
+[![NuGet Status](https://img.shields.io/nuget/v/PackageShader.svg?label=PackageShader%20nuget)](https://www.nuget.org/packages/PackageShader/)
+[![NuGet Status](https://img.shields.io/nugetRename assemblies and fixes references/v/PackageShaderTool.svg?label=PackageShaderTool%20nuget)](https://www.nuget.org/packages/PackageShaderTool/)
 
-Rename assemblies and fixes references. Designed as an alternative to [Costura](https://github.com/Fody/Costura), [ILMerge](https://github.com/dotnet/ILMerge), and [ILRepack](https://github.com/gluck/il-repack).
+. Designed as an alternative to [Costura](https://github.com/Fody/Costura), [ILMerge](https://github.com/dotnet/ILMerge), and [ILRepack](https://github.com/gluck/il-repack).
 
 **See [Milestones](../../milestones?state=closed) for release notes.**
 
@@ -15,34 +15,34 @@ This project works around this problem by renaming references and preventing nam
 
 ## dotnet tool
 
-https://www.nuget.org/packages/Alias/
+https://www.nuget.org/packages/PackageShaderTool/
 
-**[.net 6](https://dotnet.microsoft.com/download/dotnet/6.0) or higher is required to run this tool.**
+**[.net 10](https://dotnet.microsoft.com/download/dotnet/10.0) or higher is required to run this tool.**
 
 For a given directory and a subset of assemblies:
 
- * Changes the assembly name of each "alias" assembly.
- * Renames "alias" assemblies on disk.
- * For all assemblies, fixes the references to point to the new alias assemblies.
+ * Changes the assembly name of each "shaded" assembly.
+ * Renames "shaded" assemblies on disk.
+ * For all assemblies, fixes the references to point to the new shaded assemblies.
 
 
 ### Installation
 
 Ensure [dotnet CLI is installed](https://docs.microsoft.com/en-us/dotnet/core/tools/).
 
-Install [Alias](https://nuget.org/packages/Alias/)
+Install [PackageShaderTool](https://nuget.org/packages/PackageShaderTool/)
 
 ```ps
-dotnet tool install --global Alias
+dotnet tool install --global PackageShaderTool
 ```
 
 
 ### Usage
 
 ```ps
-assemblyalias --target-directory "C:/Code/TargetDirectory"
-              --suffix _Alias
-              --assemblies-to-alias "Microsoft*;System*;EmptyFiles"
+packageshader --target-directory "C:/Code/TargetDirectory"
+              --suffix _Shaded
+              --assemblies-to-shade "Microsoft*;System*;EmptyFiles"
 ```
 
 
@@ -60,7 +60,7 @@ Optional. If no directory is passed the current directory will be used.
 
 `-i` or `--internalize`
 
-Optional. To internalize all types in the aliased assemblies. Defaults to false.
+Optional. To internalize all types in the shaded assemblies. Defaults to false.
 
 
 #### Prefix/Suffix
@@ -82,11 +82,11 @@ The prefix to use when renaming assemblies.
 The suffix to use when renaming assemblies.
 
 
-#### Assemblies to alias
+#### Assemblies to shade
 
-`-a` or `--assemblies-to-alias`
+`-a` or `--assemblies-to-shade`
 
-Required. A semi-colon separated list of assembly names to alias. Names ending in `*` are treated as wildcards.
+Required. A semi-colon separated list of assembly names to shade. Names ending in `*` are treated as wildcards.
 
 
 #### Assemblies to exclude

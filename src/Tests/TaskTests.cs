@@ -1,5 +1,4 @@
 using System.Collections;
-using Alias;
 using Microsoft.Build.Framework;
 
 [Collection("Sequential")]
@@ -100,7 +99,7 @@ public class TaskTests
         // The skipped assembly should be in output without the suffix
         var outputFiles = task.CopyLocalPathsToAdd.Select(i => Path.GetFileName(i.ItemSpec)).ToList();
         Assert.Contains("AssemblyWithNoSymbols.dll", outputFiles);
-        Assert.DoesNotContain("AssemblyWithNoSymbols_Alias.dll", outputFiles);
+        Assert.DoesNotContain("AssemblyWithNoSymbols_Shaded.dll", outputFiles);
     }
 
     [Fact]
@@ -142,13 +141,13 @@ public class TaskTests
 
         task.Execute();
 
-        Assert.Contains(buildEngine.Messages, m => m.Contains("Finished AssemblyAlias") && m.Contains("ms"));
+        Assert.Contains(buildEngine.Messages, m => m.Contains("Finished PackageShader") && m.Contains("ms"));
     }
 
     [Fact]
     public void Cancel_DoesNotThrow()
     {
-        var task = new AliasTask();
+        var task = new ShadeTask();
         var exception = Record.Exception(() => task.Cancel());
         Assert.Null(exception);
     }
@@ -159,14 +158,14 @@ public class TaskTests
         using var tempDir = new TempDirectory();
         SetupIntermediateAssembly(tempDir);
 
-        var task = new AliasTask
+        var task = new ShadeTask
         {
             BuildEngine = new MockBuildEngine(),
             IntermediateAssembly = Path.Combine(tempDir, "Target.dll"),
             IntermediateDirectory = tempDir,
             ReferenceCopyLocalPaths = [],
             ReferencePath = [],
-            Suffix = "_Alias"
+            Suffix = "_Shaded"
         };
 
         var result = task.Execute();
@@ -174,21 +173,21 @@ public class TaskTests
         Assert.True(result);
     }
 
-    static AliasTask CreateTask(string tempDir, bool sign, bool internalize)
+    static ShadeTask CreateTask(string tempDir, bool sign, bool internalize)
     {
         SetupTestAssemblies(tempDir);
 
         var assemblyPaths = GetTestAssemblyPaths(tempDir);
         var referenceCopyLocalPaths = assemblyPaths.Select(p => new MockTaskItem(p)).ToArray();
 
-        var task = new AliasTask
+        var task = new ShadeTask
         {
             BuildEngine = new MockBuildEngine(),
             IntermediateAssembly = Path.Combine(tempDir, "AssemblyToProcess.dll"),
             IntermediateDirectory = tempDir,
             ReferenceCopyLocalPaths = referenceCopyLocalPaths,
             ReferencePath = [],
-            Suffix = "_Alias",
+            Suffix = "_Shaded",
             SignAssembly = sign,
             AssemblyOriginatorKeyFile = sign ? testKeyFile : null,
             Internalize = internalize

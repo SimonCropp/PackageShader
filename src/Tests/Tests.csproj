@@ -14,9 +14,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Alias.Lib\Alias.Lib.csproj" />
-    <ProjectReference Include="..\Alias\Alias.csproj" />
-    <ProjectReference Include="..\Alias.MsBuild\Alias.MsBuild.csproj" />
+    <ProjectReference Include="..\PackageShader\PackageShader.csproj" />
+    <ProjectReference Include="..\PackageShaderTool\PackageShaderTool.csproj" />
+    <ProjectReference Include="..\PackageShader.MsBuild\PackageShader.MsBuild.csproj" />
     <ProjectReference Include="..\AssemblyToProcess\AssemblyToProcess.csproj" />
     <ProjectReference Include="..\AssemblyWithEmbeddedSymbols\AssemblyWithEmbeddedSymbols.csproj" />
     <ProjectReference Include="..\AssemblyWithNoStrongName\AssemblyWithNoStrongName.csproj" />
@@ -25,6 +25,7 @@
     <ProjectReference Include="..\AssemblyWithResources\AssemblyWithResources.csproj" />
     <ProjectReference Include="..\AssemblyWithStrongName\AssemblyWithStrongName.csproj" />
     <ProjectReference Include="..\DummyAssembly\DummyAssembly.csproj" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.12.0" />
     <PackageReference Include="MarkdownSnippets.MsBuild" Version="27.0.2" PrivateAssets="all" />
     <PackageReference Include="Nullable" Version="1.3.1" PrivateAssets="All" />
     <PackageReference Include="Verify.DiffPlex" Version="3.1.2" />

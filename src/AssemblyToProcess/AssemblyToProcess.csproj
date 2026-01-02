@@ -3,9 +3,9 @@
     <Version>1.0.0</Version>
     <TargetFramework>net8.0</TargetFramework>
     <SignAssembly>false</SignAssembly>
-    <Alias_Prefix>Prefix_</Alias_Prefix>
-    <Alias_Suffix>_Suffix</Alias_Suffix>
-    <Alias_Internalize>true</Alias_Internalize>
+    <Shader_Prefix>Prefix_</Shader_Prefix>
+    <Shader_Suffix>_Suffix</Shader_Suffix>
+    <Shader_Internalize>true</Shader_Internalize>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
   <ItemGroup>
@@ -17,7 +17,7 @@
     <ProjectReference Include="..\AssemblyWithResources\AssemblyWithResources.csproj" />
     <ProjectReference Include="..\AssemblyWithStrongName\AssemblyWithStrongName.csproj" />
     <ProjectReference Include="..\AssemblyToInclude\AssemblyToInclude.csproj" />
-    <Alias_AssembliesToSkipRename Include="AssemblyToInclude" />
+    <Shader_AssembliesToSkipRename Include="AssemblyToInclude" />
   </ItemGroup>
-  <Import Condition="$(Configuration) == 'IncludeAliasTask'" Project="$(ProjectDir)..\Alias.MsBuild\build\Alias.MsBuild.targets" />
+  <Import Condition="$(Configuration) == 'IncludeTask'" Project="$(ProjectDir)..\PackageShader.MsBuild\build\PackageShader.MsBuild.targets" />
 </Project>

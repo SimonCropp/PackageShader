@@ -1,16 +1,16 @@
 ﻿{
   directory: {CurrentDirectory},
-  suffix: _Alias,
+  suffix: _Shaded,
   key: {CurrentDirectory}test.snk,
-  assembliesToAlias: [
+  assembliesToShade: [
     assembly
   ],
   consoleOut:
 TargetDirectory: {CurrentDirectory}
 Internalize: False
-Suffix: _Alias
+Suffix: _Shaded
 KeyFile: {CurrentDirectory}test.snk
-AssembliesToAlias:
+AssembliesToShade:
  * assembly
 ,
   internalize: false

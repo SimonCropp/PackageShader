@@ -1,15 +1,15 @@
 ﻿{
   directory: {CurrentDirectory},
-  suffix: _Alias,
-  assembliesToAlias: [
+  suffix: _Shaded,
+  assembliesToShade: [
     assembly1,
     assembly2
   ],
   consoleOut:
 TargetDirectory: {CurrentDirectory}
 Internalize: False
-Suffix: _Alias
-AssembliesToAlias:
+Suffix: _Shaded
+AssembliesToShade:
  * assembly1
  * assembly2
 ,

@@ -1,14 +1,14 @@
 ﻿{
   directory: {CurrentDirectory},
-  prefix: Alias_,
-  assembliesToAlias: [
+  prefix: Shaded_,
+  assembliesToShade: [
     assembly
   ],
   consoleOut:
 TargetDirectory: {CurrentDirectory}
 Internalize: False
-Prefix: Alias_
-AssembliesToAlias:
+Prefix: Shaded_
+AssembliesToShade:
  * assembly
 ,
   internalize: false
