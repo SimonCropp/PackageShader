@@ -1,5 +1,3 @@
-using PackageShader;
-
 public class StrongNameKeyTests
 {
     static string keyFilePath = Path.Combine(ProjectFiles.ProjectDirectory.Path, "test.snk");
