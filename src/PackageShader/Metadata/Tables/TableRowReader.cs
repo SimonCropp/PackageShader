@@ -22,10 +22,10 @@ class TableRowReader(byte[] data)
     public uint ReadIndex(int size)
     {
         if (size == 2)
+        {
             return ReadUInt16();
+        }
+
         return ReadUInt32();
     }
-
-    public void Skip(int bytes) =>
-        position += bytes;
 }

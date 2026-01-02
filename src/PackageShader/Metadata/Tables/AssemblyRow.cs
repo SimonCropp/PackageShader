@@ -13,23 +13,6 @@ struct AssemblyRow
     public uint NameIndex;        // String heap index
     public uint CultureIndex;     // String heap index
 
-    public static AssemblyRow Read(byte[] data, int blobIndexSize, int stringIndexSize)
-    {
-        var reader = new TableRowReader(data);
-        return new()
-        {
-            HashAlgId = reader.ReadUInt32(),
-            MajorVersion = reader.ReadUInt16(),
-            MinorVersion = reader.ReadUInt16(),
-            BuildNumber = reader.ReadUInt16(),
-            RevisionNumber = reader.ReadUInt16(),
-            Flags = reader.ReadUInt32(),
-            PublicKeyIndex = reader.ReadIndex(blobIndexSize),
-            NameIndex = reader.ReadIndex(stringIndexSize),
-            CultureIndex = reader.ReadIndex(stringIndexSize)
-        };
-    }
-
     public readonly void Write(BinaryWriter writer, int blobIndexSize, int stringIndexSize)
     {
         writer.Write(HashAlgId);

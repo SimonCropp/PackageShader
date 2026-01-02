@@ -581,9 +581,9 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
 
     uint GetFileAlignment()
     {
-        var buffer = new byte[4];
-        source.ReadAt(source.OptionalHeaderOffset + 36, buffer, 0, 4);
-        return BitConverter.ToUInt32(buffer, 0);
+        Span<byte> buffer = stackalloc byte[4];
+        source.ReadAt(source.OptionalHeaderOffset + 36, buffer);
+        return BinaryPrimitives.ReadUInt32LittleEndian(buffer);
     }
 
     long GetFirstSectionOffset()
@@ -628,56 +628,23 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
 
     static ushort ReadUInt16(Stream stream)
     {
-        var buffer = new byte[2];
-        var totalRead = 0;
-        while (totalRead < 2)
-        {
-            var read = stream.Read(buffer, totalRead, 2 - totalRead);
-            if (read == 0)
-            {
-                break;
-            }
-
-            totalRead += read;
-        }
-
-        return BitConverter.ToUInt16(buffer, 0);
+        Span<byte> buffer = stackalloc byte[2];
+        stream.ReadExactly(buffer);
+        return BinaryPrimitives.ReadUInt16LittleEndian(buffer);
     }
 
     static uint ReadUInt32(Stream stream)
     {
-        var buffer = new byte[4];
-        var totalRead = 0;
-        while (totalRead < 4)
-        {
-            var read = stream.Read(buffer, totalRead, 4 - totalRead);
-            if (read == 0)
-            {
-                break;
-            }
-
-            totalRead += read;
-        }
-
-        return BitConverter.ToUInt32(buffer, 0);
+        Span<byte> buffer = stackalloc byte[4];
+        stream.ReadExactly(buffer);
+        return BinaryPrimitives.ReadUInt32LittleEndian(buffer);
     }
 
     static ulong ReadUInt64(Stream stream)
     {
-        var buffer = new byte[8];
-        var totalRead = 0;
-        while (totalRead < 8)
-        {
-            var read = stream.Read(buffer, totalRead, 8 - totalRead);
-            if (read == 0)
-            {
-                break;
-            }
-
-            totalRead += read;
-        }
-
-        return BitConverter.ToUInt64(buffer, 0);
+        Span<byte> buffer = stackalloc byte[8];
+        stream.ReadExactly(buffer);
+        return BinaryPrimitives.ReadUInt64LittleEndian(buffer);
     }
 
     static void WriteUInt64(Stream stream, ulong value)

@@ -9,6 +9,11 @@ sealed class StreamingAssemblyModifier : IDisposable
     static readonly byte[] PublicKeyPrefix = ", PublicKey="u8.ToArray();
     static readonly string[] RuntimeAssemblyNames = ["System.Runtime", "mscorlib", "netstandard", "System.Private.CoreLib"];
 
+    // Assembly row is always RID 1, encoded as HasCustomAttribute
+    static readonly uint AssemblyParentEncoded = CodedIndexHelper.EncodeToken(
+        CodedIndex.HasCustomAttribute,
+        new(TableIndex.Assembly, 1));
+
     StreamingPEFile peFile;
     StreamingMetadataReader metadata;
     ModificationPlan plan;
@@ -41,71 +46,40 @@ sealed class StreamingAssemblyModifier : IDisposable
         }
     }
 
-    /// <summary>
-    /// Gets the source file path.
-    /// </summary>
     public string SourcePath => peFile.FilePath;
 
-    /// <summary>
-    /// Sets the assembly name.
-    /// </summary>
     public void SetAssemblyName(string name) =>
         plan.SetAssemblyName(name);
 
-    /// <summary>
-    /// Sets the assembly public key.
-    /// </summary>
     public void SetAssemblyPublicKey(byte[] publicKey) =>
         plan.SetAssemblyPublicKey(publicKey);
 
-    /// <summary>
-    /// Clears the assembly's strong name (removes public key).
-    /// </summary>
     public void ClearStrongName() =>
         plan.ClearStrongName();
 
-    /// <summary>
-    /// Redirects an assembly reference to a new name.
-    /// </summary>
-    /// <param name="sourceName">The original assembly name to find.</param>
-    /// <param name="targetName">The new assembly name.</param>
-    /// <param name="publicKeyToken">The new public key token, or null to clear it.</param>
     public bool RedirectAssemblyRef(string sourceName, string targetName, byte[]? publicKeyToken = null) =>
         plan.RedirectAssemblyRef(sourceName, targetName, publicKeyToken);
 
-    /// <summary>
-    /// Makes all public types internal.
-    /// </summary>
     public void MakeTypesInternal() =>
         plan.MakeTypesInternal();
 
-    /// <summary>
-    /// Adds an InternalsVisibleTo attribute.
-    /// </summary>
     public void AddInternalsVisibleTo(string assemblyName, byte[]? publicKey = null)
     {
         // Find or create reference to InternalsVisibleToAttribute
         var constructorRid = FindOrCreateInternalsVisibleToConstructor();
 
         var valueBlobIndex = AddValueBlob(assemblyName, publicKey);
+        var typeEncoded = CodedIndexHelper.EncodeToken(
+            CodedIndex.CustomAttributeType,
+            new(TableIndex.MemberRef, constructorRid));
 
-        // Create custom attribute row
-        // Parent = Assembly (token 0x20000001, encoded as HasCustomAttribute)
-        var assemblyToken = new MetadataToken(TableIndex.Assembly, 1);
-        var parentEncoded = CodedIndexHelper.EncodeToken(CodedIndex.HasCustomAttribute, assemblyToken);
-
-        // Type = MemberRef to constructor (encoded as CustomAttributeType)
-        var constructorToken = new MetadataToken(TableIndex.MemberRef, constructorRid);
-        var typeEncoded = CodedIndexHelper.EncodeToken(CodedIndex.CustomAttributeType, constructorToken);
-
-        var attributeRow = new CustomAttributeRow
-        {
-            ParentIndex = parentEncoded,
-            TypeIndex = typeEncoded,
-            ValueIndex = valueBlobIndex
-        };
-
-        plan.AddCustomAttribute(attributeRow);
+        plan.AddCustomAttribute(
+            new()
+            {
+                ParentIndex = AssemblyParentEncoded,
+                TypeIndex = typeEncoded,
+                ValueIndex = valueBlobIndex
+            });
     }
 
     uint AddValueBlob(string assemblyName, byte[]? publicKey)
@@ -124,8 +98,8 @@ sealed class StreamingAssemblyModifier : IDisposable
             builder.WriteBytes(PublicKeyPrefix);
             foreach (var b in publicKey)
             {
-                builder.WriteByte((byte)(b >> 4 < 10 ? '0' + (b >> 4) : 'A' + (b >> 4) - 10));
-                builder.WriteByte((byte)((b & 0xF) < 10 ? '0' + (b & 0xF) : 'A' + (b & 0xF) - 10));
+                builder.WriteByte((byte) (b >> 4 < 10 ? '0' + (b >> 4) : 'A' + (b >> 4) - 10));
+                builder.WriteByte((byte) ((b & 0xF) < 10 ? '0' + (b & 0xF) : 'A' + (b & 0xF) - 10));
             }
         }
         else
@@ -203,7 +177,7 @@ sealed class StreamingAssemblyModifier : IDisposable
         CopyExternalPdb(peFile.FilePath, path);
     }
 
-    public static void CopyExternalPdb(string sourceDll, string targetDll)
+    static void CopyExternalPdb(string sourceDll, string targetDll)
     {
         var sourcePdb = Path.ChangeExtension(sourceDll, ".pdb");
         var targetPdb = Path.ChangeExtension(targetDll, ".pdb");
@@ -230,23 +204,16 @@ sealed class StreamingAssemblyModifier : IDisposable
         {
             // Writing to same file - need to close source first, then patch in place
             peFile.Dispose();
-
-            // Apply patches directly to the file
-            if (patches.Count > 0)
-            {
-                StreamingPEWriter.ApplyInPlacePatches(path, patches);
-            }
         }
         else
         {
             // Copy entire source file to new location
             File.Copy(peFile.FilePath, path, overwrite: true);
+        }
 
-            // Apply patches
-            if (patches.Count > 0)
-            {
-                StreamingPEWriter.ApplyInPlacePatches(path, patches);
-            }
+        if (patches.Count > 0)
+        {
+            StreamingPEWriter.ApplyInPlacePatches(path, patches);
         }
 
         // Sign if key provided

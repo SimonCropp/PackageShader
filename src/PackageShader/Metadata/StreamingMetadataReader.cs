@@ -50,11 +50,6 @@ sealed class StreamingMetadataReader : IDisposable
         ParseTableLayout();
     }
 
-    /// <summary>
-    /// Gets the underlying System.Reflection.Metadata reader for direct access.
-    /// </summary>
-    public SrmMetadataReader Reader => reader;
-
     void ParseStreamLocations()
     {
         foreach (var header in peFile.StreamHeaders)
@@ -264,16 +259,6 @@ sealed class StreamingMetadataReader : IDisposable
     #endregion
 
     #region High-Level API using SRM
-
-    /// <summary>
-    /// Reads a string from the string heap.
-    /// </summary>
-    public string ReadString(uint index)
-    {
-        if (index == 0) return string.Empty;
-        var handle = MetadataTokens.StringHandle((int) index);
-        return reader.GetString(handle);
-    }
 
     /// <summary>
     /// Gets the string heap size.

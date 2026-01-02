@@ -327,12 +327,29 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
         // Copy original string heap
         source.CopyStringHeap(writer.BaseStream);
 
-        // Append new strings
-        foreach (var kvp in plan.NewStrings)
+        // Append new strings using pooled buffer
+        byte[]? rentedBuffer = null;
+        try
         {
-            var bytes = Encoding.UTF8.GetBytes(kvp.Key);
-            writer.Write(bytes);
-            writer.Write((byte)0); // null terminator
+            foreach (var kvp in plan.NewStrings)
+            {
+                var str = kvp.Key;
+                var byteCount = Encoding.UTF8.GetByteCount(str);
+                if (rentedBuffer == null || rentedBuffer.Length < byteCount)
+                {
+                    if (rentedBuffer != null)
+                        System.Buffers.ArrayPool<byte>.Shared.Return(rentedBuffer);
+                    rentedBuffer = System.Buffers.ArrayPool<byte>.Shared.Rent(Math.Max(byteCount, 256));
+                }
+                Encoding.UTF8.GetBytes(str, 0, str.Length, rentedBuffer, 0);
+                writer.Write(rentedBuffer, 0, byteCount);
+                writer.Write((byte)0); // null terminator
+            }
+        }
+        finally
+        {
+            if (rentedBuffer != null)
+                System.Buffers.ArrayPool<byte>.Shared.Return(rentedBuffer);
         }
 
         AlignTo4(writer);

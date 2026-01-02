@@ -141,8 +141,7 @@ sealed class ModificationPlan(StreamingMetadataReader metadata)
         // This is a simplification - production code should search first
 
         var index = nextStringIndex;
-        var bytes = Encoding.UTF8.GetBytes(value);
-        nextStringIndex += (uint) bytes.Length + 1; // +1 for null terminator
+        nextStringIndex += (uint) Encoding.UTF8.GetByteCount(value) + 1; // +1 for null terminator
 
         newStrings[value] = index;
         hasNewStrings = true;

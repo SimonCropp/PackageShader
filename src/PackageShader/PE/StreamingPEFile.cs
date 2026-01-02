@@ -40,11 +40,6 @@ sealed class StreamingPEFile : IDisposable
     /// </summary>
     public PEReader PEReader => peReader;
 
-    /// <summary>
-    /// Gets the PE headers.
-    /// </summary>
-    public PEHeaders Headers => peReader.PEHeaders;
-
     StreamingPEFile(string path, FileStream stream, PEReader peReader)
     {
         FilePath = path;
@@ -208,12 +203,12 @@ sealed class StreamingPEFile : IDisposable
             rva < _.VirtualAddress + _.SizeOfRawData);
 
     /// <summary>
-    /// Reads bytes at a specific file offset without caching.
+    /// Reads bytes at a specific file offset into a span.
     /// </summary>
-    public int ReadAt(long offset, byte[] buffer, int bufferOffset, int count)
+    public int ReadAt(long offset, Span<byte> buffer)
     {
         stream.Position = offset;
-        return stream.Read(buffer, bufferOffset, count);
+        return stream.Read(buffer);
     }
 
     /// <summary>

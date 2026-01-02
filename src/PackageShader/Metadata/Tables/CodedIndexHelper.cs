@@ -1,10 +1,5 @@
-﻿/// <summary>
-/// Helper methods for coded indexes.
-/// </summary>
-static class CodedIndexHelper
+﻿static class CodedIndexHelper
 {
-    const int TableCount = 58;
-
     /// <summary>
     /// Gets the size (2 or 4 bytes) of a coded index based on table row counts.
     /// </summary>
@@ -26,7 +21,7 @@ static class CodedIndexHelper
     /// <summary>
     /// Gets bit count and tables for a coded index type.
     /// </summary>
-    public static (int bits, TableIndex[] tables) GetCodedIndexInfo(CodedIndex codedIndex) =>
+    static (int bits, TableIndex[] tables) GetCodedIndexInfo(CodedIndex codedIndex) =>
         codedIndex switch
         {
             CodedIndex.TypeDefOrRef => (2, [TableIndex.TypeDef, TableIndex.TypeRef, TableIndex.TypeSpec]),
@@ -63,41 +58,23 @@ static class CodedIndexHelper
         };
 
     /// <summary>
-    /// Decodes a coded index value to a metadata token.
-    /// </summary>
-    public static MetadataToken DecodeToken(CodedIndex codedIndex, uint data)
-    {
-        var (bits, tables) = GetCodedIndexInfo(codedIndex);
-        var mask = (1u << bits) - 1;
-        var tableIndex = (int)(data & mask);
-        var rid = data >> bits;
-
-        if (tableIndex >= tables.Length)
-            return MetadataToken.Zero;
-
-        var table = tables[tableIndex];
-
-        // Check for placeholder/unused table entries (0xFF)
-        if ((byte)table == 0xFF)
-            return MetadataToken.Zero;
-
-        return new(table, rid);
-    }
-
-    /// <summary>
     /// Encodes a metadata token to a coded index value.
     /// </summary>
     public static uint EncodeToken(CodedIndex codedIndex, MetadataToken token)
     {
         if (token.RID == 0)
+        {
             return 0;
+        }
 
         var (bits, tables) = GetCodedIndexInfo(codedIndex);
 
         for (var i = 0; i < tables.Length; i++)
         {
             if (tables[i] == token.TableIndex)
+            {
                 return (token.RID << bits) | (uint)i;
+            }
         }
 
         throw new ArgumentException($"Table {token.TableIndex} not valid for coded index {codedIndex}");

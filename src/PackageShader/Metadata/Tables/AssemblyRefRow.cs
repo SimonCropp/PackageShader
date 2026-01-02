@@ -13,23 +13,6 @@ struct AssemblyRefRow
     public uint CultureIndex;           // String heap index
     public uint HashValueIndex;         // Blob heap index
 
-    public static AssemblyRefRow Read(byte[] data, int blobIndexSize, int stringIndexSize)
-    {
-        var reader = new TableRowReader(data);
-        return new()
-        {
-            MajorVersion = reader.ReadUInt16(),
-            MinorVersion = reader.ReadUInt16(),
-            BuildNumber = reader.ReadUInt16(),
-            RevisionNumber = reader.ReadUInt16(),
-            Flags = reader.ReadUInt32(),
-            PublicKeyOrTokenIndex = reader.ReadIndex(blobIndexSize),
-            NameIndex = reader.ReadIndex(stringIndexSize),
-            CultureIndex = reader.ReadIndex(stringIndexSize),
-            HashValueIndex = reader.ReadIndex(blobIndexSize)
-        };
-    }
-
     public readonly void Write(BinaryWriter writer, int blobIndexSize, int stringIndexSize)
     {
         writer.Write(MajorVersion);
