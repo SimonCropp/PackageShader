@@ -7,14 +7,42 @@
 
 Rename assemblies and fix references. Designed as an alternative to [Costura](https://github.com/Fody/Costura), [ILMerge](https://github.com/dotnet/ILMerge), and [ILRepack](https://github.com/gluck/il-repack).
 
+This project is a fork of [Alias](https://github.com/getsentry/dotnet-assembly-alias). Credit goes to [Sentry](https://sentry.io/) for producing the original Alias project. See their blog post [Alias: An approach to .NET assembly conflict resolution](https://blog.sentry.io/alias-an-approach-to-net-assembly-conflict-resolution/) for background on the approach.
+
 **See [Milestones](../../milestones?state=closed) for release notes.**
 
 
-## Use Case
+## The Problem
 
-Designed to mitigate scenarios where an assembly is run in a plugin scenario. For example Unity extensions, MSBuild tasks, or SharePoint extensions. In these scenarios an assembly, and all its references, are loaded into a shared AppDomain. So dependencies operate as "first one wins". So, for example, if two addins assemblies use different versions of Newtonsoft, the first addin that is loaded defines what version of Newtonsoft is used by all subsequent addins assemblies.
+.NET plugin-based applications load assemblies into a single shared context, making it impossible to load multiple versions of the same assembly simultaneously. When plugins depend on different versions of a library (like Newtonsoft.Json), conflicts arise based on load order - whichever version loads first is used by all subsequent plugins, causing failures.
 
-This project works around this problem by renaming references and preventing name conflicts.
+This is particularly common in:
+ * **Unity extensions** - Unity Package Manager packages bundle System DLLs
+ * **MSBuild tasks** - Tasks run in a shared AppDomain
+ * **SharePoint/Office extensions** - Plugins share the host's assembly context
+ * **Visual Studio extensions** - Extensions share the VS process
+
+
+## How It Works
+
+PackageShader resolves conflicts by:
+
+1. **Renaming assemblies** - Both the filename and IL assembly name are changed with a unique prefix/suffix
+2. **Patching references** - All assembly references are updated to point to the renamed assemblies
+3. **Fixing strong names** - Re-signs assemblies if a key is provided, or removes strong naming
+4. **Optionally internalizing** - Makes types internal and adds `InternalsVisibleTo` to maintain access
+
+The result is a group of files that will not conflict with any assemblies loaded in the plugin context.
+
+
+## Alternatives
+
+| Tool | Approach | Limitation |
+|------|----------|------------|
+| [Costura](https://github.com/Fody/Costura) | Embeds dependencies as resources | Doesn't rename assemblies, conflicts persist |
+| [ILMerge](https://github.com/dotnet/ILMerge) | Merges IL into single assembly | Unmaintained, known bugs in .NET Core |
+| [ILRepack](https://github.com/gluck/il-repack) | Merges IL into single assembly | Not suitable for plugin deployment scenarios |
+| **PackageShader** | Renames and patches references | Produces multiple files (by design) |
 
 
 ## Packages
