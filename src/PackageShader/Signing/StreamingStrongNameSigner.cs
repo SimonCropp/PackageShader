@@ -30,7 +30,9 @@ static class StreamingStrongNameSigner
 
         // Check if assembly has strong name signature
         if (headers.CorHeader == null)
+        {
             return false;
+        }
 
         var snDirectory = headers.CorHeader.StrongNameSignatureDirectory;
         if (snDirectory.RelativeVirtualAddress == 0 || snDirectory.Size == 0)

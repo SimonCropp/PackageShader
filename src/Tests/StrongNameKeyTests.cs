@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+
 public class StrongNameKeyTests
 {
     static string keyFilePath = Path.Combine(ProjectFiles.ProjectDirectory.Path, "test.snk");
@@ -62,15 +64,146 @@ public class StrongNameKeyTests
         Assert.True(key.PublicKey.Length > 0);
     }
 
-    static int ToInt(byte[] bytes)
+    // Private key blob parsing tests (test.snk contains a private key)
+
+    [Fact]
+    public void FromFile_PrivateKey_CanExportPrivateParameters()
     {
-        var result = 0;
-        for (var i = 0; i < bytes.Length; i++)
-        {
-            result = (result << 8) | bytes[i];
-        }
-        return result;
+        var key = StrongNameKey.FromFile(keyFilePath);
+
+        // Should be able to export private parameters since test.snk is a private key
+        var parameters = key.Rsa.ExportParameters(includePrivateParameters: true);
+
+        Assert.NotNull(parameters.D);
+        Assert.NotNull(parameters.P);
+        Assert.NotNull(parameters.Q);
     }
+
+    [Fact]
+    public void FromFile_PrivateKey_HasValidKeyPair()
+    {
+        var key = StrongNameKey.FromFile(keyFilePath);
+
+        // KeyPair should contain the original blob
+        Assert.True(key.KeyPair.Length > 0);
+    }
+
+    // Error handling tests
+
+    [Fact]
+    public void FromBlob_ThrowsOnEmptyBlob() =>
+        Assert.Throws<CryptographicException>(() => StrongNameKey.FromBlob([]));
+
+    [Fact]
+    public void FromBlob_ThrowsOnTooShortBlob() =>
+        Assert.Throws<CryptographicException>(() => StrongNameKey.FromBlob(new byte[5]));
+
+    [Fact]
+    public void FromBlob_ThrowsOnInvalidBlobType()
+    {
+        // Create a blob with invalid type byte (not 0x06 or 0x07)
+        var blob = new byte[20];
+        blob[0] = 0x99; // Invalid blob type
+
+        Assert.Throws<CryptographicException>(() => StrongNameKey.FromBlob(blob));
+    }
+
+    [Fact]
+    public void FromBlob_ThrowsOnInvalidPublicKeyMagic()
+    {
+        // Create a public key blob with wrong magic
+        var blob = CreatePublicKeyBlob(65537, 2048);
+        // Corrupt the RSA1 magic (at offset 12+8 = 20 in the full blob)
+        blob[20] = 0x00;
+
+        Assert.Throws<CryptographicException>(() => StrongNameKey.FromBlob(blob));
+    }
+
+    // Round-trip consistency tests
+
+    [Fact]
+    public void FromFile_PublicKeyToken_IsConsistentAcrossLoads()
+    {
+        var key1 = StrongNameKey.FromFile(keyFilePath);
+        var key2 = StrongNameKey.FromFile(keyFilePath);
+
+        Assert.Equal(key1.PublicKeyToken, key2.PublicKeyToken);
+    }
+
+    [Fact]
+    public void FromFile_PublicKey_IsConsistentAcrossLoads()
+    {
+        var key1 = StrongNameKey.FromFile(keyFilePath);
+        var key2 = StrongNameKey.FromFile(keyFilePath);
+
+        Assert.Equal(key1.PublicKey, key2.PublicKey);
+    }
+
+    [Fact]
+    public void PublicKeyToken_IsDerivedFromPublicKey()
+    {
+        var key = StrongNameKey.FromFile(keyFilePath);
+
+        // Manually compute the public key token (SHA1 hash, last 8 bytes reversed)
+        using var sha1 = System.Security.Cryptography.SHA1.Create();
+        var hash = sha1.ComputeHash(key.PublicKey);
+        var expectedToken = new byte[8];
+        for (var i = 0; i < 8; i++)
+        {
+            expectedToken[i] = hash[hash.Length - 1 - i];
+        }
+
+        Assert.Equal(expectedToken, key.PublicKeyToken);
+    }
+
+    [Fact]
+    public void FromBlob_ProducesConsistentPublicKeyToken()
+    {
+        // Create two keys with same parameters, verify tokens match
+        var blob1 = CreatePublicKeyBlob(65537, 2048);
+        var key1 = StrongNameKey.FromBlob(blob1);
+
+        // Reload from same blob
+        var key2 = StrongNameKey.FromBlob(blob1);
+
+        Assert.Equal(key1.PublicKeyToken, key2.PublicKeyToken);
+    }
+
+    // Public key token format verification
+
+    [Fact]
+    public void PublicKeyToken_IsValidHexFormat()
+    {
+        var key = StrongNameKey.FromFile(keyFilePath);
+
+        // Token should be exactly 8 bytes
+        Assert.Equal(8, key.PublicKeyToken.Length);
+
+        // All bytes should be valid (no specific constraint, but verify it's populated)
+        Assert.False(key.PublicKeyToken.All(b => b == 0), "Token should not be all zeros");
+    }
+
+    [Fact]
+    public void PublicKey_ContainsExpectedHeader()
+    {
+        var key = StrongNameKey.FromFile(keyFilePath);
+
+        // Public key should start with the .NET header
+        // ALG_ID for signature (CALG_RSA_SIGN = 0x00002400)
+        Assert.Equal(0x00, key.PublicKey[0]);
+        Assert.Equal(0x24, key.PublicKey[1]);
+        Assert.Equal(0x00, key.PublicKey[2]);
+        Assert.Equal(0x00, key.PublicKey[3]);
+
+        // ALG_ID for hash (CALG_SHA1 = 0x00008004)
+        Assert.Equal(0x04, key.PublicKey[4]);
+        Assert.Equal(0x80, key.PublicKey[5]);
+        Assert.Equal(0x00, key.PublicKey[6]);
+        Assert.Equal(0x00, key.PublicKey[7]);
+    }
+
+    static int ToInt(byte[] bytes) =>
+        bytes.Aggregate(0, (current, t) => (current << 8) | t);
 
     static byte[] CreatePublicKeyBlob(int exponent, int modulusBits)
     {

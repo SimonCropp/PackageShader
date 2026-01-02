@@ -74,12 +74,16 @@ public sealed class StrongNameKey
     {
         // Validate header: PRIVATEKEYBLOB (0x07), Version (0x02), Reserved (0x0000)
         if (blob[offset] != 0x07 || blob[offset + 1] != 0x02)
+        {
             throw new CryptographicException("Invalid private key blob header");
+        }
 
         // Check magic: RSA2
         var magic = BitConverter.ToUInt32(blob, offset + 8);
         if (magic != 0x32415352) // "RSA2" in little-endian
+        {
             throw new CryptographicException("Invalid RSA2 magic");
+        }
 
         // Read bit length
         var bitLen = BitConverter.ToInt32(blob, offset + 12);
