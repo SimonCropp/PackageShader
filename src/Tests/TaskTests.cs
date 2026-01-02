@@ -164,7 +164,6 @@ public class TaskTests
             IntermediateAssembly = Path.Combine(tempDir, "Target.dll"),
             IntermediateDirectory = tempDir,
             ReferenceCopyLocalPaths = [],
-            ReferencePath = [],
             Suffix = "_Shaded"
         };
 
@@ -186,7 +185,6 @@ public class TaskTests
             IntermediateAssembly = Path.Combine(tempDir, "AssemblyToProcess.dll"),
             IntermediateDirectory = tempDir,
             ReferenceCopyLocalPaths = referenceCopyLocalPaths,
-            ReferencePath = [],
             Suffix = "_Shaded",
             SignAssembly = sign,
             AssemblyOriginatorKeyFile = sign ? testKeyFile : null,

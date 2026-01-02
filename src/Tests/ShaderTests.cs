@@ -40,7 +40,7 @@ public class ShaderTests
         }
 
         var namesToShade = assemblyFiles.Where(_ => _.StartsWith("AssemblyWith") || _ == "Newtonsoft.Json").ToList();
-        Program.Inner(tempPath, namesToShade, new(), keyFile, new(), null, "_Shaded", internalize, _ =>
+        Program.Inner(tempPath, namesToShade, keyFile, new(), null, "_Shaded", internalize, _ =>
         {
         });
 
@@ -225,7 +225,6 @@ public class ShaderTests
         Program.Inner(
             tempPath,
             assemblyNamesToShade: ["Assembly*"],
-            references: [],
             keyFile: null,
             assembliesToExclude:
             [
@@ -372,7 +371,7 @@ public class ShaderTests
                 IsShaded: true))
             .ToList();
 
-        Shader.Run([], infos, internalize: false, key: null);
+        Shader.Run(infos, internalize: false, key: null);
 
         // Delete original assemblies (Shader.Run doesn't do this)
         foreach (var info in infos)

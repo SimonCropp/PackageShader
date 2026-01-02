@@ -28,7 +28,6 @@ public static class Program
     public static void Inner(
         string directory,
         List<string> assemblyNamesToShade,
-        List<string> references,
         string? keyFile,
         List<string> assembliesToExclude,
         string? prefix,
@@ -62,7 +61,7 @@ public static class Program
 
         var keyPair = GetKeyPair(keyFile);
 
-        Shader.Run(references, assemblyInfos, internalize, keyPair);
+        Shader.Run(assemblyInfos, internalize, keyPair);
 
         foreach (var assembly in assemblyInfos.Where(_ => _.IsShaded))
         {

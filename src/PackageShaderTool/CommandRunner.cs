@@ -69,31 +69,9 @@
             }
         }
 
-        var references = options.References.ToList();
-        var referencesFile = Path.Combine(targetDirectory, "alias-references.txt");
-        if (File.Exists(referencesFile))
-        {
-            references.AddRange(File.ReadAllLines(referencesFile));
-        }
-
-        if (options.ReferenceFile != null && File.Exists(options.ReferenceFile))
-        {
-            references.AddRange(File.ReadAllLines(options.ReferenceFile));
-        }
-
-        if (references.Any())
-        {
-            log("References:");
-            foreach (var reference in references)
-            {
-                log($" * {reference}");
-            }
-        }
-
         invoke(
             targetDirectory,
             assemblyToShade,
-            references,
             keyFile,
             assembliesToExclude,
             prefix,

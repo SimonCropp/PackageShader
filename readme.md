@@ -103,37 +103,3 @@ Optional. A semi-colon separated list of assembly names to exclude.
 Path to an snk file.
 
 Optional. If no key is passed, strong naming will be removed from all assemblies.
-
-
-#### References
-
-`-r` or `--references`
-
-Optional. A semi-colon separated list of paths to reference files.
-
-
-#### Reference File
-
-`--reference-file`
-
-Optional. A path to a file containing references file paths. One file path per line.
-
-
-##### Default Reference File
-
-By default the target directory will be scanned for a reference file named `alias-references.txt`
-
-It can be helpful to extract reference during a build using msbuild and write them to a file accessible to Alias:
-
-<!-- snippet: WriteReferenceForAlias -->
-<a id='snippet-WriteReferenceForAlias'></a>
-```csproj
-<Target Name="WriteReferenceForAlias" AfterTargets="AfterCompile">
-  <ItemGroup>
-    <ReferenceForAlias Include="@(ReferencePath)" Condition="'%(FileName)' == 'CommandLine'" />
-  </ItemGroup>
-  <WriteLinesToFile File="$(TargetDir)/alias-references.txt" Lines="%(ReferenceForAlias.FullPath)" Overwrite="true" />
-</Target>
-```
-<sup><a href='/src/SampleApp/SampleApp.csproj#L19-L26' title='Snippet source file'>snippet source</a> | <a href='#snippet-WriteReferenceForAlias' title='Start of snippet'>anchor</a></sup>
-<!-- endSnippet -->

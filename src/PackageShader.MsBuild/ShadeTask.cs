@@ -24,9 +24,6 @@ public class ShadeTask :
     public bool SignAssembly { get; set; }
     public bool Internalize { get; set; }
 
-    [Required]
-    public ITaskItem[] ReferencePath { get; set; } = null!;
-
     [Output]
     public ITaskItem[] CopyLocalPathsToRemove { get; set; } = null!;
 
@@ -69,9 +66,6 @@ public class ShadeTask :
             .ToList();
         var assemblyCopyLocalPaths = referenceCopyLocalPaths
             .Where(x=>Path.GetExtension(x).ToLowerInvariant() ==".dll")
-            .ToList();
-        var references = ReferencePath.Select(_ => _.ItemSpec)
-            .Where(x => !assemblyCopyLocalPaths.Contains(x))
             .ToList();
 
         var assembliesToShade = assemblyCopyLocalPaths
@@ -146,7 +140,7 @@ public class ShadeTask :
                       """;
         Log.LogMessageFromText(inputs, MessageImportance.High);
 
-        Shader.Run(references, sourceTargetInfos, Internalize, strongNameKey);
+        Shader.Run(sourceTargetInfos, Internalize, strongNameKey);
         CopyLocalPathsToRemove = copyLocalPathsToRemove.ToArray();
         CopyLocalPathsToAdd = copyLocalPathsToAdd.ToArray();
     }

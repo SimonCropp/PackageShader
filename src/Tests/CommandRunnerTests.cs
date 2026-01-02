@@ -55,27 +55,6 @@ public class CommandRunnerTests
     }
 
     [Fact]
-    public Task ReferenceFile()
-    {
-        var result = Parse("--assemblies-to-shade assembly --reference-file referenceFile --suffix _Shaded");
-        return Verify(result);
-    }
-
-    [Fact]
-    public Task References()
-    {
-        var result = Parse("--assemblies-to-shade assembly --references reference1 --suffix _Shaded");
-        return Verify(result);
-    }
-
-    [Fact]
-    public Task ReferencesMultiple()
-    {
-        var result = Parse("--assemblies-to-shade assembly --references reference1;reference2 --suffix _Shaded");
-        return Verify(result);
-    }
-
-    [Fact]
     public Task CurrentDirectory()
     {
         var result = Parse("--assemblies-to-shade assembly --suffix _Shaded");
@@ -106,22 +85,20 @@ public class CommandRunnerTests
         var internalize = false;
         IEnumerable<string>? assembliesToShade = null;
         IEnumerable<string>? assembliesToExclude = null;
-        IEnumerable<string>? references = null;
         var result = CommandRunner.RunCommand(
-            (_directory, _assembliesToShade, _references, _key, _assembliesToExclude, _prefix, _suffix, _internalize, _) =>
+            (_directory, _assembliesToShade, _key, _assembliesToExclude, _prefix, _suffix, _internalize, _) =>
             {
                 directory = _directory;
                 key = _key;
                 assembliesToShade = _assembliesToShade;
                 assembliesToExclude = _assembliesToExclude;
-                references = _references;
                 prefix = _prefix;
                 suffix = _suffix;
                 internalize = _internalize;
             },
             line => consoleOut.AppendLine(line),
             input.Split(' '));
-        return new(result, directory, prefix, suffix, key, assembliesToShade, references, assembliesToExclude, consoleOut.ToString(), internalize);
+        return new(result, directory, prefix, suffix, key, assembliesToShade, assembliesToExclude, consoleOut.ToString(), internalize);
     }
 
     public record Result(
@@ -131,7 +108,6 @@ public class CommandRunnerTests
         string? suffix,
         string? key,
         IEnumerable<string>? assembliesToShade,
-        IEnumerable<string>? references,
         IEnumerable<string>? assembliesToExclude,
         string consoleOut,
         bool internalize);

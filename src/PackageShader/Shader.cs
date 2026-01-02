@@ -3,7 +3,6 @@ namespace PackageShader;
 public static class Shader
 {
     public static void Run(
-        IEnumerable<string> references,
         IEnumerable<SourceTargetInfo> infos,
         bool internalize,
         StrongNameKey? key)
@@ -58,7 +57,6 @@ public static class Shader
     /// Overload that accepts a StrongNameKeyPair path for backwards compatibility.
     /// </summary>
     public static void Run(
-        IEnumerable<string> references,
         IEnumerable<SourceTargetInfo> infos,
         bool internalize,
         string? keyPath)
@@ -69,6 +67,6 @@ public static class Shader
             key = StrongNameKey.FromFile(keyPath!);
         }
 
-        Run(references, infos, internalize, key);
+        Run(infos, internalize, key);
     }
 }
