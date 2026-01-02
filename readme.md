@@ -5,7 +5,7 @@
 [![NuGet Status](https://img.shields.io/nuget/v/PackageShaderTool.svg?label=PackageShaderTool)](https://www.nuget.org/packages/PackageShaderTool/)
 [![NuGet Status](https://img.shields.io/nuget/v/PackageShader.MsBuild.svg?label=PackageShader.MsBuild)](https://www.nuget.org/packages/PackageShader.MsBuild/)
 
-Rename assemblies and fix references. Designed as an alternative to [Costura](https://github.com/Fody/Costura), [ILMerge](https://github.com/dotnet/ILMerge), and [ILRepack](https://github.com/gluck/il-repack).
+Avoid dependency conflicts in assemblies change changing the name of references. Designed as an alternative to [Costura](https://github.com/Fody/Costura), [ILMerge](https://github.com/dotnet/ILMerge), and [ILRepack](https://github.com/gluck/il-repack).
 
 This project is a fork of [Alias](https://github.com/getsentry/dotnet-assembly-alias). Credit goes to [Sentry](https://sentry.io/) for producing the original Alias project. See their blog post [Alias: An approach to .NET assembly conflict resolution](https://blog.sentry.io/alias-an-approach-to-net-assembly-conflict-resolution/) for background on the approach.
 
@@ -14,7 +14,7 @@ This project is a fork of [Alias](https://github.com/getsentry/dotnet-assembly-a
 
 ## The Problem
 
-.NET plugin/extension based applications load assemblies into a single shared context, making it impossible to load multiple versions of the same assembly simultaneously. When an assemblies depend on different versions of a library (like Newtonsoft.Json), conflicts arise based on load order - whichever version loads first is used by all subsequent assemblies, causing unexpected behavior or exceptions.
+In .NET plugin/extension based applications, all assemblies are loaded into a single shared context, making it impossible to load multiple versions of the same assembly simultaneously. When an assemblies depend on different versions of a library (like Newtonsoft.Json), conflicts arise based on load order - whichever version loads first is used by all subsequent assemblies, causing unexpected behavior or exceptions.
 
 This is particularly common in:
 
@@ -73,9 +73,9 @@ dotnet add package PackageShader
 
 The main entry point is `Shader.Run()`:
 
+<!-- snippet: ShaderUsage -->
+<a id='snippet-ShaderUsage'></a>
 ```cs
-using PackageShader;
-
 var assemblies = new List<SourceTargetInfo>
 {
     new(
@@ -93,7 +93,7 @@ var assemblies = new List<SourceTargetInfo>
 };
 
 // Optional: provide a strong name key
-var key = StrongNameKey.Read("mykey.snk");
+var key = StrongNameKey.FromFile("mykey.snk");
 
 Shader.Run(
     infos: assemblies,
@@ -102,24 +102,32 @@ Shader.Run(
     // null if strong naming is not required
     key: key);
 ```
+<sup><a href='/src/Tests/UsageExamples.cs#L9-L35' title='Snippet source file'>snippet source</a> | <a href='#snippet-ShaderUsage' title='Start of snippet'>anchor</a></sup>
+<!-- endSnippet -->
 
 
 ### SourceTargetInfo
 
+<!-- snippet: SourceTargetInfo -->
+<a id='snippet-SourceTargetInfo'></a>
 ```cs
 public record SourceTargetInfo(
-    string SourceName,   // Original assembly name
-    string SourcePath,   // Path to source assembly
-    string TargetName,   // New assembly name
-    string TargetPath,   // Path to write modified assembly
-    bool IsShaded);      // True if this assembly should be renamed/internalized
+    string SourceName,
+    string SourcePath,
+    string TargetName,
+    string TargetPath,
+    bool IsShaded);
 ```
+<sup><a href='/src/PackageShader/SourceTargetInfo.cs#L3-L10' title='Snippet source file'>snippet source</a> | <a href='#snippet-SourceTargetInfo' title='Start of snippet'>anchor</a></sup>
+<!-- endSnippet -->
 
 
 ### Low-Level API
 
 For fine-grained control, use `StreamingAssemblyModifier` directly:
 
+<!-- snippet: LowLevelUsage -->
+<a id='snippet-LowLevelUsage'></a>
 ```cs
 using var modifier = StreamingAssemblyModifier.Open("MyAssembly.dll");
 
@@ -131,6 +139,8 @@ modifier.AddInternalsVisibleTo("MyApp", key.PublicKey);
 
 modifier.Save("MyAssembly_Shaded.dll", key);
 ```
+<sup><a href='/src/Tests/UsageExamples.cs#L42-L52' title='Snippet source file'>snippet source</a> | <a href='#snippet-LowLevelUsage' title='Start of snippet'>anchor</a></sup>
+<!-- endSnippet -->
 
 
 ---
@@ -140,7 +150,7 @@ modifier.Save("MyAssembly_Shaded.dll", key);
 
 https://www.nuget.org/packages/PackageShaderTool/
 
-**.NET 10 or higher is required to run this tool.**
+**.NET  SDK 10 or higher is required to run this tool.**
 
 For a given directory and a subset of assemblies:
 
@@ -220,8 +230,10 @@ dotnet add package PackageShader.MsBuild
 
 ### Configuration
 
-Configure shading via MSBuild properties in your project file:
+Configure shading via MSBuild properties in the project file:
 
+<!-- snippet: MsBuildConfig -->
+<a id='snippet-MsBuildConfig'></a>
 ```xml
 <PropertyGroup>
   <!-- Prefix or suffix for shaded assemblies (one required) -->
@@ -239,6 +251,8 @@ Configure shading via MSBuild properties in your project file:
   <Shader_AssembliesToSkipRename Include="AnotherAssembly" />
 </ItemGroup>
 ```
+<sup><a href='/src/msbuild-config.include.xml#L1-L17' title='Snippet source file'>snippet source</a> | <a href='#snippet-MsBuildConfig' title='Start of snippet'>anchor</a></sup>
+<!-- endSnippet -->
 
 
 ### How It Works
@@ -246,15 +260,17 @@ Configure shading via MSBuild properties in your project file:
 The MSBuild package:
 
 1. Runs after the `AfterCompile` target
-2. Processes the intermediate assembly and its `ReferenceCopyLocalPaths`
-3. Renames assemblies matching the pattern (all except those in `Shader_AssembliesToSkipRename`)
-4. Fixes assembly references
-5. Optionally internalizes types and adds `InternalsVisibleTo` attributes
-6. Signs with the project's `AssemblyOriginatorKeyFile` if `SignAssembly` is true
+1. Processes the intermediate assembly and its `ReferenceCopyLocalPaths`
+1. Renames assemblies matching the pattern (all except those in `Shader_AssembliesToSkipRename`)
+1. Fixes assembly references
+1. Optionally internalizes types and adds `InternalsVisibleTo` attributes
+1. Signs with the project's `AssemblyOriginatorKeyFile` if `SignAssembly` is true
 
 
 ### Full Example
 
+<!-- snippet: MsBuildFull -->
+<a id='snippet-MsBuildFull'></a>
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
@@ -278,10 +294,18 @@ The MSBuild package:
   </ItemGroup>
 </Project>
 ```
+<sup><a href='/src/msbuild-full.include.xml#L1-L23' title='Snippet source file'>snippet source</a> | <a href='#snippet-MsBuildFull' title='Start of snippet'>anchor</a></sup>
+<!-- endSnippet -->
 
 This configuration will:
+
 - Shade all referenced assemblies except the project's own assembly
 - Add `_Shaded` suffix to shaded assembly names
 - Make all types in shaded assemblies internal
-- Add `InternalsVisibleTo` attributes so your code can still access internal types
+- Add `InternalsVisibleTo` attributes so the main assembly can still access internal types
 - Sign all assemblies with `mykey.snk`
+
+
+## Icon
+
+[Shade](https://thenounproject.com/icon/shade-7850642/) designed by [Kim Naces](https://thenounproject.com/creator/kim2262/) from [The Noun Project](https://thenounproject.com).

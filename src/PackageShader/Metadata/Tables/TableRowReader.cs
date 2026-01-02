@@ -3,7 +3,7 @@
 /// </summary>
 class TableRowReader(byte[] data)
 {
-    int position = 0;
+    int position;
 
     public ushort ReadUInt16()
     {

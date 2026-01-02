@@ -1,0 +1,17 @@
+<!-- begin-snippet: MsBuildConfig -->
+<PropertyGroup>
+  <!-- Prefix or suffix for shaded assemblies (one required) -->
+  <Shader_Prefix>Shaded_</Shader_Prefix>
+  <!-- OR -->
+  <Shader_Suffix>_Shaded</Shader_Suffix>
+
+  <!-- Make shaded types internal (optional, default: false) -->
+  <Shader_Internalize>true</Shader_Internalize>
+</PropertyGroup>
+
+<!-- Assemblies to skip renaming (optional) -->
+<ItemGroup>
+  <Shader_AssembliesToSkipRename Include="MyAssembly" />
+  <Shader_AssembliesToSkipRename Include="AnotherAssembly" />
+</ItemGroup>
+<!-- end-snippet -->

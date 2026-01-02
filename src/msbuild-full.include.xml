@@ -1,0 +1,23 @@
+<!-- begin-snippet: MsBuildFull -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Shader_Suffix>_Shaded</Shader_Suffix>
+    <Shader_Internalize>true</Shader_Internalize>
+
+    <!-- Optional: strong name signing -->
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>mykey.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="PackageShader.MsBuild" PrivateAssets="all" />
+    <PackageReference Include="Newtonsoft.Json" />
+  </ItemGroup>
+
+  <!-- Don't shade these assemblies -->
+  <ItemGroup>
+    <Shader_AssembliesToSkipRename Include="$(AssemblyName)" />
+  </ItemGroup>
+</Project>
+<!-- end-snippet -->

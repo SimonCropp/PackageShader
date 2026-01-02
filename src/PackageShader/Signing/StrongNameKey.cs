@@ -129,12 +129,16 @@ public sealed class StrongNameKey
     {
         // Validate header: PUBLICKEYBLOB (0x06), Version (0x02)
         if (blob[offset] != 0x06 || blob[offset + 1] != 0x02)
+        {
             throw new CryptographicException("Invalid public key blob header");
+        }
 
         // Check magic: RSA1
         var magic = BitConverter.ToUInt32(blob, offset + 8);
         if (magic != 0x31415352) // "RSA1" in little-endian
+        {
             throw new CryptographicException("Invalid RSA1 magic");
+        }
 
         // Read bit length
         var bitLen = BitConverter.ToInt32(blob, offset + 12);
@@ -142,12 +146,11 @@ public sealed class StrongNameKey
 
         var parameters = new RSAParameters();
 
-        // Public exponent (stored as 4 bytes, little-endian)
-        parameters.Exponent = new byte[3];
-        parameters.Exponent[0] = blob[offset + 18];
-        parameters.Exponent[1] = blob[offset + 17];
-        parameters.Exponent[2] = blob[offset + 16];
-        parameters.Exponent = TrimLeadingZeros(parameters.Exponent);
+        // Public exponent (4 bytes, little-endian)
+        var exp = new byte[4];
+        Array.Copy(blob, offset + 16, exp, 0, 4);
+        Array.Reverse(exp);
+        parameters.Exponent = TrimLeadingZeros(exp);
 
         var pos = offset + 20;
 
@@ -172,10 +175,14 @@ public sealed class StrongNameKey
     {
         var start = 0;
         while (start < data.Length - 1 && data[start] == 0)
+        {
             start++;
+        }
 
         if (start == 0)
+        {
             return data;
+        }
 
         var result = new byte[data.Length - start];
         Array.Copy(data, start, result, 0, result.Length);
