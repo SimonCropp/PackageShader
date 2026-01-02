@@ -14,9 +14,10 @@ This project is a fork of [Alias](https://github.com/getsentry/dotnet-assembly-a
 
 ## The Problem
 
-.NET plugin-based applications load assemblies into a single shared context, making it impossible to load multiple versions of the same assembly simultaneously. When plugins depend on different versions of a library (like Newtonsoft.Json), conflicts arise based on load order - whichever version loads first is used by all subsequent plugins, causing failures.
+.NET plugin/extension based applications load assemblies into a single shared context, making it impossible to load multiple versions of the same assembly simultaneously. When an assemblies depend on different versions of a library (like Newtonsoft.Json), conflicts arise based on load order - whichever version loads first is used by all subsequent assemblies, causing unexpected behavior or exceptions.
 
 This is particularly common in:
+
  * **Unity extensions** - Unity Package Manager packages bundle System DLLs
  * **MSBuild tasks** - Tasks run in a shared AppDomain
  * **SharePoint/Office extensions** - Plugins share the host's assembly context
@@ -52,9 +53,6 @@ The result is a group of files that will not conflict with any assemblies loaded
 | [PackageShader](https://www.nuget.org/packages/PackageShader/) | Core library for programmatic assembly shading |
 | [PackageShaderTool](https://www.nuget.org/packages/PackageShaderTool/) | .NET CLI tool for command-line usage |
 | [PackageShader.MsBuild](https://www.nuget.org/packages/PackageShader.MsBuild/) | MSBuild integration for automatic shading at build time |
-
-
----
 
 
 ## PackageShader (Library)
@@ -95,12 +93,14 @@ var assemblies = new List<SourceTargetInfo>
 };
 
 // Optional: provide a strong name key
-StrongNameKey? key = StrongNameKey.Read("mykey.snk");
+var key = StrongNameKey.Read("mykey.snk");
 
 Shader.Run(
     infos: assemblies,
-    internalize: true,  // Make shaded assembly types internal
-    key: key);          // null to remove strong naming
+    // Make shaded assembly types internal
+    internalize: true,
+    // null if strong naming is not required
+    key: key);
 ```
 
 
