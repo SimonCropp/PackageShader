@@ -582,6 +582,59 @@ public class ShaderTests
             }
         }
     }
+
+    [Fact]
+    public void TransitiveShadingRedirectsReferences()
+    {
+        // TransitiveAssembly1 -> TransitiveAssembly2 -> TransitiveAssembly3
+        // All are shaded, so references should be redirected throughout the chain
+        using var directory = new TempDirectory();
+
+        // Copy the transitive test assemblies
+        File.Copy(Path.Combine(binDirectory, "TransitiveAssembly1.dll"), Path.Combine(directory, "TransitiveAssembly1.dll"));
+        File.Copy(Path.Combine(binDirectory, "TransitiveAssembly2.dll"), Path.Combine(directory, "TransitiveAssembly2.dll"));
+        File.Copy(Path.Combine(binDirectory, "TransitiveAssembly3.dll"), Path.Combine(directory, "TransitiveAssembly3.dll"));
+
+        // Shade all assemblies
+        Program.Inner(
+            directory,
+            assemblyNamesToShade: ["TransitiveAssembly1", "TransitiveAssembly2", "TransitiveAssembly3"],
+            references: [],
+            keyFile: null,
+            assembliesToExclude: [],
+            prefix: null,
+            suffix: "_Shaded",
+            internalize: false,
+            _ => { });
+
+        // Verify TransitiveAssembly1_Shaded references TransitiveAssembly2_Shaded
+        var assembly1Path = Path.Combine(directory, "TransitiveAssembly1_Shaded.dll");
+        Assert.True(File.Exists(assembly1Path), "TransitiveAssembly1_Shaded.dll should exist");
+
+        using (var fileStream = File.OpenRead(assembly1Path))
+        using (var peReader = new PEReader(fileStream))
+        {
+            var metadataReader = peReader.GetMetadataReader();
+            var references = GetAssemblyReferences(metadataReader).ToList();
+
+            Assert.Contains(references, r => r.Contains("TransitiveAssembly2_Shaded"));
+            Assert.DoesNotContain(references, r => r.StartsWith("TransitiveAssembly2,"));
+        }
+
+        // Verify TransitiveAssembly2_Shaded references TransitiveAssembly3_Shaded
+        var assembly2Path = Path.Combine(directory, "TransitiveAssembly2_Shaded.dll");
+        Assert.True(File.Exists(assembly2Path), "TransitiveAssembly2_Shaded.dll should exist");
+
+        using (var fileStream = File.OpenRead(assembly2Path))
+        using (var peReader = new PEReader(fileStream))
+        {
+            var metadataReader = peReader.GetMetadataReader();
+            var references = GetAssemblyReferences(metadataReader).ToList();
+
+            Assert.Contains(references, r => r.Contains("TransitiveAssembly3_Shaded"));
+            Assert.DoesNotContain(references, r => r.StartsWith("TransitiveAssembly3,"));
+        }
+    }
 }
 
 public record AssemblyResult(string Name, bool HasSymbols, List<string> References, List<string> Attributes);
