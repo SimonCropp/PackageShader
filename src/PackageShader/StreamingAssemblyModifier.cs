@@ -81,10 +81,6 @@ sealed class StreamingAssemblyModifier : IDisposable
     {
         // Find or create reference to InternalsVisibleToAttribute
         var constructorRid = FindOrCreateInternalsVisibleToConstructor();
-        if (constructorRid == 0)
-        {
-            throw new InvalidOperationException("Could not find or create InternalsVisibleTo constructor reference");
-        }
 
         // Build attribute value
         var value = publicKey is { Length: > 0 }
@@ -136,7 +132,7 @@ sealed class StreamingAssemblyModifier : IDisposable
         var resolutionScope = FindSystemRuntimeAssemblyRef();
         if (!resolutionScope.HasValue)
         {
-            return 0;
+            throw new InvalidOperationException("Could not find or create InternalsVisibleTo constructor reference");
         }
 
         // Create TypeRef for InternalsVisibleToAttribute
