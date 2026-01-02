@@ -69,11 +69,11 @@ sealed class StreamingPEFile : IDisposable
             var sh = headers.SectionHeaders[i];
             Sections[i] = new()
             {
-                VirtualSize = (uint)sh.VirtualSize,
-                VirtualAddress = (uint)sh.VirtualAddress,
-                SizeOfRawData = (uint)sh.SizeOfRawData,
-                PointerToRawData = (uint)sh.PointerToRawData,
-                Characteristics = (uint)sh.SectionCharacteristics
+                VirtualSize = (uint) sh.VirtualSize,
+                VirtualAddress = (uint) sh.VirtualAddress,
+                SizeOfRawData = (uint) sh.SizeOfRawData,
+                PointerToRawData = (uint) sh.PointerToRawData,
+                Characteristics = (uint) sh.SectionCharacteristics
             };
         }
 
@@ -81,13 +81,13 @@ sealed class StreamingPEFile : IDisposable
         if (headers.CorHeader != null)
         {
             var metadataDir = headers.CorHeader.MetadataDirectory;
-            MetadataRva = (uint)metadataDir.RelativeVirtualAddress;
-            MetadataSize = (uint)metadataDir.Size;
+            MetadataRva = (uint) metadataDir.RelativeVirtualAddress;
+            MetadataSize = (uint) metadataDir.Size;
             MetadataFileOffset = MetadataRva > 0 ? ResolveRva(MetadataRva) : 0;
 
             var snDir = headers.CorHeader.StrongNameSignatureDirectory;
-            StrongNameRva = (uint)snDir.RelativeVirtualAddress;
-            StrongNameSize = (uint)snDir.Size;
+            StrongNameRva = (uint) snDir.RelativeVirtualAddress;
+            StrongNameSize = (uint) snDir.Size;
             StrongNameFileOffset = StrongNameRva > 0 ? ResolveRva(StrongNameRva) : 0;
         }
 
@@ -159,8 +159,9 @@ sealed class StreamingPEFile : IDisposable
                 var b = reader.ReadByte();
                 bytesRead++;
                 if (b == 0) break;
-                nameBuilder.Append((char)b);
+                nameBuilder.Append((char) b);
             }
+
             // Align to 4-byte boundary
             var aligned = (bytesRead + 3) & ~3;
             stream.Position += aligned - bytesRead;
@@ -241,7 +242,7 @@ sealed class StreamingPEFile : IDisposable
 
         while (remaining > 0)
         {
-            var toRead = (int)Math.Min(remaining, bufferSize);
+            var toRead = (int) Math.Min(remaining, bufferSize);
             var read = stream.Read(buffer, 0, toRead);
             if (read == 0)
             {

@@ -1,6 +1,3 @@
-/// <summary>
-/// Metadata stream header.
-/// </summary>
 sealed class StreamHeader
 {
     public uint Offset { get; set; }

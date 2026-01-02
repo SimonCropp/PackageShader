@@ -1,7 +1,4 @@
-﻿/// <summary>
-/// Information about a PE section.
-/// </summary>
-class SectionInfo
+﻿class SectionInfo
 {
     public uint VirtualSize { get; init; }
     public uint VirtualAddress { get; init; }

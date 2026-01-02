@@ -55,7 +55,8 @@ public sealed class StrongNameKey
 
     static RSA FromCapiKeyBlob(byte[] blob)
     {
-        if (blob == null || blob.Length < 12)
+        if (blob == null ||
+            blob.Length < 12)
         {
             throw new CryptographicException("Invalid key blob");
         }
@@ -63,7 +64,8 @@ public sealed class StrongNameKey
         // Check blob type
         return blob[0] switch
         {
-            0x00 when blob.Length > 12 && blob[12] == 0x06 => FromCapiPublicKeyBlob(blob, 12),
+            0x00 when blob.Length > 12 &&
+                      blob[12] == 0x06 => FromCapiPublicKeyBlob(blob, 12),
             0x06 => FromCapiPublicKeyBlob(blob, 0),
             0x07 => FromCapiPrivateKeyBlob(blob, 0),
             _ => throw new CryptographicException("Unknown blob format")

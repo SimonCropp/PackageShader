@@ -34,16 +34,17 @@ static class StreamingStrongNameSigner
             return false;
         }
 
-        var snDirectory = headers.CorHeader.StrongNameSignatureDirectory;
-        if (snDirectory.RelativeVirtualAddress == 0 || snDirectory.Size == 0)
+        var directory = headers.CorHeader.StrongNameSignatureDirectory;
+        if (directory.RelativeVirtualAddress == 0 ||
+            directory.Size == 0)
         {
             return false;
         }
 
         // Calculate offsets
         var checksumOffset = headers.PEHeaderStartOffset + ChecksumOffsetInOptionalHeader;
-        var signatureOffset = ResolveRvaToFileOffset(headers, snDirectory.RelativeVirtualAddress);
-        var signatureSize = snDirectory.Size;
+        var signatureOffset = ResolveRvaToFileOffset(headers, directory.RelativeVirtualAddress);
+        var signatureSize = directory.Size;
 
         if (signatureOffset == 0)
         {
@@ -125,7 +126,8 @@ static class StreamingStrongNameSigner
 
             // Calculate how much to read (stop at next skip region or EOF)
             var bytesToRead = Math.Min(BufferSize, fileLength - position);
-            if (nextSkipStart < long.MaxValue && position + bytesToRead > nextSkipStart)
+            if (nextSkipStart < long.MaxValue &&
+                position + bytesToRead > nextSkipStart)
             {
                 bytesToRead = nextSkipStart - position;
             }
@@ -139,12 +141,16 @@ static class StreamingStrongNameSigner
                     skipIndex++;
                     continue;
                 }
+
                 break;
             }
 
             // Read and hash
-            var read = stream.Read(buffer, 0, (int)bytesToRead);
-            if (read == 0) break;
+            var read = stream.Read(buffer, 0, (int) bytesToRead);
+            if (read == 0)
+            {
+                break;
+            }
 
             hash.AppendData(buffer, 0, read);
             position += read;
