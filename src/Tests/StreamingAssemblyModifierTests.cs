@@ -1,6 +1,4 @@
-﻿using PackageShader;
-
-[Collection("Sequential")]
+﻿[Collection("Sequential")]
 public class StreamingAssemblyModifierTests
 {
     static string binDirectory = Path.GetDirectoryName(typeof(StreamingAssemblyModifierTests).Assembly.Location)!;

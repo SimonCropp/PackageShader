@@ -1,10 +1,4 @@
-﻿using CliWrap;
-using CliWrap.Buffered;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using PackageShader;
-
-[Collection("Sequential")]
+﻿[Collection("Sequential")]
 public class ShaderTests
 {
     static string binDirectory = Path.GetDirectoryName(typeof(ShaderTests).Assembly.Location)!;
@@ -70,149 +64,11 @@ public class ShaderTests
         var hasEmbeddedSymbols = HasEmbeddedSymbols(peReader);
         var metadataReader = peReader.GetMetadataReader();
 
-        var assemblyName = FormatAssemblyName(metadataReader);
+        var assemblyName = MetadataHelper.FormatAssemblyName(metadataReader);
 
-        var references = GetAssemblyReferences(metadataReader)
-            .OrderBy(_ => _)
-            .ToList();
-        var attributes = GetInternalVisibleToAttributes(metadataReader);
+        var references = MetadataHelper.GetAssemblyReferences(metadataReader);
+        var attributes = MetadataHelper.GetInternalVisibleToAttributes(metadataReader);
         return new(assemblyName, references, attributes, hasExternalSymbols, hasEmbeddedSymbols);
-    }
-
-    static List<string> GetInternalVisibleToAttributes(MetadataReader metadataReader)
-    {
-        return GetAssemblyCustomAttributes(metadataReader)
-            .Where(_ => _.typeName.EndsWith("InternalsVisibleToAttribute"))
-            .Select(_ => _.argument)
-            .OrderBy(_ => _)
-            .ToList();
-    }
-
-    static string FormatAssemblyName(MetadataReader reader)
-    {
-        var assemblyDef = reader.GetAssemblyDefinition();
-        var name = reader.GetString(assemblyDef.Name);
-        var version = assemblyDef.Version;
-        var culture = reader.GetString(assemblyDef.Culture);
-        var cultureStr = string.IsNullOrEmpty(culture) ? "neutral" : culture;
-        var publicKey = reader.GetBlobBytes(assemblyDef.PublicKey);
-        var tokenStr = FormatPublicKeyToken(publicKey);
-
-        return $"{name}, Version={version}, Culture={cultureStr}, PublicKeyToken={tokenStr}";
-    }
-
-    static string FormatAssemblyRefName(MetadataReader reader, AssemblyReference assemblyRef)
-    {
-        var name = reader.GetString(assemblyRef.Name);
-        var version = assemblyRef.Version;
-        var culture = reader.GetString(assemblyRef.Culture);
-        var cultureStr = string.IsNullOrEmpty(culture) ? "neutral" : culture;
-        var publicKeyOrToken = reader.GetBlobBytes(assemblyRef.PublicKeyOrToken);
-        var tokenStr = publicKeyOrToken.Length == 8
-            ? BitConverter.ToString(publicKeyOrToken).Replace("-", "").ToLowerInvariant()
-            : FormatPublicKeyToken(publicKeyOrToken);
-
-        return $"{name}, Version={version}, Culture={cultureStr}, PublicKeyToken={tokenStr}";
-    }
-
-    static string FormatPublicKeyToken(byte[] publicKey)
-    {
-        if (publicKey.Length == 0)
-        {
-            return "null";
-        }
-
-        using var sha1 = System.Security.Cryptography.SHA1.Create();
-        var hash = sha1.ComputeHash(publicKey);
-
-        // Token is last 8 bytes reversed
-        var token = new byte[8];
-        for (var i = 0; i < 8; i++)
-        {
-            token[i] = hash[hash.Length - 1 - i];
-        }
-
-        return BitConverter.ToString(token).Replace("-", "").ToLowerInvariant();
-    }
-
-    static IEnumerable<string> GetAssemblyReferences(MetadataReader reader)
-    {
-        foreach (var refHandle in reader.AssemblyReferences)
-        {
-            var assemblyRef = reader.GetAssemblyReference(refHandle);
-            yield return FormatAssemblyRefName(reader, assemblyRef);
-        }
-    }
-
-    static IEnumerable<(string typeName, string argument)> GetAssemblyCustomAttributes(MetadataReader reader)
-    {
-        var assemblyToken = EntityHandle.AssemblyDefinition;
-        foreach (var attrHandle in reader.GetCustomAttributes(assemblyToken))
-        {
-            var attr = reader.GetCustomAttribute(attrHandle);
-            var typeName = GetAttributeTypeName(reader, attr);
-            var argument = ParseAttributeArgument(reader, attr);
-            yield return (typeName, argument);
-        }
-    }
-
-    static string GetAttributeTypeName(MetadataReader reader, CustomAttribute attr)
-    {
-        if (attr.Constructor.Kind == HandleKind.MemberReference)
-        {
-            var memberRef = reader.GetMemberReference((MemberReferenceHandle) attr.Constructor);
-            if (memberRef.Parent.Kind == HandleKind.TypeReference)
-            {
-                var typeRef = reader.GetTypeReference((TypeReferenceHandle) memberRef.Parent);
-                return reader.GetString(typeRef.Name);
-            }
-        }
-
-        return string.Empty;
-    }
-
-    static string ParseAttributeArgument(MetadataReader reader, CustomAttribute attr)
-    {
-        var blob = reader.GetBlobBytes(attr.Value);
-        if (blob.Length < 2)
-            return string.Empty;
-
-        // Skip prolog (2 bytes: 0x01 0x00)
-        if (blob[0] != 0x01 || blob[1] != 0x00)
-        {
-            return string.Empty;
-        }
-
-        // Try to read a string argument
-        var offset = 2;
-        if (offset >= blob.Length)
-            return string.Empty;
-
-        // Read compressed length
-        int length;
-        if ((blob[offset] & 0x80) == 0)
-        {
-            length = blob[offset];
-            offset++;
-        }
-        else if ((blob[offset] & 0xC0) == 0x80)
-        {
-            if (offset + 1 >= blob.Length) return string.Empty;
-            length = ((blob[offset] & 0x3F) << 8) | blob[offset + 1];
-            offset += 2;
-        }
-        else
-        {
-            if (offset + 3 >= blob.Length) return string.Empty;
-            length = ((blob[offset] & 0x1F) << 24) | (blob[offset + 1] << 16) |
-                     (blob[offset + 2] << 8) | blob[offset + 3];
-            offset += 4;
-        }
-
-        if (offset + length > blob.Length)
-            return string.Empty;
-
-        return System.Text.Encoding.UTF8.GetString(blob, offset, length);
     }
 
     [Theory]
@@ -222,97 +78,28 @@ public class ShaderTests
         using var directory = new TempDirectory();
         var results = Run(copyPdbs, sign, internalize, directory);
 
+        EnsureLoadable(directory);
         await Verify(results)
             .UseParameters(copyPdbs, sign, internalize);
     }
 
-    [Theory]
-    [MemberData(nameof(GetData))]
-    public void ModifiedAssembliesAreLoadable(bool copyPdbs, bool sign, bool internalize)
+    static void EnsureLoadable(string directory)
     {
-        using var directory = new TempDirectory();
-        Run(copyPdbs, sign, internalize, directory);
-
-        var loadContext = new AssemblyLoadContext("TestContext", isCollectible: true);
-        var loadedAssemblies = new List<(string Name, Assembly Assembly)>();
+        var context = new AssemblyLoadContext("TestContext", isCollectible: true);
 
         try
         {
             foreach (var dllPath in Directory.GetFiles(directory, "*.dll"))
             {
-                var assemblyBytes = File.ReadAllBytes(dllPath);
-                using var stream = new MemoryStream(assemblyBytes);
-                var assembly = loadContext.LoadFromStream(stream);
-                loadedAssemblies.Add((Path.GetFileName(dllPath), assembly));
-            }
-
-            Assert.True(loadedAssemblies.Count > 0, "Should have loaded at least one assembly");
-
-            foreach (var (name, assembly) in loadedAssemblies)
-            {
-                Assert.NotNull(assembly.GetName());
-                Assert.NotNull(assembly.GetName().Name);
+                var bytes = File.ReadAllBytes(dllPath);
+                using var stream = new MemoryStream(bytes);
+                var assembly = context.LoadFromStream(stream);
+                assembly.GetTypes();
             }
         }
         finally
         {
-            loadContext.Unload();
-        }
-    }
-
-    [Theory]
-    [MemberData(nameof(GetData))]
-    public void ModifiedAssembliesHaveValidMetadata(bool copyPdbs, bool sign, bool internalize)
-    {
-        using var directory = new TempDirectory();
-        Run(copyPdbs, sign, internalize, directory);
-
-        foreach (var dllPath in Directory.GetFiles(directory, "*.dll"))
-        {
-            using var fileStream = File.OpenRead(dllPath);
-            using var peReader = new PEReader(fileStream);
-
-            Assert.True(peReader.HasMetadata, $"{Path.GetFileName(dllPath)} should have metadata");
-
-            var metadataReader = peReader.GetMetadataReader();
-
-            // Verify assembly definition is valid
-            Assert.True(metadataReader.IsAssembly, $"{Path.GetFileName(dllPath)} should be an assembly");
-
-            var assemblyDef = metadataReader.GetAssemblyDefinition();
-            var assemblyName = metadataReader.GetString(assemblyDef.Name);
-            Assert.False(string.IsNullOrEmpty(assemblyName), "Assembly name should not be empty");
-
-            // Verify type definitions are readable
-            var typeCount = 0;
-            foreach (var typeHandle in metadataReader.TypeDefinitions)
-            {
-                var typeDef = metadataReader.GetTypeDefinition(typeHandle);
-                var typeName = metadataReader.GetString(typeDef.Name);
-                Assert.NotNull(typeName);
-                typeCount++;
-            }
-            Assert.True(typeCount > 0, $"{Path.GetFileName(dllPath)} should have types");
-
-            // Verify method definitions are readable
-            foreach (var typeHandle in metadataReader.TypeDefinitions)
-            {
-                var typeDef = metadataReader.GetTypeDefinition(typeHandle);
-                foreach (var methodHandle in typeDef.GetMethods())
-                {
-                    var methodDef = metadataReader.GetMethodDefinition(methodHandle);
-                    var methodName = metadataReader.GetString(methodDef.Name);
-                    Assert.NotNull(methodName);
-                }
-            }
-
-            // Verify assembly references are readable
-            foreach (var refHandle in metadataReader.AssemblyReferences)
-            {
-                var assemblyRef = metadataReader.GetAssemblyReference(refHandle);
-                var refName = metadataReader.GetString(assemblyRef.Name);
-                Assert.NotNull(refName);
-            }
+            context.Unload();
         }
     }
 
@@ -597,6 +384,7 @@ public class ShaderTests
         var results = BuildResults(directory);
         await Verify(results);
     }
-}
 
-public record AssemblyResult(string Name, List<string> References, List<string> InternalsVisibleTo, bool HasExternalSymbols, bool HasEmbeddedSymbols);
+    public record AssemblyResult(string Name, List<string> References, List<string> InternalsVisibleTo, bool HasExternalSymbols, bool HasEmbeddedSymbols);
+
+}

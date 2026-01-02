@@ -1,6 +1,5 @@
 using System.Collections;
 using Microsoft.Build.Framework;
-using PackageShader;
 
 [Collection("Sequential")]
 public class TaskTests
