@@ -1,6 +1,4 @@
-﻿using System.Reflection;
-
-/// <summary>
+﻿/// <summary>
 /// TypeDef table row (0x02).
 /// </summary>
 struct TypeDefRow

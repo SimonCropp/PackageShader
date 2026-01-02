@@ -202,12 +202,10 @@ sealed class StreamingPEFile : IDisposable
     /// <summary>
     /// Gets the section containing the given RVA.
     /// </summary>
-    public SectionInfo? GetSectionAtRva(uint rva)
-    {
-        return Sections.FirstOrDefault(_ =>
+    public SectionInfo? GetSectionAtRva(uint rva) =>
+        Sections.FirstOrDefault(_ =>
             rva >= _.VirtualAddress &&
             rva < _.VirtualAddress + _.SizeOfRawData);
-    }
 
     /// <summary>
     /// Reads bytes at a specific file offset without caching.

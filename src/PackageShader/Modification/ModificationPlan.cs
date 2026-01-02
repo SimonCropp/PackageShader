@@ -141,7 +141,7 @@ sealed class ModificationPlan(StreamingMetadataReader metadata)
         // This is a simplification - production code should search first
 
         var index = nextStringIndex;
-        var bytes = System.Text.Encoding.UTF8.GetBytes(value);
+        var bytes = Encoding.UTF8.GetBytes(value);
         nextStringIndex += (uint) bytes.Length + 1; // +1 for null terminator
 
         newStrings[value] = index;
@@ -255,7 +255,7 @@ sealed class ModificationPlan(StreamingMetadataReader metadata)
         // Add new string heap data
         foreach (var kvp in newStrings)
         {
-            size += System.Text.Encoding.UTF8.GetByteCount(kvp.Key) + 1;
+            size += Encoding.UTF8.GetByteCount(kvp.Key) + 1;
         }
 
         // Add new blob heap data

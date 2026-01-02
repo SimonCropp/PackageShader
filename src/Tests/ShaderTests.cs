@@ -331,7 +331,7 @@ public class ShaderTests
             assemblyName,
             [syntaxTree],
             references,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            new(OutputKind.DynamicallyLinkedLibrary));
 
         var outputPath = Path.Combine(directory, $"{assemblyName}.dll");
         var result = compilation.Emit(outputPath);
@@ -339,8 +339,8 @@ public class ShaderTests
         if (!result.Success)
         {
             var errors = string.Join("\n", result.Diagnostics
-                .Where(d => d.Severity == DiagnosticSeverity.Error));
-            throw new Exception($"Compilation failed for {assemblyName}:\n{errors}");
+                .Where(_ => _.Severity == DiagnosticSeverity.Error));
+            throw new($"Compilation failed for {assemblyName}:\n{errors}");
         }
     }
 

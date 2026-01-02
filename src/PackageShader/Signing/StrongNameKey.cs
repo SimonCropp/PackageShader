@@ -170,7 +170,7 @@ public sealed class StrongNameKey
 
     static byte[] TrimLeadingZeros(byte[] data)
     {
-        int start = 0;
+        var start = 0;
         while (start < data.Length - 1 && data[start] == 0)
             start++;
 
@@ -211,7 +211,7 @@ public sealed class StrongNameKey
 
         // Public exponent (little-endian)
         var exp = parameters.Exponent!;
-        for (int i = 0; i < exp.Length && i < 4; i++)
+        for (var i = 0; i < exp.Length && i < 4; i++)
         {
             capiBlob[16 + i] = exp[exp.Length - 1 - i];
         }
@@ -256,7 +256,7 @@ public sealed class StrongNameKey
 
         // Take last 8 bytes, reversed
         var token = new byte[8];
-        for (int i = 0; i < 8; i++)
+        for (var i = 0; i < 8; i++)
         {
             token[i] = hash[hash.Length - 1 - i];
         }

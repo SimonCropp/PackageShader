@@ -52,21 +52,4 @@ public static class Shader
             modifier.Save(info.TargetPath, key);
         }
     }
-
-    /// <summary>
-    /// Overload that accepts a StrongNameKeyPair path for backwards compatibility.
-    /// </summary>
-    public static void Run(
-        IEnumerable<SourceTargetInfo> infos,
-        bool internalize,
-        string? keyPath)
-    {
-        StrongNameKey? key = null;
-        if (!string.IsNullOrEmpty(keyPath) && File.Exists(keyPath))
-        {
-            key = StrongNameKey.FromFile(keyPath!);
-        }
-
-        Run(infos, internalize, key);
-    }
 }

@@ -4,19 +4,10 @@
     <TargetFramework>net8.0</TargetFramework>
     <ToolCommandName>packageshader</ToolCommandName>
     <PackAsTool>True</PackAsTool>
-    <DebugType>embedded</DebugType>
-    <DebugSymbols>true</DebugSymbols>
-    <GeneratePackageOnBuild Condition="$(Configuration) == 'Release'">true</GeneratePackageOnBuild>
-    <SignAssembly>True</SignAssembly>
-    <AssemblyOriginatorKeyFile>$(SolutionDir)key.snk</AssemblyOriginatorKeyFile>
-    <LangVersion>latest</LangVersion>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <RootNamespace>PackageShader</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <None Include="$(SolutionDir)icon.png" Pack="true" PackagePath="\" />
-    <PackageReference Include="CommandLineParser" Version="2.9.1" />
+    <PackageReference Include="CommandLineParser" />
+    <PackageReference Include="ProjectDefaults" PrivateAssets="all" />
     <ProjectReference Include="..\PackageShader\PackageShader.csproj" />
   </ItemGroup>
 </Project>

@@ -34,7 +34,9 @@ static class StreamingStrongNameSigner
 
         var snDirectory = headers.CorHeader.StrongNameSignatureDirectory;
         if (snDirectory.RelativeVirtualAddress == 0 || snDirectory.Size == 0)
+        {
             return false;
+        }
 
         // Calculate offsets
         var checksumOffset = headers.PEHeaderStartOffset + ChecksumOffsetInOptionalHeader;
@@ -42,7 +44,9 @@ static class StreamingStrongNameSigner
         var signatureSize = snDirectory.Size;
 
         if (signatureOffset == 0)
+        {
             return false;
+        }
 
         // Zero out the signature area
         stream.Position = signatureOffset;
@@ -77,6 +81,7 @@ static class StreamingStrongNameSigner
                 return rva - section.VirtualAddress + section.PointerToRawData;
             }
         }
+
         return 0;
     }
 
@@ -99,13 +104,13 @@ static class StreamingStrongNameSigner
         // Sort by start position
         Array.Sort(skipRegions, (a, b) => a.start.CompareTo(b.start));
 
-        int skipIndex = 0;
+        var skipIndex = 0;
 
         while (position < fileLength)
         {
             // Find next skip region
-            long nextSkipStart = skipIndex < skipRegions.Length ? skipRegions[skipIndex].start : long.MaxValue;
-            long nextSkipEnd = skipIndex < skipRegions.Length ? skipRegions[skipIndex].end : long.MaxValue;
+            var nextSkipStart = skipIndex < skipRegions.Length ? skipRegions[skipIndex].start : long.MaxValue;
+            var nextSkipEnd = skipIndex < skipRegions.Length ? skipRegions[skipIndex].end : long.MaxValue;
 
             if (position >= nextSkipStart && position < nextSkipEnd)
             {
@@ -117,7 +122,7 @@ static class StreamingStrongNameSigner
             }
 
             // Calculate how much to read (stop at next skip region or EOF)
-            long bytesToRead = Math.Min(BufferSize, fileLength - position);
+            var bytesToRead = Math.Min(BufferSize, fileLength - position);
             if (nextSkipStart < long.MaxValue && position + bytesToRead > nextSkipStart)
             {
                 bytesToRead = nextSkipStart - position;

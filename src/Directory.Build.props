@@ -1,20 +1,9 @@
 <Project>
   <PropertyGroup>
-    <Version>0.4.3</Version>
-    <Description>PackageShader</Description>
+    <Version>0.1.0</Version>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <SolutionDir>$(ProjectDir)..\</SolutionDir>
-    <LangVersion>preview</LangVersion>
-    <GenerateDocumentationFile>false</GenerateDocumentationFile>
-    <Nullable>enable</Nullable>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <NoWarn>CS1591</NoWarn>
-    <Copyright>Copyright $([System.DateTime]::UtcNow.ToString(yyyy)). All rights reserved</Copyright>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <ContinuousIntegrationBuild Condition="$(CI) == true">true</ContinuousIntegrationBuild>
-    <PackageIcon>icon.png</PackageIcon>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <PackageOutputPath>$(SolutionDir)..\nugets</PackageOutputPath>
-    <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <Configurations>Debug;Release;IncludeTask</Configurations>
     <ResolveAssemblyReferencesSilent>true</ResolveAssemblyReferencesSilent>
   </PropertyGroup>

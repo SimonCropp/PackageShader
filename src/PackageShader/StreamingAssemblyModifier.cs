@@ -349,7 +349,7 @@ sealed class StreamingAssemblyModifier : IDisposable
 
     void SaveWithMetadataRebuild(string path, StrongNameKey? key, bool isSameFile)
     {
-        string targetPath = path;
+        var targetPath = path;
         string? tempPath = null;
 
         if (isSameFile)

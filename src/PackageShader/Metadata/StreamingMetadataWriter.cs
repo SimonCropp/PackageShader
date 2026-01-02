@@ -179,7 +179,7 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
         writer.Write(sorted);
 
         // Row counts
-        for (int i = 0; i < 58; i++)
+        for (var i = 0; i < 58; i++)
         {
             if ((valid & (1L << i)) == 0) continue;
 
@@ -198,7 +198,7 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
         }
 
         // Write table data
-        for (int i = 0; i < 58; i++)
+        for (var i = 0; i < 58; i++)
         {
             if ((valid & (1L << i)) == 0) continue;
 
@@ -400,7 +400,7 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
         // Align to 4 bytes
         var totalLen = bytes.Length + 1;
         var aligned = (totalLen + 3) & ~3;
-        for (int i = totalLen; i < aligned; i++)
+        for (var i = totalLen; i < aligned; i++)
         {
             writer.Write((byte)0);
         }

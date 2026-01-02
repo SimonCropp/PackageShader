@@ -1,7 +1,4 @@
-﻿using System.Text;
-using CommandLine;
-
-public class CommandRunnerTests
+﻿public class CommandRunnerTests
 {
     [Fact]
     public Task MissingAssembliesToShade()

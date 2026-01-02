@@ -1,4 +1,3 @@
-using System.Collections;
 using Microsoft.Build.Framework;
 
 [Collection("Sequential")]

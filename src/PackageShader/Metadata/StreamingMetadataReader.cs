@@ -92,7 +92,7 @@ sealed class StreamingMetadataReader : IDisposable
         }
 
         var header = peFile.ReadBytesAt(tableHeapOffset, 24);
-        int position = 6; // Skip reserved (4), MajorVersion (1), MinorVersion (1)
+        var position = 6; // Skip reserved (4), MajorVersion (1), MinorVersion (1)
 
         // HeapSizes
         var heapSizes = header[position++];
@@ -110,8 +110,8 @@ sealed class StreamingMetadataReader : IDisposable
         Sorted = BitConverter.ToInt64(header, position);
 
         // Count present tables to read row counts
-        int presentTableCount = 0;
-        for (int i = 0; i < 64; i++)
+        var presentTableCount = 0;
+        for (var i = 0; i < 64; i++)
         {
             if ((Valid & (1L << i)) != 0)
                 presentTableCount++;
@@ -119,8 +119,8 @@ sealed class StreamingMetadataReader : IDisposable
 
         // Read row counts
         var rowCountsData = peFile.ReadBytesAt(tableHeapOffset + 24, presentTableCount * 4);
-        int rowCountPos = 0;
-        for (int i = 0; i < 64; i++)
+        var rowCountPos = 0;
+        for (var i = 0; i < 64; i++)
         {
             if ((Valid & (1L << i)) == 0)
                 continue;
@@ -137,13 +137,13 @@ sealed class StreamingMetadataReader : IDisposable
     {
         uint offset = 0;
 
-        for (int i = 0; i < 64; i++)
+        for (var i = 0; i < 64; i++)
         {
             var table = (TableIndex) i;
             if (!HasTable(table))
                 continue;
 
-            int rowSize = ComputeRowSize(table);
+            var rowSize = ComputeRowSize(table);
             tables[i].RowSize = (uint) rowSize;
             tables[i].Offset = offset;
             offset += (uint) (rowSize * tables[i].RowCount);
@@ -226,7 +226,7 @@ sealed class StreamingMetadataReader : IDisposable
     public int GetTableIndexSize(TableIndex table) =>
         GetRowCount(table) < 65536 ? 2 : 4;
 
-    public int GetCodedIndexSize(global::CodedIndex codedIndex)
+    public int GetCodedIndexSize(CodedIndex codedIndex)
     {
         var index = (int) codedIndex;
         if (codedIndexSizes[index] != 0)

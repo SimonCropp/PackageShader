@@ -1,7 +1,4 @@
-﻿
-using Newtonsoft.Json;
-
-public static class ClassToTest
+﻿public static class ClassToTest
 {
     public static IEnumerable<string> Method()
     {

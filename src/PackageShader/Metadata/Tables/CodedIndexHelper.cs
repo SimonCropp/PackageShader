@@ -12,7 +12,7 @@ static class CodedIndexHelper
     {
         var (bits, tables) = GetCodedIndexInfo(codedIndex);
 
-        int max = 0;
+        var max = 0;
         foreach (var table in tables)
         {
             // Skip placeholder/unused table entries (0xFF)
@@ -94,7 +94,7 @@ static class CodedIndexHelper
 
         var (bits, tables) = GetCodedIndexInfo(codedIndex);
 
-        for (int i = 0; i < tables.Length; i++)
+        for (var i = 0; i < tables.Length; i++)
         {
             if (tables[i] == token.TableIndex)
                 return (token.RID << bits) | (uint)i;
