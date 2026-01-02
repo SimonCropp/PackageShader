@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using CliWrap;
+﻿using CliWrap;
 using CliWrap.Buffered;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -76,12 +75,17 @@ public class ShaderTests
         var references = GetAssemblyReferences(metadataReader)
             .OrderBy(_ => _)
             .ToList();
-        var attributes = GetAssemblyCustomAttributes(metadataReader)
-            .Where(_ => _.typeName.Contains("Internals"))
-            .Select(_ => $"{_.typeName}({_.argument})")
+        var attributes = GetInternalVisibleToAttributes(metadataReader);
+        return new(assemblyName, references, attributes, hasExternalSymbols, hasEmbeddedSymbols);
+    }
+
+    static List<string> GetInternalVisibleToAttributes(MetadataReader metadataReader)
+    {
+        return GetAssemblyCustomAttributes(metadataReader)
+            .Where(_ => _.typeName.EndsWith("InternalsVisibleToAttribute"))
+            .Select(_ => _.argument)
             .OrderBy(_ => _)
             .ToList();
-        return new(assemblyName, references, attributes, hasExternalSymbols, hasEmbeddedSymbols);
     }
 
     static string FormatAssemblyName(MetadataReader reader)
@@ -595,4 +599,4 @@ public class ShaderTests
     }
 }
 
-public record AssemblyResult(string Name, List<string> References, List<string> Attributes, bool HasExternalSymbols, bool HasEmbeddedSymbols);
+public record AssemblyResult(string Name, List<string> References, List<string> InternalsVisibleTo, bool HasExternalSymbols, bool HasEmbeddedSymbols);
