@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "Alias": {
-      "commandName": "Project",
-      "commandLineArgs": "--target-directory D:\\Code\\sentry\\sentry-unity\\package-dev --prefix Sentry. --assemblies-to-shade Microsoft*;System*  --assemblies-to-exclude nunit.framework"
-    }
-  }
-}

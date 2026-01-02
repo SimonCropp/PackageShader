@@ -38,22 +38,22 @@ public static class Program
     {
         var list = Directory.GetFiles(directory, "*.dll", SearchOption.AllDirectories).ToList();
 
-        // Include all files, but mark excluded ones as not-aliased after finding matches
+        // Include all files, but mark excluded ones as not-shaded after finding matches
         var assemblyInfos = Finder.FindAssemblyInfos(assemblyNamesToShade, list, prefix, suffix)
             .Select(info =>
             {
-                // If assembly matches exclusion list, mark it as not-aliased
+                // If assembly matches exclusion list, mark it as not-shaded
                 if (assembliesToExclude.Contains(info.SourceName))
                 {
-                    return info with { TargetName = info.SourceName, TargetPath = info.SourcePath, IsAlias = false };
+                    return info with { TargetName = info.SourceName, TargetPath = info.SourcePath, IsShaded = false };
                 }
                 return info;
             })
             .ToList();
 
-        var builder = new StringBuilder("Resolved assemblies to alias:");
+        var builder = new StringBuilder("Resolved assemblies to shade:");
         builder.AppendLine();
-        foreach (var assemblyInfo in assemblyInfos.Where(_ => _.IsAlias))
+        foreach (var assemblyInfo in assemblyInfos.Where(_ => _.IsShaded))
         {
             builder.AppendLine($" * {assemblyInfo.SourceName}");
         }
@@ -64,7 +64,7 @@ public static class Program
 
         Shader.Run(references, assemblyInfos, internalize, keyPair);
 
-        foreach (var assembly in assemblyInfos.Where(_ => _.IsAlias))
+        foreach (var assembly in assemblyInfos.Where(_ => _.IsShaded))
         {
             File.Delete(assembly.SourcePath);
             var pdbPath = Path.ChangeExtension(assembly.SourcePath, "pdb");

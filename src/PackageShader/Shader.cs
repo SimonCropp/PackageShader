@@ -29,7 +29,7 @@ public static class Shader
             }
 
             // If this is an aliased assembly and internalize is enabled
-            if (info.IsAlias && internalize)
+            if (info.IsShaded && internalize)
             {
                 // Add InternalsVisibleTo for all other assemblies in the list
                 foreach (var otherInfo in infoList)

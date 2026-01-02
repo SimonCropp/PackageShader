@@ -369,7 +369,7 @@ public class ShaderTests
                 SourcePath: Path.Combine(directory, $"{name}.dll"),
                 TargetName: $"{name}_Shaded",
                 TargetPath: Path.Combine(directory, $"{name}_Shaded.dll"),
-                IsAlias: true))
+                IsShaded: true))
             .ToList();
 
         Shader.Run([], infos, internalize: false, key: null);

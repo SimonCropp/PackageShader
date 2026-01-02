@@ -27,7 +27,7 @@ public static class Finder
         {
             var name = Path.GetFileNameWithoutExtension(file);
             var fileDirectory = Path.GetDirectoryName(file)!;
-            var isAliased = false;
+            var isShaded = false;
             foreach (var assemblyToShade in assemblyNamesToShade)
             {
                 var targetName = getTargetName(name);
@@ -39,7 +39,7 @@ public static class Finder
                     if (name.StartsWith(match))
                     {
                         yield return new(name, file, targetName, targetPath, true);
-                        isAliased = true;
+                        isShaded = true;
                     }
 
                     continue;
@@ -48,11 +48,11 @@ public static class Finder
                 if (name == assemblyToShade)
                 {
                     yield return new(name, file, targetName, targetPath, true);
-                    isAliased = true;
+                    isShaded = true;
                 }
             }
 
-            if (!isAliased)
+            if (!isShaded)
             {
                 yield return new(name, file, name, file, false);
             }
