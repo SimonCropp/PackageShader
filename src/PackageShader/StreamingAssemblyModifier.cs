@@ -6,6 +6,7 @@ sealed class StreamingAssemblyModifier : IDisposable
 {
     // Constructor signature: HASTHIS (0x20) | ParamCount(1) | ReturnType:VOID(0x01) | Param:STRING(0x0E)
     static readonly byte[] IvtCtorSignature = [0x20, 0x01, 0x01, 0x0E];
+    static readonly byte[] PublicKeyPrefix = ", PublicKey="u8.ToArray();
     static readonly string[] RuntimeAssemblyNames = ["System.Runtime", "mscorlib", "netstandard", "System.Private.CoreLib"];
 
     StreamingPEFile peFile;
@@ -109,21 +110,32 @@ sealed class StreamingAssemblyModifier : IDisposable
 
     uint AddValueBlob(string assemblyName, byte[]? publicKey)
     {
-        // Build attribute value
-
         var builder = new BlobBuilder();
-        builder.WriteUInt16(0x0001); // Prolog
+        // Prolog
+        builder.WriteUInt16(0x0001);
+
         if (publicKey is {Length: > 0})
         {
-            builder.WriteSerializedString($"{assemblyName}, PublicKey={Convert.ToHexString(publicKey)}");
+            // Write serialized string without intermediate allocations
+            // Format: "{assemblyName}, PublicKey={hex}"
+            var nameByteCount = Encoding.UTF8.GetByteCount(assemblyName);
+            builder.WriteCompressedInteger(nameByteCount + 12 + publicKey.Length * 2);
+            builder.WriteUTF8(assemblyName);
+            builder.WriteBytes(PublicKeyPrefix);
+            foreach (var b in publicKey)
+            {
+                builder.WriteByte((byte)(b >> 4 < 10 ? '0' + (b >> 4) : 'A' + (b >> 4) - 10));
+                builder.WriteByte((byte)((b & 0xF) < 10 ? '0' + (b & 0xF) : 'A' + (b & 0xF) - 10));
+            }
         }
         else
         {
             builder.WriteSerializedString(assemblyName);
         }
-        builder.WriteUInt16(0x0000); // No named arguments
-        var valueBlob = builder.ToArray();
-        return plan.GetOrAddBlob(valueBlob);
+
+        // No named arguments
+        builder.WriteUInt16(0x0000);
+        return plan.GetOrAddBlob(builder.ToArray());
     }
 
     uint FindOrCreateInternalsVisibleToConstructor()
