@@ -59,22 +59,29 @@ public class ShaderTests
         var resultingFiles = Directory.EnumerateFiles(tempPath);
         foreach (var assemblyPath in resultingFiles.Where(_ => _.EndsWith(".dll")).OrderBy(_ => _))
         {
-            using var fileStream = File.OpenRead(assemblyPath);
-            using var peReader = new PEReader(fileStream);
-            var metadataReader = peReader.GetMetadataReader();
-
-            var assemblyName = FormatAssemblyName(metadataReader);
-            var hasSymbols = HasSymbols(assemblyPath);
-            var references = GetAssemblyReferences(metadataReader)
-                .OrderBy(_ => _)
-                .ToList();
-            var attributes = GetAssemblyCustomAttributes(metadataReader)
-                .Where(_ => _.typeName.Contains("Internals"))
-                .Select(_ => $"{_.typeName}({_.argument})")
-                .OrderBy(_ => _)
-                .ToList();
-            yield return new(assemblyName, hasSymbols, references, attributes);
+            yield return BuildAssemblyResult(assemblyPath);
         }
+    }
+
+    static AssemblyResult BuildAssemblyResult(string assemblyPath)
+    {
+        var hasExternalSymbols = HasExternalSymbols(assemblyPath);
+        using var fileStream = File.OpenRead(assemblyPath);
+        using var peReader = new PEReader(fileStream);
+        var hasEmbeddedSymbols = HasEmbeddedSymbols(peReader);
+        var metadataReader = peReader.GetMetadataReader();
+
+        var assemblyName = FormatAssemblyName(metadataReader);
+
+        var references = GetAssemblyReferences(metadataReader)
+            .OrderBy(_ => _)
+            .ToList();
+        var attributes = GetAssemblyCustomAttributes(metadataReader)
+            .Where(_ => _.typeName.Contains("Internals"))
+            .Select(_ => $"{_.typeName}({_.argument})")
+            .OrderBy(_ => _)
+            .ToList();
+        return new(assemblyName, references, attributes, hasExternalSymbols, hasEmbeddedSymbols);
     }
 
     static string FormatAssemblyName(MetadataReader reader)
@@ -107,15 +114,19 @@ public class ShaderTests
     static string FormatPublicKeyToken(byte[] publicKey)
     {
         if (publicKey.Length == 0)
+        {
             return "null";
+        }
 
         using var sha1 = System.Security.Cryptography.SHA1.Create();
         var hash = sha1.ComputeHash(publicKey);
 
         // Token is last 8 bytes reversed
         var token = new byte[8];
-        for (int i = 0; i < 8; i++)
+        for (var i = 0; i < 8; i++)
+        {
             token[i] = hash[hash.Length - 1 - i];
+        }
 
         return BitConverter.ToString(token).Replace("-", "").ToLowerInvariant();
     }
@@ -145,13 +156,14 @@ public class ShaderTests
     {
         if (attr.Constructor.Kind == HandleKind.MemberReference)
         {
-            var memberRef = reader.GetMemberReference((MemberReferenceHandle)attr.Constructor);
+            var memberRef = reader.GetMemberReference((MemberReferenceHandle) attr.Constructor);
             if (memberRef.Parent.Kind == HandleKind.TypeReference)
             {
-                var typeRef = reader.GetTypeReference((TypeReferenceHandle)memberRef.Parent);
+                var typeRef = reader.GetTypeReference((TypeReferenceHandle) memberRef.Parent);
                 return reader.GetString(typeRef.Name);
             }
         }
+
         return string.Empty;
     }
 
@@ -163,7 +175,9 @@ public class ShaderTests
 
         // Skip prolog (2 bytes: 0x01 0x00)
         if (blob[0] != 0x01 || blob[1] != 0x00)
+        {
             return string.Empty;
+        }
 
         // Try to read a string argument
         var offset = 2;
@@ -298,59 +312,6 @@ public class ShaderTests
         }
     }
 
-
-    public static bool HasSymbols(string path)
-    {
-        var pdbPath = Path.ChangeExtension(path, ".pdb");
-        if (File.Exists(pdbPath))
-        {
-            return true;
-        }
-
-        return HasEmbeddedPdb(path);
-    }
-
-    public static bool HasEmbeddedPdb(string path)
-    {
-        using var stream = File.OpenRead(path);
-        using var peReader = new PEReader(stream, PEStreamOptions.LeaveOpen);
-        var debug = peReader.ReadDebugDirectory();
-
-        return Enumerable.Any(debug, _ => _.Type == DebugDirectoryEntryType.EmbeddedPortablePdb);
-    }
-
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void ModifiedAssembliesWithSymbolsHaveValidPdb(bool sign)
-    {
-        using var directory = new TempDirectory();
-        // Run with copyPdbs=true to have PDB files, internalize doesn't matter for PDB validity
-        Run(copyPdbs: true, sign: sign, internalize: false, directory);
-
-        var assembliesWithSymbolsChecked = 0;
-
-        foreach (var dllPath in Directory.GetFiles(directory, "*.dll"))
-        {
-            bool hasExternalPdb;
-            bool hasEmbeddedPdb;
-            (hasExternalPdb, hasEmbeddedPdb) = ReadSmybolsInfo(dllPath);
-
-            Debug.WriteLine(hasExternalPdb);
-            Debug.WriteLine(hasEmbeddedPdb);
-            if (hasExternalPdb || hasEmbeddedPdb)
-            {
-                assembliesWithSymbolsChecked++;
-            }
-
-        }
-
-        Assert.True(assembliesWithSymbolsChecked > 0, "Should have checked at least one assembly with symbols");
-    }
-
-    static (bool hasExternalPdb, bool hasEmbeddedPdb) ReadSmybolsInfo(string dllPath) =>
-        (HasExternalSymbols(dllPath), HasEmbeddedSymbols(dllPath));
-
     static bool HasExternalSymbols(string dllPath)
     {
         var pdbPath = Path.ChangeExtension(dllPath, ".pdb");
@@ -366,59 +327,24 @@ public class ShaderTests
         return true;
     }
 
-    static bool HasEmbeddedSymbols(string dllPath)
+    static bool HasEmbeddedSymbols(PEReader peReader)
     {
-        using var dllStream = File.OpenRead(dllPath);
-        using var peReader = new PEReader(dllStream);
-
-        var embeddedEntries = peReader.ReadDebugDirectory()
-            .Where(e => e.Type == DebugDirectoryEntryType.EmbeddedPortablePdb)
+        var entries = peReader.ReadDebugDirectory()
+            .Where(_ => _.Type == DebugDirectoryEntryType.EmbeddedPortablePdb)
             .ToList();
 
-        if (embeddedEntries.Count == 0)
+        if (entries.Count == 0)
         {
             return false;
         }
 
-        foreach (var entry in embeddedEntries)
+        foreach (var entry in entries)
         {
             using var symbolReader = peReader.ReadEmbeddedPortablePdbDebugDirectoryData(entry);
             ValidatePdbReader(symbolReader);
         }
 
         return true;
-    }
-
-    [Fact]
-    public void ModifiedAssemblyWithEmbeddedPdbHasValidSymbols()
-    {
-        using var directory = new TempDirectory();
-        // copyPdbs=false but AssemblyWithEmbeddedSymbols has embedded PDB
-        Run(copyPdbs: false, sign: false, internalize: false, directory);
-
-        var embeddedSymbolsPath = Path.Combine(directory, "AssemblyWithEmbeddedSymbols_Shaded.dll");
-        Assert.True(File.Exists(embeddedSymbolsPath), "AssemblyWithEmbeddedSymbols_Shaded.dll should exist");
-        Assert.True(HasEmbeddedPdb(embeddedSymbolsPath), "Should have embedded PDB");
-
-        using var dllStream = File.OpenRead(embeddedSymbolsPath);
-        using var peReader = new PEReader(dllStream);
-
-        var embeddedEntry = peReader.ReadDebugDirectory()
-            .First(e => e.Type == DebugDirectoryEntryType.EmbeddedPortablePdb);
-
-        using var pdbProvider = peReader.ReadEmbeddedPortablePdbDebugDirectoryData(embeddedEntry);
-        var pdbReader = pdbProvider.GetMetadataReader();
-
-        // Verify we can read document info
-        var documents = pdbReader.Documents.Select(h =>
-        {
-            var doc = pdbReader.GetDocument(h);
-            return pdbReader.GetString(doc.Name);
-        }).ToList();
-
-        Assert.True(documents.Count > 0, "Should have source documents in PDB");
-        Assert.True(documents.Any(d => d.Contains("AssemblyWithEmbeddedSymbols")),
-            "Should have source file for AssemblyWithEmbeddedSymbols");
     }
 
     //[Fact]
@@ -669,4 +595,4 @@ public class ShaderTests
     }
 }
 
-public record AssemblyResult(string Name, bool HasSymbols, List<string> References, List<string> Attributes);
+public record AssemblyResult(string Name, List<string> References, List<string> Attributes, bool HasExternalSymbols, bool HasEmbeddedSymbols);

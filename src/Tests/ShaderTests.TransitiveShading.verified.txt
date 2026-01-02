@@ -1,25 +1,28 @@
 ﻿[
   {
     Name: Assembly1_Shaded, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null,
-    HasSymbols: false,
     References: [
       Assembly2_Shaded, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null,
       System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
-    ]
+    ],
+    HasExternalSymbols: false,
+    HasEmbeddedSymbols: false
   },
   {
     Name: Assembly2_Shaded, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null,
-    HasSymbols: false,
     References: [
       Assembly3_Shaded, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null,
       System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
-    ]
+    ],
+    HasExternalSymbols: false,
+    HasEmbeddedSymbols: false
   },
   {
     Name: Assembly3_Shaded, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null,
-    HasSymbols: false,
     References: [
       System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e
-    ]
+    ],
+    HasExternalSymbols: false,
+    HasEmbeddedSymbols: false
   }
 ]
