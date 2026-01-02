@@ -1,4 +1,4 @@
-* text
+* text=auto eol=lf
 *.png binary
 *.snk binary
 *.dll binary
@@ -7,3 +7,6 @@
 
 .editorconfig text eol=lf working-tree-encoding=UTF-8
 Shared.sln.DotSettings text eol=lf working-tree-encoding=UTF-8
+
+# Verify
+*.verified.txt text eol=lf working-tree-encoding=UTF-8

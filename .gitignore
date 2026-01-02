@@ -92,3 +92,7 @@ Fody/.DS_Store
 *.bak
 Integration/Directory.Build.props
 .claude/settings.local.json
+
+# Verify
+*.received.*
+*.received/

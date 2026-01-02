@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-
 public class StrongNameKeyTests
 {
     static string keyFilePath = Path.Combine(ProjectFiles.ProjectDirectory.Path, "test.snk");
@@ -145,8 +143,7 @@ public class StrongNameKeyTests
         var key = StrongNameKey.FromFile(keyFilePath);
 
         // Manually compute the public key token (SHA1 hash, last 8 bytes reversed)
-        using var sha1 = System.Security.Cryptography.SHA1.Create();
-        var hash = sha1.ComputeHash(key.PublicKey);
+        var hash = SHA1.HashData(key.PublicKey);
         var expectedToken = new byte[8];
         for (var i = 0; i < 8; i++)
         {

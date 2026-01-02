@@ -60,7 +60,7 @@
 
         var assembliesToExclude = options.AssembliesToExclude.ToList();
 
-        if (assembliesToExclude.Any())
+        if (assembliesToExclude.Count != 0)
         {
             log("AssembliesToExclude:");
             foreach (var assembly in assembliesToExclude)

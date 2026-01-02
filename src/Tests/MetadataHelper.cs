@@ -85,9 +85,7 @@ static class MetadataHelper
         {
             return "null";
         }
-
-        using var sha1 = System.Security.Cryptography.SHA1.Create();
-        var hash = sha1.ComputeHash(publicKey);
+        var hash = SHA1.HashData(publicKey);
 
         // Token is last 8 bytes reversed
         var token = new byte[8];
