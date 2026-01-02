@@ -24,9 +24,6 @@
   <Project Path="DummyAssembly/DummyAssembly.csproj">
     <Build Solution="IncludeTask|*" Project="false" />
   </Project>
-  <Project Path="TransitiveAssembly1/TransitiveAssembly1.csproj" />
-  <Project Path="TransitiveAssembly2/TransitiveAssembly2.csproj" />
-  <Project Path="TransitiveAssembly3/TransitiveAssembly3.csproj" />
   <Project Path="PackageShader.MsBuild/PackageShader.MsBuild.csproj" />
   <Project Path="PackageShader/PackageShader.csproj" />
   <Project Path="PackageShaderTool/PackageShaderTool.csproj">

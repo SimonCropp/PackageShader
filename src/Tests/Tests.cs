@@ -1,5 +1,7 @@
 ﻿using CliWrap;
 using CliWrap.Buffered;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 
 [Collection("Sequential")]
 public class ShaderTests
@@ -583,22 +585,60 @@ public class ShaderTests
         }
     }
 
-    [Fact]
-    public void TransitiveShadingRedirectsReferences()
+    static void CompileAssembly(string directory, string assemblyName, string code,
+                                params string[] referenceNames)
     {
-        // TransitiveAssembly1 -> TransitiveAssembly2 -> TransitiveAssembly3
-        // All are shaded, so references should be redirected throughout the chain
+        var syntaxTree = CSharpSyntaxTree.ParseText(code);
+
+        var references = new List<MetadataReference>
+        {
+            MetadataReference.CreateFromFile(typeof(object).Assembly.Location)
+        };
+
+        foreach (var refName in referenceNames)
+        {
+            var refPath = Path.Combine(directory, $"{refName}.dll");
+            references.Add(MetadataReference.CreateFromFile(refPath));
+        }
+
+        var compilation = CSharpCompilation.Create(
+            assemblyName,
+            [syntaxTree],
+            references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        var outputPath = Path.Combine(directory, $"{assemblyName}.dll");
+        var result = compilation.Emit(outputPath);
+
+        if (!result.Success)
+        {
+            var errors = string.Join("\n", result.Diagnostics
+                .Where(d => d.Severity == DiagnosticSeverity.Error));
+            throw new Exception($"Compilation failed for {assemblyName}:\n{errors}");
+        }
+    }
+
+    [Fact]
+    public async Task TransitiveShading()
+    {
         using var directory = new TempDirectory();
 
-        // Copy the transitive test assemblies
-        File.Copy(Path.Combine(binDirectory, "TransitiveAssembly1.dll"), Path.Combine(directory, "TransitiveAssembly1.dll"));
-        File.Copy(Path.Combine(binDirectory, "TransitiveAssembly2.dll"), Path.Combine(directory, "TransitiveAssembly2.dll"));
-        File.Copy(Path.Combine(binDirectory, "TransitiveAssembly3.dll"), Path.Combine(directory, "TransitiveAssembly3.dll"));
+        // Create 3-layer transitive chain: Assembly1 -> Assembly2 -> Assembly3
+        CompileAssembly(directory, "Assembly3",
+            "public static class Class3 { public static string Method() => \"Assembly3\"; }");
+
+        CompileAssembly(directory, "Assembly2",
+            "public static class Class2 { public static string Method() => Class3.Method(); }",
+            "Assembly3");
+
+        CompileAssembly(directory, "Assembly1",
+            "public static class Class1 { public static string Method() => Class2.Method(); }",
+            "Assembly2");
 
         // Shade all assemblies
         Program.Inner(
             directory,
-            assemblyNamesToShade: ["TransitiveAssembly1", "TransitiveAssembly2", "TransitiveAssembly3"],
+            assemblyNamesToShade: ["Assembly1", "Assembly2", "Assembly3"],
             references: [],
             keyFile: null,
             assembliesToExclude: [],
@@ -607,33 +647,9 @@ public class ShaderTests
             internalize: false,
             _ => { });
 
-        // Verify TransitiveAssembly1_Shaded references TransitiveAssembly2_Shaded
-        var assembly1Path = Path.Combine(directory, "TransitiveAssembly1_Shaded.dll");
-        Assert.True(File.Exists(assembly1Path), "TransitiveAssembly1_Shaded.dll should exist");
-
-        using (var fileStream = File.OpenRead(assembly1Path))
-        using (var peReader = new PEReader(fileStream))
-        {
-            var metadataReader = peReader.GetMetadataReader();
-            var references = GetAssemblyReferences(metadataReader).ToList();
-
-            Assert.Contains(references, r => r.Contains("TransitiveAssembly2_Shaded"));
-            Assert.DoesNotContain(references, r => r.StartsWith("TransitiveAssembly2,"));
-        }
-
-        // Verify TransitiveAssembly2_Shaded references TransitiveAssembly3_Shaded
-        var assembly2Path = Path.Combine(directory, "TransitiveAssembly2_Shaded.dll");
-        Assert.True(File.Exists(assembly2Path), "TransitiveAssembly2_Shaded.dll should exist");
-
-        using (var fileStream = File.OpenRead(assembly2Path))
-        using (var peReader = new PEReader(fileStream))
-        {
-            var metadataReader = peReader.GetMetadataReader();
-            var references = GetAssemblyReferences(metadataReader).ToList();
-
-            Assert.Contains(references, r => r.Contains("TransitiveAssembly3_Shaded"));
-            Assert.DoesNotContain(references, r => r.StartsWith("TransitiveAssembly3,"));
-        }
+        // Use same BuildResults verification as Combo tests
+        var results = BuildResults(directory);
+        await Verify(results);
     }
 }
 
