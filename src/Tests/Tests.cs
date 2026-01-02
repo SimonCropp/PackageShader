@@ -2,6 +2,7 @@
 using CliWrap.Buffered;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using PackageShader;
 
 [Collection("Sequential")]
 public class ShaderTests
@@ -636,16 +637,22 @@ public class ShaderTests
             "Assembly2");
 
         // Shade all assemblies
-        Program.Inner(
-            directory,
-            assemblyNamesToShade: ["Assembly1", "Assembly2", "Assembly3"],
-            references: [],
-            keyFile: null,
-            assembliesToExclude: [],
-            prefix: null,
-            suffix: "_Shaded",
-            internalize: false,
-            _ => { });
+        var infos = new[] { "Assembly1", "Assembly2", "Assembly3" }
+            .Select(name => new SourceTargetInfo(
+                SourceName: name,
+                SourcePath: Path.Combine(directory, $"{name}.dll"),
+                TargetName: $"{name}_Shaded",
+                TargetPath: Path.Combine(directory, $"{name}_Shaded.dll"),
+                IsAlias: true))
+            .ToList();
+
+        Shader.Run([], infos, internalize: false, key: null);
+
+        // Delete original assemblies (Shader.Run doesn't do this)
+        foreach (var info in infos)
+        {
+            File.Delete(info.SourcePath);
+        }
 
         // Use same BuildResults verification as Combo tests
         var results = BuildResults(directory);
