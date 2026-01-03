@@ -28,6 +28,14 @@ public class ShadeTask :
     [Output]
     public ITaskItem[] CopyLocalPathsToAdd { get; set; } = null!;
 
+    /// <summary>
+    /// Output: Mappings from original assembly names to shaded names.
+    /// ItemSpec = shaded name (e.g., "MyApp.Newtonsoft.Json")
+    /// OriginalName metadata = original name (e.g., "Newtonsoft.Json")
+    /// </summary>
+    [Output]
+    public ITaskItem[] ShadedNameMappings { get; set; } = null!;
+
     public override bool Execute()
     {
         var stopwatch = Stopwatch.StartNew();
@@ -80,6 +88,7 @@ public class ShadeTask :
         var sourceTargetInfos = new List<SourceTargetInfo>();
         var copyLocalPathsToRemove = new List<ITaskItem>();
         var copyLocalPathsToAdd = new List<ITaskItem>();
+        var shadedNameMappings = new List<ITaskItem>();
 
         void ProcessCopyLocal(string sourcePath, string targetPath)
         {
@@ -112,6 +121,11 @@ public class ShadeTask :
             var targetPath = Path.Combine(IntermediateDirectory, $"{targetName}.dll");
             sourceTargetInfos.Add(new(sourceName, sourcePath, targetName, targetPath, true));
             ProcessCopyLocal(sourcePath, targetPath);
+
+            // Record the mapping for deps.json patching
+            var mapping = new TaskItem(targetName);
+            mapping.SetMetadata("OriginalName", sourceName);
+            shadedNameMappings.Add(mapping);
         }
 
         foreach (var sourcePath in assembliesToTarget)
@@ -141,6 +155,7 @@ public class ShadeTask :
         Shader.Run(sourceTargetInfos, Internalize, strongNameKey);
         CopyLocalPathsToRemove = copyLocalPathsToRemove.ToArray();
         CopyLocalPathsToAdd = copyLocalPathsToAdd.ToArray();
+        ShadedNameMappings = shadedNameMappings.ToArray();
     }
 
     StrongNameKey? GetKey()

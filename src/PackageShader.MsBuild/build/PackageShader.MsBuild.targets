@@ -9,6 +9,10 @@
     TaskName="PackageShader.ShadeTask"
     AssemblyFile="$(ShaderAssembly)" />
 
+  <UsingTask
+    TaskName="PackageShader.DepsJsonPatcherTask"
+    AssemblyFile="$(ShaderAssembly)" />
+
   <!-- Target 1: Collect PackageReference and ProjectReference items with Shade="true" -->
   <Target Name="_CollectShadedReferences"
           BeforeTargets="ShadeTarget"
@@ -76,6 +80,9 @@
       <Output
         TaskParameter="CopyLocalPathsToRemove"
         ItemName="CopyLocalPathsToRemove" />
+      <Output
+        TaskParameter="ShadedNameMappings"
+        ItemName="_ShadedNameMappings" />
 
     </PackageShader.ShadeTask>
 
@@ -97,5 +104,17 @@
         <TargetPath>%(Filename)%(Extension)</TargetPath>
       </BuildOutputInPackage>
     </ItemGroup>
+  </Target>
+
+  <!-- Target 5: Patch deps.json to use shaded assembly names -->
+  <Target Name="_PatchDepsJson"
+          AfterTargets="GenerateBuildDependencyFile"
+          Condition="'@(_ShadedNameMappings)' != ''">
+    <PropertyGroup>
+      <_DepsJsonPath>$(ProjectDir)$(OutputPath)$(AssemblyName).deps.json</_DepsJsonPath>
+    </PropertyGroup>
+    <PackageShader.DepsJsonPatcherTask
+      DepsJsonPath="$(_DepsJsonPath)"
+      ShadedNameMappings="@(_ShadedNameMappings)" />
   </Target>
 </Project>

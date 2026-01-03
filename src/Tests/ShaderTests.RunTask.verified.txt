@@ -45,11 +45,16 @@ Build succeeded.
     0 Error(s)
 
 ,
-  consoleOutput: ,
-  consoleError:
-Unhandled exception. System.IO.FileNotFoundException: Could not load file or assembly 'AssemblyToProcess.Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=null'. The system cannot find the file specified.
-File name: 'AssemblyToProcess.Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=null'
-   at ClassToTest.Method()+MoveNext()
-   at Program.<Main>$(String[] args) in D:/Code/PackageShader/src/SampleApp/Program.cs:line 1
-
+  consoleOutput:
+AssemblyWithEmbeddedSymbols
+AssemblyWithStrongName
+AssemblyWithNoStrongName
+AssemblyWithNoSymbols
+AssemblyWithPdb
+AssemblyToInclude
+"a//b"
+AssemblyToInclude
+AssemblyWithResources: ResourceValue
+,
+  consoleError: 
 }
