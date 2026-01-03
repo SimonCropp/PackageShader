@@ -148,8 +148,8 @@ public class ModificationTests
         var plan = new ModificationPlan(reader);
 
         var existingCount = reader.GetRowCount(TableIndex.TypeRef);
-        var rid1 = plan.AddTypeRef(new TypeRefRow());
-        var rid2 = plan.AddTypeRef(new TypeRefRow());
+        var rid1 = plan.AddTypeRef(new());
+        var rid2 = plan.AddTypeRef(new());
 
         Assert.Equal((uint)(existingCount + 1), rid1);
         Assert.Equal((uint)(existingCount + 2), rid2);
@@ -165,8 +165,8 @@ public class ModificationTests
         var plan = new ModificationPlan(reader);
 
         var existingCount = reader.GetRowCount(TableIndex.MemberRef);
-        var rid1 = plan.AddMemberRef(new MemberRefRow());
-        var rid2 = plan.AddMemberRef(new MemberRefRow());
+        var rid1 = plan.AddMemberRef(new());
+        var rid2 = plan.AddMemberRef(new());
 
         Assert.Equal((uint)(existingCount + 1), rid1);
         Assert.Equal((uint)(existingCount + 2), rid2);
@@ -181,8 +181,8 @@ public class ModificationTests
         using var reader = new StreamingMetadataReader(peFile);
         var plan = new ModificationPlan(reader);
 
-        plan.AddCustomAttribute(new CustomAttributeRow());
-        plan.AddCustomAttribute(new CustomAttributeRow());
+        plan.AddCustomAttribute(new());
+        plan.AddCustomAttribute(new());
 
         Assert.Equal(2, plan.NewCustomAttributes.Count);
     }
@@ -225,7 +225,7 @@ public class ModificationTests
         using var reader = new StreamingMetadataReader(peFile);
         var plan = new ModificationPlan(reader);
 
-        plan.AddCustomAttribute(new CustomAttributeRow());
+        plan.AddCustomAttribute(new());
         var strategy = plan.GetStrategy();
 
         Assert.NotEqual(ModificationStrategy.InPlacePatch, strategy);

@@ -152,6 +152,22 @@ public class TaskTests
     }
 
     [Fact]
+    public void Execute_WithNoPrefixOrSuffix_ReturnsFalse()
+    {
+        using var tempDir = new TempDirectory();
+        var buildEngine = new MockBuildEngine();
+        var task = CreateTask(tempDir, sign: false, internalize: false);
+        task.Prefix = null;
+        task.Suffix = null;
+        task.BuildEngine = buildEngine;
+
+        var result = task.Execute();
+
+        Assert.False(result);
+        Assert.Contains(buildEngine.Errors, e => e.Contains("Either Shader_Prefix or Shader_Suffix must be specified"));
+    }
+
+    [Fact]
     public void Execute_WithEmptyReferenceCopyLocalPaths_ReturnsTrue()
     {
         using var tempDir = new TempDirectory();

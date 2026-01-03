@@ -205,7 +205,7 @@ public class StrongNameKeyTests
     static byte[] CreatePublicKeyBlob(int exponent, int modulusBits)
     {
         // Create an RSA key with the specified exponent
-        using var rsa = System.Security.Cryptography.RSA.Create(modulusBits);
+        using var rsa = RSA.Create(modulusBits);
         var parameters = rsa.ExportParameters(false);
 
         // Convert exponent to bytes (big-endian, trimmed)

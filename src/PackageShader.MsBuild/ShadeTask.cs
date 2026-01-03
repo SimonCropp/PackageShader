@@ -51,6 +51,11 @@ public class ShadeTask :
 
     void InnerExecute()
     {
+        if (string.IsNullOrEmpty(Prefix) && string.IsNullOrEmpty(Suffix))
+        {
+            throw new ErrorException("Either Shader_Prefix or Shader_Suffix must be specified");
+        }
+
         List<string> assembliesToSkipRename;
         if (AssembliesToSkipRename == null)
         {
