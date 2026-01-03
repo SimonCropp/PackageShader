@@ -1,0 +1,20 @@
+<Solution>
+  <Configurations>
+    <BuildType Name="Debug" />
+    <BuildType Name="IncludeTask" />
+    <BuildType Name="Release" />
+  </Configurations>
+  <Folder Name="/Solution Items/" />
+  <Project Path="ConsumeBoth/ConsumeBoth.csproj">
+    <BuildType Solution="IncludeTask|*" Project="Debug" />
+  </Project>
+  <Project Path="ConsumeNew/ConsumeNew.csproj">
+    <BuildType Solution="IncludeTask|*" Project="Debug" />
+  </Project>
+  <Project Path="ConsumeOld/ConsumeOld.csproj">
+    <BuildType Solution="IncludeTask|*" Project="Debug" />
+  </Project>
+  <Properties Name="MonoDevelopProperties">
+    <Property Name="StartupItem" Value="Fody\Fody.csproj" />
+  </Properties>
+</Solution>

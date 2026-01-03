@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+      <Shader_Prefix>Shaded_</Shader_Prefix>
+      <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="FluentValidation" Version="9.5.4" />
+      <PackageReference Include="PackageShader.MsBuild" Version="0.1.0" PrivateAssets="all" />
+    </ItemGroup>
+  <ItemGroup>
+  </ItemGroup>
+
+</Project>
