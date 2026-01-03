@@ -264,10 +264,7 @@ public sealed class StrongNameKey
 
     static byte[] ComputePublicKeyToken(byte[] publicKey)
     {
-        using var sha1 = SHA1.Create();
-#pragma warning disable CA1850
-        var hash = sha1.ComputeHash(publicKey);
-#pragma warning restore CA1850
+        var hash = SHA1.HashData(publicKey);
 
         // Take last 8 bytes, reversed
         var token = new byte[8];
