@@ -1,8 +1,7 @@
 ﻿{
   buildOutput:
   
-  Prefix: Prefix_
-  Suffix: _Suffix
+  Prefix: AssemblyToProcess.
   Internalize: True
   StrongName: False
   AssembliesToShade: 
@@ -17,13 +16,13 @@
   	AssemblyToProcess
   	AssemblyToInclude
   TargetInfos: 
-  	Newtonsoft.Json => Prefix_Newtonsoft.Json_Suffix
-  	AssemblyWithEmbeddedSymbols => Prefix_AssemblyWithEmbeddedSymbols_Suffix
-  	AssemblyWithNoStrongName => Prefix_AssemblyWithNoStrongName_Suffix
-  	AssemblyWithNoSymbols => Prefix_AssemblyWithNoSymbols_Suffix
-  	AssemblyWithPdb => Prefix_AssemblyWithPdb_Suffix
-  	AssemblyWithResources => Prefix_AssemblyWithResources_Suffix
-  	AssemblyWithStrongName => Prefix_AssemblyWithStrongName_Suffix
+  	Newtonsoft.Json => AssemblyToProcess.Newtonsoft.Json
+  	AssemblyWithEmbeddedSymbols => AssemblyToProcess.AssemblyWithEmbeddedSymbols
+  	AssemblyWithNoStrongName => AssemblyToProcess.AssemblyWithNoStrongName
+  	AssemblyWithNoSymbols => AssemblyToProcess.AssemblyWithNoSymbols
+  	AssemblyWithPdb => AssemblyToProcess.AssemblyWithPdb
+  	AssemblyWithResources => AssemblyToProcess.AssemblyWithResources
+  	AssemblyWithStrongName => AssemblyToProcess.AssemblyWithStrongName
   	AssemblyToProcess => AssemblyToProcess
   	AssemblyToInclude => AssemblyToInclude
   ReferenceCopyLocalPaths: 
@@ -46,16 +45,11 @@ Build succeeded.
     0 Error(s)
 
 ,
-  consoleOutput:
-AssemblyWithEmbeddedSymbols
-AssemblyWithStrongName
-AssemblyWithNoStrongName
-AssemblyWithNoSymbols
-AssemblyWithPdb
-AssemblyToInclude
-"a//b"
-AssemblyToInclude
-AssemblyWithResources: ResourceValue
-,
-  consoleError: 
+  consoleOutput: ,
+  consoleError:
+Unhandled exception. System.IO.FileNotFoundException: Could not load file or assembly 'AssemblyToProcess.Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=null'. The system cannot find the file specified.
+File name: 'AssemblyToProcess.Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=null'
+   at ClassToTest.Method()+MoveNext()
+   at Program.<Main>$(String[] args) in D:/Code/PackageShader/src/SampleApp/Program.cs:line 1
+
 }

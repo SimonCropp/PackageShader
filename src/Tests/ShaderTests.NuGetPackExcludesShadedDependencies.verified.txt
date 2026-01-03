@@ -1,0 +1,10 @@
+﻿{
+  OutputFiles: [
+    TestLib.Argon.dll,
+    TestLib.dll
+  ],
+  LibEntries: [
+    lib/net8.0/TestLib.dll
+  ],
+  NuspecHasArgonDependency: false
+}

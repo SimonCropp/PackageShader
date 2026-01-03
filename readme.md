@@ -235,23 +235,18 @@ Configure shading via MSBuild properties in the project file:
 <!-- snippet: MsBuildConfig -->
 <a id='snippet-MsBuildConfig'></a>
 ```xml
-<PropertyGroup>
-  <!-- Prefix or suffix for shaded assemblies (one required) -->
-  <Shader_Prefix>Shaded_</Shader_Prefix>
-  <!-- OR -->
-  <Shader_Suffix>_Shaded</Shader_Suffix>
+<!-- Mark references to shade with Shade="true" -->
+<ItemGroup>
+  <PackageReference Include="Newtonsoft.Json" Shade="true" />
+  <ProjectReference Include="..\MyLibrary\MyLibrary.csproj" Shade="true" />
+</ItemGroup>
 
-  <!-- Make shaded types internal (optional, default: false) -->
+<!-- Make shaded types internal (optional, default: false) -->
+<PropertyGroup>
   <Shader_Internalize>true</Shader_Internalize>
 </PropertyGroup>
-
-<!-- Assemblies to skip renaming (optional) -->
-<ItemGroup>
-  <Shader_AssembliesToSkipRename Include="MyAssembly" />
-  <Shader_AssembliesToSkipRename Include="AnotherAssembly" />
-</ItemGroup>
 ```
-<sup><a href='/src/msbuild-config.include.xml#L1-L17' title='Snippet source file'>snippet source</a> | <a href='#snippet-MsBuildConfig' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/msbuild-config.include.xml#L1-L12' title='Snippet source file'>snippet source</a> | <a href='#snippet-MsBuildConfig' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 

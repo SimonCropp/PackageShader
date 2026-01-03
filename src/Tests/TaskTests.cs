@@ -86,48 +86,124 @@ public class TaskTests
     }
 
     [Fact]
-    public void Execute_WithAssembliesToSkipRename_ExcludesThoseAssemblies()
+    public void Execute_WithAssembliesToShade_OnlyShadesThoseAssemblies()
     {
         using var tempDir = new TempDirectory();
-        var task = CreateTask(tempDir, sign: false, internalize: false);
-        task.AssembliesToSkipRename = [new MockTaskItem("AssemblyWithNoSymbols")];
+        SetupTestAssemblies(tempDir);
+
+        var assemblyPaths = GetTestAssemblyPaths(tempDir);
+        var assemblyWithPdbPath = assemblyPaths.First(p => p.Contains("AssemblyWithPdb"));
+        var referenceCopyLocalPaths = assemblyPaths.Select(p => new MockTaskItem(p)).ToArray();
+
+        var task = new ShadeTask
+        {
+            BuildEngine = new MockBuildEngine(),
+            IntermediateAssembly = Path.Combine(tempDir, "AssemblyToProcess.dll"),
+            IntermediateDirectory = tempDir,
+            ReferenceCopyLocalPaths = referenceCopyLocalPaths,
+            AssembliesToShade = [new MockTaskItem(assemblyWithPdbPath)],
+            SignAssembly = false,
+            Internalize = false
+        };
 
         var result = task.Execute();
 
         Assert.True(result);
-        // The skipped assembly should be in output without the suffix
         var outputFiles = task.CopyLocalPathsToAdd.Select(i => Path.GetFileName(i.ItemSpec)).ToList();
+        // Only AssemblyWithPdb should be shaded with prefix
+        Assert.Contains("AssemblyToProcess.AssemblyWithPdb.dll", outputFiles);
+        // AssemblyWithNoSymbols should NOT be shaded (not in AssembliesToShade)
+        Assert.DoesNotContain("AssemblyToProcess.AssemblyWithNoSymbols.dll", outputFiles);
         Assert.Contains("AssemblyWithNoSymbols.dll", outputFiles);
-        Assert.DoesNotContain("AssemblyWithNoSymbols_Shaded.dll", outputFiles);
     }
 
     [Fact]
-    public void Execute_AppliesPrefixAndSuffix()
+    public void Execute_DerivesPrefix_FromIntermediateAssemblyName()
     {
         using var tempDir = new TempDirectory();
-        var task = CreateTask(tempDir, sign: false, internalize: false);
-        task.Prefix = "Pre_";
-        task.Suffix = "_Suf";
+        SetupTestAssemblies(tempDir);
+
+        // Rename the intermediate assembly to a custom name
+        var originalAssembly = Path.Combine(tempDir, "AssemblyToProcess.dll");
+        var customAssembly = Path.Combine(tempDir, "MyCustomApp.dll");
+        File.Copy(originalAssembly, customAssembly);
+
+        var assemblyPaths = GetTestAssemblyPaths(tempDir);
+        var assemblyWithPdbPath = assemblyPaths.First(p => p.Contains("AssemblyWithPdb"));
+        var referenceCopyLocalPaths = assemblyPaths.Select(p => new MockTaskItem(p)).ToArray();
+
+        var task = new ShadeTask
+        {
+            BuildEngine = new MockBuildEngine(),
+            IntermediateAssembly = customAssembly,
+            IntermediateDirectory = tempDir,
+            ReferenceCopyLocalPaths = referenceCopyLocalPaths,
+            AssembliesToShade = [new MockTaskItem(assemblyWithPdbPath)],
+            SignAssembly = false,
+            Internalize = false
+        };
 
         task.Execute();
 
         var outputFiles = task.CopyLocalPathsToAdd.Select(i => Path.GetFileName(i.ItemSpec)).ToList();
-        Assert.Contains(outputFiles, f => f.StartsWith("Pre_") && f.Contains("_Suf.dll"));
+        // Prefix should be derived from "MyCustomApp"
+        Assert.Contains("MyCustomApp.AssemblyWithPdb.dll", outputFiles);
     }
 
     [Fact]
-    public void Execute_WithPrefixOnly_Works()
+    public void Execute_WithNoAssembliesToShade_DoesNothing()
     {
         using var tempDir = new TempDirectory();
-        var task = CreateTask(tempDir, sign: false, internalize: false);
-        task.Prefix = "Prefix_";
-        task.Suffix = null;
+        SetupTestAssemblies(tempDir);
+
+        var assemblyPaths = GetTestAssemblyPaths(tempDir);
+        var referenceCopyLocalPaths = assemblyPaths.Select(p => new MockTaskItem(p)).ToArray();
+
+        var task = new ShadeTask
+        {
+            BuildEngine = new MockBuildEngine(),
+            IntermediateAssembly = Path.Combine(tempDir, "AssemblyToProcess.dll"),
+            IntermediateDirectory = tempDir,
+            ReferenceCopyLocalPaths = referenceCopyLocalPaths,
+            AssembliesToShade = null, // No assemblies to shade
+            SignAssembly = false,
+            Internalize = false
+        };
 
         var result = task.Execute();
 
         Assert.True(result);
+        // All assemblies should be in output without prefix (none shaded)
         var outputFiles = task.CopyLocalPathsToAdd.Select(i => Path.GetFileName(i.ItemSpec)).ToList();
-        Assert.Contains(outputFiles, f => f.StartsWith("Prefix_"));
+        Assert.DoesNotContain(outputFiles, f => f.StartsWith("AssemblyToProcess.Assembly"));
+    }
+
+    [Fact]
+    public void Execute_WithEmptyAssembliesToShade_DoesNothing()
+    {
+        using var tempDir = new TempDirectory();
+        SetupTestAssemblies(tempDir);
+
+        var assemblyPaths = GetTestAssemblyPaths(tempDir);
+        var referenceCopyLocalPaths = assemblyPaths.Select(p => new MockTaskItem(p)).ToArray();
+
+        var task = new ShadeTask
+        {
+            BuildEngine = new MockBuildEngine(),
+            IntermediateAssembly = Path.Combine(tempDir, "AssemblyToProcess.dll"),
+            IntermediateDirectory = tempDir,
+            ReferenceCopyLocalPaths = referenceCopyLocalPaths,
+            AssembliesToShade = [], // Empty array
+            SignAssembly = false,
+            Internalize = false
+        };
+
+        var result = task.Execute();
+
+        Assert.True(result);
+        // All assemblies should be in output without prefix (none shaded)
+        var outputFiles = task.CopyLocalPathsToAdd.Select(i => Path.GetFileName(i.ItemSpec)).ToList();
+        Assert.DoesNotContain(outputFiles, f => f.StartsWith("AssemblyToProcess.Assembly"));
     }
 
     [Fact]
@@ -152,22 +228,6 @@ public class TaskTests
     }
 
     [Fact]
-    public void Execute_WithNoPrefixOrSuffix_ReturnsFalse()
-    {
-        using var tempDir = new TempDirectory();
-        var buildEngine = new MockBuildEngine();
-        var task = CreateTask(tempDir, sign: false, internalize: false);
-        task.Prefix = null;
-        task.Suffix = null;
-        task.BuildEngine = buildEngine;
-
-        var result = task.Execute();
-
-        Assert.False(result);
-        Assert.Contains(buildEngine.Errors, e => e.Contains("Either Shader_Prefix or Shader_Suffix must be specified"));
-    }
-
-    [Fact]
     public void Execute_WithEmptyReferenceCopyLocalPaths_ReturnsTrue()
     {
         using var tempDir = new TempDirectory();
@@ -179,7 +239,7 @@ public class TaskTests
             IntermediateAssembly = Path.Combine(tempDir, "Target.dll"),
             IntermediateDirectory = tempDir,
             ReferenceCopyLocalPaths = [],
-            Suffix = "_Shaded"
+            AssembliesToShade = null
         };
 
         var result = task.Execute();
@@ -194,13 +254,19 @@ public class TaskTests
         var assemblyPaths = GetTestAssemblyPaths(tempDir);
         var referenceCopyLocalPaths = assemblyPaths.Select(p => new MockTaskItem(p)).ToArray();
 
+        // By default, shade all assemblies except the main one
+        var assembliesToShade = assemblyPaths
+            .Where(p => !p.Contains("AssemblyToProcess"))
+            .Select(p => new MockTaskItem(p))
+            .ToArray();
+
         var task = new ShadeTask
         {
             BuildEngine = new MockBuildEngine(),
             IntermediateAssembly = Path.Combine(tempDir, "AssemblyToProcess.dll"),
             IntermediateDirectory = tempDir,
             ReferenceCopyLocalPaths = referenceCopyLocalPaths,
-            Suffix = "_Shaded",
+            AssembliesToShade = assembliesToShade,
             SignAssembly = sign,
             AssemblyOriginatorKeyFile = sign ? testKeyFile : null,
             Internalize = internalize
