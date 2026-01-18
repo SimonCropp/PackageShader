@@ -2,6 +2,7 @@
   <PropertyGroup>
     <ShaderAssembly>$(MSBuildThisFileDirectory)..\task\PackageShader.MsBuild.dll</ShaderAssembly>
     <ShaderAssembly Condition="!Exists($(ShaderAssembly))">$(MSBuildThisFileDirectory)..\bin\Debug\PackageShader.MsBuild.dll</ShaderAssembly>
+    <ShaderAssembly Condition="!Exists($(ShaderAssembly))">$(MSBuildThisFileDirectory)..\bin\Release\PackageShader.MsBuild.dll</ShaderAssembly>
     <ShaderAssembly Condition="!Exists($(ShaderAssembly))">$(MSBuildThisFileDirectory)..\bin\IncludeTask\PackageShader.MsBuild.dll</ShaderAssembly>
   </PropertyGroup>
 
