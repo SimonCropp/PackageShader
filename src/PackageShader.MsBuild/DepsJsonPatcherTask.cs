@@ -30,7 +30,7 @@ public class DepsJsonPatcherTask : Task
                 return true;
             }
 
-            if (ShadedNameMappings == null || ShadedNameMappings.Length == 0)
+            if (ShadedNameMappings.Length == 0)
             {
                 Log.LogMessage(MessageImportance.Normal, "DepsJsonPatcher: No shaded mappings provided, skipping");
                 return true;

@@ -40,7 +40,7 @@ public class ShaderTests
         }
 
         var namesToShade = assemblyFiles.Where(_ => _.StartsWith("AssemblyWith") || _ == "Newtonsoft.Json").ToList();
-        Program.Inner(tempPath, namesToShade, keyFile, new(), null, "_Shaded", internalize, _ =>
+        Program.Inner(tempPath, namesToShade, keyFile, [], null, "_Shaded", internalize, _ =>
         {
         });
 
@@ -432,7 +432,7 @@ public class ShaderTests
 
         if (packResult.ExitCode != 0)
         {
-            throw new Exception($"Pack failed:\n{packResult.StandardOutput}\n{packResult.StandardError}");
+            throw new($"Pack failed:\n{packResult.StandardOutput}\n{packResult.StandardError}");
         }
 
         // Debug: Check what files are in the output directory
