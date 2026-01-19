@@ -91,9 +91,21 @@
     <ItemGroup Condition="'@(_AssembliesToShade)' != ''">
       <ReferenceCopyLocalPaths Remove="@(CopyLocalPathsToRemove)" />
       <ReferenceCopyLocalPaths Include="@(CopyLocalPathsToAdd)" />
-      <!-- Mark shaded assemblies for inclusion in NuGet package -->
-      <_ShadedDllsToAdd Include="@(CopyLocalPathsToAdd)" Condition="'%(Extension)' == '.dll'" />
+      <!-- Mark shaded assemblies for inclusion in NuGet package (only those with assembly name prefix) -->
+      <_ShadedDllsToAdd Include="@(CopyLocalPathsToAdd)"
+                        Condition="'%(Extension)' == '.dll' AND $([System.String]::Copy('%(Filename)').StartsWith('$(AssemblyName).'))" />
     </ItemGroup>
+
+    <!-- Write shaded DLL list to a file for use during pack -->
+    <PropertyGroup Condition="'@(_ShadedDllsToAdd)' != ''">
+      <_ShadedDllsListFile>$(IntermediateOutputPath)PackageShader.ShadedDlls.txt</_ShadedDllsListFile>
+    </PropertyGroup>
+    <WriteLinesToFile
+      Condition="'@(_ShadedDllsToAdd)' != ''"
+      File="$(_ShadedDllsListFile)"
+      Lines="@(_ShadedDllsToAdd)"
+      Overwrite="true"
+      WriteOnlyWhenDifferent="true" />
   </Target>
 
   <!-- Target 4: Include shaded assemblies in NuGet package -->
@@ -103,24 +115,20 @@
       <!-- Default to lib folder, but allow override via ShadedAssembliesPackagePath -->
       <_ShadedPackagePath Condition="'$(ShadedAssembliesPackagePath)' == ''">lib\$(TargetFramework)</_ShadedPackagePath>
       <_ShadedPackagePath Condition="'$(ShadedAssembliesPackagePath)' != ''">$(ShadedAssembliesPackagePath)</_ShadedPackagePath>
+      <_ShadedDllsListFile>$(IntermediateOutputPath)PackageShader.ShadedDlls.txt</_ShadedDllsListFile>
     </PropertyGroup>
 
-    <ItemGroup>
-      <!--
-        Find shaded assemblies by looking for DLLs with the project name prefix in the output directory.
+    <!--
+      Read the list of shaded assemblies from a file written during build.
+      This file contains the CopyLocalPathsToAdd output from ShadeTask, which persists
+      between build and pack phases, allowing this to work with 'dotnet pack' without rebuilding.
+    -->
+    <ReadLinesFromFile File="$(_ShadedDllsListFile)" Condition="Exists('$(_ShadedDllsListFile)')">
+      <Output TaskParameter="Lines" ItemName="_ShadedDllsFromFile" />
+    </ReadLinesFromFile>
 
-        Note: We scan the output directory instead of using CopyLocalPathsToAdd from ShadeTask because
-        that output item is only available during build. When running 'dotnet pack --no-build' or when
-        IncludeBuildOutput=false, the build targets don't run during pack, so CopyLocalPathsToAdd is empty.
-        Scanning the output directory works reliably in all scenarios.
-      -->
-      <_AllOutputDlls Include="$(OutputPath)*.dll" />
-      <_ProjectShadedDlls Include="@(_AllOutputDlls)"
-                          Condition="$([System.String]::Copy('%(Filename)').StartsWith('$(AssemblyName).'))" />
-    </ItemGroup>
-
-    <ItemGroup Condition="'@(_ProjectShadedDlls)' != ''">
-      <TfmSpecificPackageFile Include="@(_ProjectShadedDlls)">
+    <ItemGroup Condition="'@(_ShadedDllsFromFile)' != ''">
+      <TfmSpecificPackageFile Include="@(_ShadedDllsFromFile)">
         <PackagePath>$(_ShadedPackagePath)</PackagePath>
         <Pack>true</Pack>
       </TfmSpecificPackageFile>
