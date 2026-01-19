@@ -19,12 +19,10 @@
   <Project Path="AssemblyWithPdb/AssemblyWithPdb.csproj" />
   <Project Path="AssemblyWithResources/AssemblyWithResources.csproj" />
   <Project Path="AssemblyWithStrongName/AssemblyWithStrongName.csproj" />
-  <Project Path="DummyAssembly/DummyAssembly.csproj">
-    <Build Solution="IncludeTask|*" Project="false" />
-  </Project>
+  <Project Path="DummyAssembly/DummyAssembly.csproj" />
   <Project Path="PackageShader.MsBuild/PackageShader.MsBuild.csproj" />
   <Project Path="PackageShader/PackageShader.csproj" />
-  <Project Path="PackageShaderTool/PackageShaderTool.csproj"/>
+  <Project Path="PackageShaderTool/PackageShaderTool.csproj" />
   <Project Path="SampleApp/SampleApp.csproj">
     <BuildDependency Project="PackageShaderTool/PackageShaderTool.csproj" />
   </Project>
