@@ -63,19 +63,19 @@ public class ShadeTask :
 
         // Get the set of assemblies to shade from the explicit input
         var assembliesToShadeSet = new HashSet<string>(
-            (AssembliesToShade ?? []).Select(item => item.ItemSpec),
+            (AssembliesToShade ?? []).Select(_ => _.ItemSpec),
             StringComparer.OrdinalIgnoreCase);
 
         var referenceCopyLocalPaths = ReferenceCopyLocalPaths
             .Select(_ => _.ItemSpec)
             .ToList();
         var assemblyCopyLocalPaths = referenceCopyLocalPaths
-            .Where(x => Path.GetExtension(x).Equals(".dll", StringComparison.OrdinalIgnoreCase))
+            .Where(_ => Path.GetExtension(_).Equals(".dll", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         // Only shade assemblies in the explicit shade list
         var assembliesToShade = assemblyCopyLocalPaths
-            .Where(x => assembliesToShadeSet.Contains(x))
+            .Where(_ => assembliesToShadeSet.Contains(_))
             .ToList();
 
         // Assemblies that reference shaded ones but aren't shaded themselves

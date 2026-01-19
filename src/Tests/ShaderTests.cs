@@ -406,7 +406,7 @@ public class ShaderTests
         Assert.True(File.Exists(nupkgPath), $"NuGet package should exist at {nupkgPath}");
 
         await using var archive = await ZipFile.OpenReadAsync(nupkgPath, TestContext.Current.CancellationToken);
-        var entries = archive.Entries.Select(e => e.FullName).ToList();
+        var entries = archive.Entries.Select(_ => _.FullName).ToList();
 
         var libEntries = entries.Where(e => e.StartsWith("lib/")).ToList();
 
@@ -423,8 +423,8 @@ public class ShaderTests
 
         await Verify(new
         {
-            OutputFiles = outputFiles.OrderBy(x => x).ToList(),
-            LibEntries = libEntries.OrderBy(x => x).ToList(),
+            OutputFiles = outputFiles.OrderBy(_ => _).ToList(),
+            LibEntries = libEntries.OrderBy(_ => _).ToList(),
             NuspecHasArgonDependency = nuspecContent.Contains("Argon")
         });
     }
