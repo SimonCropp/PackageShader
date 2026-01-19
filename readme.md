@@ -245,15 +245,9 @@ Configure shading via MSBuild properties in the project file:
 <PropertyGroup>
   <!-- Make shaded types internal (default: false) -->
   <Shader_Internalize>true</Shader_Internalize>
-
-  <!-- Add suffix to shaded assembly names (optional) -->
-  <Shader_Suffix>_Shaded</Shader_Suffix>
-
-  <!-- Or add prefix to shaded assembly names (optional) -->
-  <Shader_Prefix>Shaded_</Shader_Prefix>
 </PropertyGroup>
 ```
-<sup><a href='/src/msbuild-config.include.xml#L1-L19' title='Snippet source file'>snippet source</a> | <a href='#snippet-MsBuildConfig' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/msbuild-config.include.xml#L1-L13' title='Snippet source file'>snippet source</a> | <a href='#snippet-MsBuildConfig' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 
