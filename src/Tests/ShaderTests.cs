@@ -39,10 +39,20 @@ public class ShaderTests
             keyFile = Path.Combine(ProjectFiles.ProjectDirectory.Path, "test.snk");
         }
 
-        var namesToShade = assemblyFiles.Where(_ => _.StartsWith("AssemblyWith") || _ == "Newtonsoft.Json").ToList();
-        Program.Inner(tempPath, namesToShade, keyFile, [], null, "_Shaded", internalize, _ =>
-        {
-        });
+        var namesToShade = assemblyFiles
+            .Where(_ => _.StartsWith("AssemblyWith") ||
+                        _ == "Newtonsoft.Json").ToList();
+        Program.Inner(
+            tempPath,
+            namesToShade,
+            keyFile,
+            [],
+            null,
+            "_Shaded",
+            internalize,
+            _ =>
+            {
+            });
 
         return BuildResults(tempPath);
     }
@@ -154,61 +164,6 @@ public class ShaderTests
     //    return Verifier.Verify(results);
     //}
 
-    [Fact]
-    public async Task RunTask()
-    {
-        var solutionDir = ProjectFiles.SolutionDirectory.Path;
-
-        var buildResult = await Cli.Wrap("dotnet")
-            .WithArguments("build --configuration IncludeTask --no-restore")
-            .WithWorkingDirectory(solutionDir)
-            .WithValidation(CommandResultValidation.None)
-            .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
-
-        await Cli.Wrap("dotnet")
-            .WithArguments("build-server shutdown")
-            .ExecuteAsync(TestContext.Current.CancellationToken);
-
-        if (buildResult.StandardError.Length > 0)
-        {
-            throw new(buildResult.StandardError);
-        }
-
-        if (buildResult.StandardOutput.Contains("error"))
-        {
-            throw new(buildResult.StandardOutput.Replace(solutionDir, ""));
-        }
-
-        var appPath = Path.Combine(solutionDir, "SampleAppForMsBuild/bin/IncludeTask/SampleAppForMsBuild.dll");
-        var runResult = await Cli.Wrap("dotnet")
-            .WithArguments(appPath)
-            .WithValidation(CommandResultValidation.None)
-            .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
-
-        await Verify(
-                new
-                {
-                    buildOutput = buildResult.StandardOutput,
-                    consoleOutput = runResult.StandardOutput,
-                    consoleError = runResult.StandardError
-                })
-            .ScrubLinesContaining(
-                " -> ",
-                "You are using a preview version",
-                "MSBuild version ",
-                "Time Elapsed")
-            .ScrubLinesWithReplace(line => line.Replace('\\', '/'))
-            .ScrubLinesWithReplace(line =>
-            {
-                if (line.Contains("Newtonsoft.Json.dll"))
-                {
-                    return "  	Newtonsoft.Json.dll";
-                }
-
-                return line;
-            });
-    }
-
 #if DEBUG
 
     [Fact]
@@ -307,7 +262,7 @@ public class ShaderTests
     }
 
     static void CompileAssembly(string directory, string assemblyName, string code,
-                                params string[] referenceNames)
+        params string[] referenceNames)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(code);
 
@@ -357,7 +312,12 @@ public class ShaderTests
             "Assembly2");
 
         // Shade all assemblies
-        var infos = new[] { "Assembly1", "Assembly2", "Assembly3" }
+        var infos = new[]
+            {
+                "Assembly1",
+                "Assembly2",
+                "Assembly3"
+            }
             .Select(name => new SourceTargetInfo(
                 SourceName: name,
                 SourcePath: Path.Combine(directory, $"{name}.dll"),
@@ -379,96 +339,5 @@ public class ShaderTests
         await Verify(results);
     }
 
-    [Fact]
-    public async Task NuGetPackExcludesShadedDependencies()
-    {
-        using var tempDir = new TempDirectory();
-
-        // Create a minimal library project with a shaded PackageReference
-        var projectContent = """
-            <Project Sdk="Microsoft.NET.Sdk">
-              <PropertyGroup>
-                <TargetFramework>net8.0</TargetFramework>
-                <PackageId>TestLibWithShadedDeps</PackageId>
-                <Version>1.0.0</Version>
-                <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-              </PropertyGroup>
-              <ItemGroup>
-                <PackageReference Include="Argon" Version="0.28.0" Shade="true" />
-              </ItemGroup>
-              <Import Project="$MsBuildTargetsPath$" />
-            </Project>
-            """;
-
-        // Point to the actual targets file
-        var targetsPath = Path.Combine(ProjectFiles.ProjectDirectory.Path, "..", "PackageShader.MsBuild", "build", "PackageShader.MsBuild.targets");
-        projectContent = projectContent.Replace("$MsBuildTargetsPath$", targetsPath);
-
-        var projectPath = Path.Combine(tempDir, "TestLib.csproj");
-        File.WriteAllText(projectPath, projectContent);
-
-        // Create a minimal class file
-        var classContent = """
-            namespace TestLib;
-            public class MyClass
-            {
-                public string GetJson() => Argon.JObject.Parse("{}").ToString();
-            }
-            """;
-        File.WriteAllText(Path.Combine(tempDir, "MyClass.cs"), classContent);
-
-        // Restore first
-        await Cli.Wrap("dotnet")
-            .WithArguments("restore")
-            .WithWorkingDirectory(tempDir)
-            .ExecuteAsync(TestContext.Current.CancellationToken);
-
-        // Build and Pack together (pack --no-build skips shader target which runs AfterCompile)
-        var packResult = await Cli.Wrap("dotnet")
-            .WithArguments("pack -c Release -o .")
-            .WithWorkingDirectory(tempDir)
-            .WithValidation(CommandResultValidation.None)
-            .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
-
-        if (packResult.ExitCode != 0)
-        {
-            throw new($"Pack failed:\n{packResult.StandardOutput}\n{packResult.StandardError}");
-        }
-
-        // Debug: Check what files are in the output directory
-        var outputDir = Path.Combine(tempDir, "bin", "Release", "net8.0");
-        var outputFiles = Directory.Exists(outputDir)
-            ? Directory.GetFiles(outputDir, "*.dll").Select(Path.GetFileName).ToList()
-            : [];
-
-        // Inspect the nupkg
-        var nupkgPath = Path.Combine(tempDir, "TestLibWithShadedDeps.1.0.0.nupkg");
-        Assert.True(File.Exists(nupkgPath), $"NuGet package should exist at {nupkgPath}");
-
-        using var archive = ZipFile.OpenRead(nupkgPath);
-        var entries = archive.Entries.Select(e => e.FullName).ToList();
-
-        var libEntries = entries.Where(e => e.StartsWith("lib/")).ToList();
-
-        // Read nuspec from package to verify no dependency on Argon
-        var nuspecEntry = archive.Entries.FirstOrDefault(e => e.Name.EndsWith(".nuspec"));
-        Assert.NotNull(nuspecEntry);
-
-        using var nuspecStream = nuspecEntry.Open();
-        using var reader = new StreamReader(nuspecStream);
-        var nuspecContent = await reader.ReadToEndAsync(TestContext.Current.CancellationToken);
-
-        // Verify Argon is NOT listed as a dependency
-        Assert.DoesNotContain("Argon", nuspecContent);
-
-        await Verify(new
-        {
-            OutputFiles = outputFiles.OrderBy(x => x).ToList(),
-            LibEntries = libEntries.OrderBy(x => x).ToList(),
-            NuspecHasArgonDependency = nuspecContent.Contains("Argon")
-        });
-    }
-
     public record AssemblyResult(string Name, List<string> References, List<string> InternalsVisibleTo, bool HasExternalSymbols, bool HasEmbeddedSymbols);
-
 }

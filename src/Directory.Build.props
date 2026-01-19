@@ -1,10 +1,10 @@
 <Project>
   <PropertyGroup>
-    <Version>0.1.1</Version>
+    <Version>0.1.2</Version>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <NoWarn>CS1591</NoWarn>
-    <Configurations>Debug;Release;IncludeTask</Configurations>
+    <Configurations>Debug;Release</Configurations>
     <ResolveAssemblyReferencesSilent>true</ResolveAssemblyReferencesSilent>
   </PropertyGroup>
 </Project>

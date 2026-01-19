@@ -4,6 +4,7 @@
     TestLib.dll
   ],
   LibEntries: [
+    lib/net8.0/TestLib.Argon.dll,
     lib/net8.0/TestLib.dll
   ],
   NuspecHasArgonDependency: false

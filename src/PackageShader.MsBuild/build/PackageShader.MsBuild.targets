@@ -2,6 +2,9 @@
   <PropertyGroup>
     <ShaderAssembly>$(MSBuildThisFileDirectory)..\task\PackageShader.MsBuild.dll</ShaderAssembly>
     <ShaderAssembly Condition="!Exists($(ShaderAssembly))">$(MSBuildThisFileDirectory)..\bin\$(Configuration)\PackageShader.MsBuild.dll</ShaderAssembly>
+
+    <!-- Register our target for NuGet pack to include shaded assemblies -->
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_IncludeShadedInPackage</TargetsForTfmSpecificContentInPackage>
   </PropertyGroup>
 
   <UsingTask
@@ -88,20 +91,47 @@
     <ItemGroup Condition="'@(_AssembliesToShade)' != ''">
       <ReferenceCopyLocalPaths Remove="@(CopyLocalPathsToRemove)" />
       <ReferenceCopyLocalPaths Include="@(CopyLocalPathsToAdd)" />
-      <!-- Mark shaded assemblies for inclusion in NuGet package -->
-      <_ShadedDllsToAdd Include="@(CopyLocalPathsToAdd)" Condition="'%(Extension)' == '.dll'" />
+      <!-- Mark shaded assemblies for inclusion in NuGet package (only those with assembly name prefix) -->
+      <_ShadedDllsToAdd Include="@(CopyLocalPathsToAdd)"
+                        Condition="'%(Extension)' == '.dll' AND $([System.String]::Copy('%(Filename)').StartsWith('$(AssemblyName).'))" />
     </ItemGroup>
+
+    <!-- Write shaded DLL list to a file for use during pack -->
+    <PropertyGroup Condition="'@(_ShadedDllsToAdd)' != ''">
+      <_ShadedDllsListFile>$(IntermediateOutputPath)PackageShader.ShadedDlls.txt</_ShadedDllsListFile>
+    </PropertyGroup>
+    <WriteLinesToFile
+      Condition="'@(_ShadedDllsToAdd)' != ''"
+      File="$(_ShadedDllsListFile)"
+      Lines="@(_ShadedDllsToAdd)"
+      Overwrite="true"
+      WriteOnlyWhenDifferent="true" />
   </Target>
 
   <!-- Target 4: Include shaded assemblies in NuGet package -->
-  <Target Name="_IncludeShadedInPackage"
-          AfterTargets="ShadeTarget"
-          BeforeTargets="_GetBuildOutputFilesWithTfm"
-          Condition="'@(_ShadedDllsToAdd)' != ''">
-    <ItemGroup>
-      <BuildOutputInPackage Include="@(_ShadedDllsToAdd)">
-        <TargetPath>%(Filename)%(Extension)</TargetPath>
-      </BuildOutputInPackage>
+  <!-- This target is called via TargetsForTfmSpecificContentInPackage during pack -->
+  <Target Name="_IncludeShadedInPackage">
+    <PropertyGroup>
+      <!-- Default to lib folder, but allow override via ShadedAssembliesPackagePath -->
+      <_ShadedPackagePath Condition="'$(ShadedAssembliesPackagePath)' == ''">lib\$(TargetFramework)</_ShadedPackagePath>
+      <_ShadedPackagePath Condition="'$(ShadedAssembliesPackagePath)' != ''">$(ShadedAssembliesPackagePath)</_ShadedPackagePath>
+      <_ShadedDllsListFile>$(IntermediateOutputPath)PackageShader.ShadedDlls.txt</_ShadedDllsListFile>
+    </PropertyGroup>
+
+    <!--
+      Read the list of shaded assemblies from a file written during build.
+      This file contains the CopyLocalPathsToAdd output from ShadeTask, which persists
+      between build and pack phases, allowing this to work with 'dotnet pack' without rebuilding.
+    -->
+    <ReadLinesFromFile File="$(_ShadedDllsListFile)" Condition="Exists('$(_ShadedDllsListFile)')">
+      <Output TaskParameter="Lines" ItemName="_ShadedDllsFromFile" />
+    </ReadLinesFromFile>
+
+    <ItemGroup Condition="'@(_ShadedDllsFromFile)' != ''">
+      <TfmSpecificPackageFile Include="@(_ShadedDllsFromFile)">
+        <PackagePath>$(_ShadedPackagePath)</PackagePath>
+        <Pack>true</Pack>
+      </TfmSpecificPackageFile>
     </ItemGroup>
   </Target>
 
