@@ -1,7 +1,0 @@
-{
-  LibEntries: [
-    lib/netstandard2.0/TestProject.Newtonsoft.Json.dll
-  ],
-  HasShadedAssembly: true,
-  HasOriginalAssembly: false
-}

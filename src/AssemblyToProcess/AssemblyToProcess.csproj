@@ -16,5 +16,4 @@
     <ProjectReference Include="..\AssemblyWithStrongName\AssemblyWithStrongName.csproj" Shade="true" />
     <ProjectReference Include="..\AssemblyToInclude\AssemblyToInclude.csproj" />
   </ItemGroup>
-  <Import Condition="$(Configuration) == 'IncludeTask'" Project="$(ProjectDir)..\PackageShader.MsBuild\build\PackageShader.MsBuild.targets" />
 </Project>

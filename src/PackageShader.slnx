@@ -1,9 +1,4 @@
 <Solution>
-  <Configurations>
-    <BuildType Name="Debug" />
-    <BuildType Name="IncludeTask" />
-    <BuildType Name="Release" />
-  </Configurations>
   <Folder Name="/Solution Items/">
     <File Path="../readme.md" />
     <File Path="appveyor.yml" />
@@ -29,19 +24,15 @@
   </Project>
   <Project Path="PackageShader.MsBuild/PackageShader.MsBuild.csproj" />
   <Project Path="PackageShader/PackageShader.csproj" />
-  <Project Path="PackageShaderTool/PackageShaderTool.csproj">
-    <Build Solution="IncludeTask|*" Project="false" />
-  </Project>
+  <Project Path="PackageShaderTool/PackageShaderTool.csproj"/>
   <Project Path="SampleApp/SampleApp.csproj">
     <BuildDependency Project="PackageShaderTool/PackageShaderTool.csproj" />
-    <Build Solution="IncludeTask|*" Project="false" />
   </Project>
   <Project Path="SampleAppForMsBuild/SampleAppForMsBuild.csproj">
     <BuildDependency Project="PackageShader.MsBuild/PackageShader.MsBuild.csproj" />
   </Project>
   <Project Path="Tests/Tests.csproj">
     <BuildDependency Project="SampleApp/SampleApp.csproj" />
-    <Build Solution="IncludeTask|*" Project="false" />
   </Project>
   <Properties Name="MonoDevelopProperties">
     <Property Name="StartupItem" Value="Fody\Fody.csproj" />
