@@ -573,4 +573,140 @@ public class TaskTests
             NuspecHasArgonDependency = nuspecContent.Contains("Argon")
         });
     }
+
+#if !DEBUG
+    [Fact]
+    public async Task ShadedAssembliesCoLocatedWithCustomPackagePath()
+    {
+        using var tempDirectory = new TempDirectory();
+        var projectDir = (string)tempDirectory;
+
+        // Get the actual built version from the PackageShader.MsBuild assembly
+        var packageVersion = typeof(ShadeTask).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!
+            .InformationalVersion;
+
+        // Create test project with custom TfmSpecificPackageFile placing DLL in task/ folder
+        var projectContent =
+            $"""
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net8.0</TargetFramework>
+                <Version>1.0.0</Version>
+                <LangVersion>latest</LangVersion>
+                <IncludeBuildOutput>false</IncludeBuildOutput>
+                <Shader_Internalize>true</Shader_Internalize>
+                <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+              </PropertyGroup>
+
+              <ItemGroup>
+                <!-- Custom package path for primary DLL in task/ folder -->
+                <TfmSpecificPackageFile Include="$(OutputPath)$(TargetFileName)">
+                  <PackagePath>task/$(TargetFramework)</PackagePath>
+                  <Pack>true</Pack>
+                </TfmSpecificPackageFile>
+
+                <PackageReference Include="PackageShader.MsBuild" Version="{packageVersion}" PrivateAssets="all" />
+                <PackageReference Include="Argon" Version="0.28.0" Shade="true" />
+              </ItemGroup>
+            </Project>
+            """;
+
+        var projectPath = Path.Combine(projectDir, "TestProject.csproj");
+        await File.WriteAllTextAsync(projectPath, projectContent, TestContext.Current.CancellationToken);
+
+        // Create a minimal class file that uses the shaded dependency
+        var classContent =
+            """
+            namespace TestProject;
+            public class TestClass
+            {
+                public string GetJson() => Argon.JObject.Parse("{}").ToString();
+            }
+            """;
+        await File.WriteAllTextAsync(Path.Combine(projectDir, "TestClass.cs"), classContent, TestContext.Current.CancellationToken);
+
+        // Create NuGet.config pointing to local PackageShader package
+        var packageShaderBinPath = Path.Combine(ProjectFiles.SolutionDirectory.Path, "..", "nugets");
+        var nugetConfig =
+            $"""
+             <?xml version="1.0" encoding="utf-8"?>
+             <configuration>
+               <packageSources>
+                 <clear />
+                 <add key="local" value="{packageShaderBinPath}" />
+                 <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+               </packageSources>
+             </configuration>
+             """;
+        await File.WriteAllTextAsync(Path.Combine(projectDir, "NuGet.config"), nugetConfig, TestContext.Current.CancellationToken);
+
+        // Restore
+        var restoreResult = await Cli.Wrap("dotnet")
+            .WithArguments(["restore"])
+            .WithWorkingDirectory(projectDir)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
+
+        if (restoreResult.ExitCode != 0)
+        {
+            throw new($"Restore failed:\n{restoreResult.StandardOutput}\n{restoreResult.StandardError}");
+        }
+
+        // Build
+        var buildResult = await Cli.Wrap("dotnet")
+            .WithArguments(["build", "-c", "Release"])
+            .WithWorkingDirectory(projectDir)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
+
+        if (buildResult.ExitCode != 0)
+        {
+            throw new($"Build failed:\n{buildResult.StandardOutput}\n{buildResult.StandardError}");
+        }
+
+        // Pack (with --no-build to test temp file persistence)
+        var packResult = await Cli.Wrap("dotnet")
+            .WithArguments(["pack", "-c", "Release", "--no-build"])
+            .WithWorkingDirectory(projectDir)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
+
+        if (packResult.ExitCode != 0)
+        {
+            throw new($"Pack failed:\n{packResult.StandardOutput}\n{packResult.StandardError}");
+        }
+
+        // Verify package exists
+        var nupkgPath = Path.Combine(projectDir, "bin", "Release", "TestProject.1.0.0.nupkg");
+        Assert.True(File.Exists(nupkgPath), $"Package not found at {nupkgPath}");
+
+        await using var archive = await ZipFile.OpenReadAsync(nupkgPath, TestContext.Current.CancellationToken);
+
+        // Get all entries for verification
+        var entries = archive.Entries.Select(e => e.FullName).ToList();
+        var taskEntries = entries.Where(e => e.StartsWith("task/")).OrderBy(e => e).ToList();
+        var libEntries = entries.Where(e => e.StartsWith("lib/")).OrderBy(e => e).ToList();
+
+        // Verify shaded assembly exists in task/ folder (co-located with primary DLL)
+        var shadedEntryInTask = archive.GetEntry("task/net8.0/TestProject.Argon.dll");
+        Assert.NotNull(shadedEntryInTask);
+
+        // Verify shaded assembly does NOT exist in lib/ folder (old behavior)
+        var shadedEntryInLib = archive.GetEntry("lib/net8.0/TestProject.Argon.dll");
+        Assert.Null(shadedEntryInLib);
+
+        // Verify primary DLL is in task/ folder
+        var primaryEntry = archive.GetEntry("task/net8.0/TestProject.dll");
+        Assert.NotNull(primaryEntry);
+
+        await Verify(new
+        {
+            TaskEntries = taskEntries,
+            LibEntries = libEntries,
+            ShadedInTaskFolder = shadedEntryInTask != null,
+            ShadedInLibFolder = shadedEntryInLib != null
+        });
+    }
+#endif
 }

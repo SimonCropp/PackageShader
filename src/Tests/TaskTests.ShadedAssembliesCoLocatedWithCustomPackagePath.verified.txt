@@ -1,0 +1,8 @@
+﻿{
+  TaskEntries: [
+    task/net8.0/TestProject.Argon.dll,
+    task/net8.0/TestProject.dll
+  ],
+  ShadedInTaskFolder: true,
+  ShadedInLibFolder: false
+}
