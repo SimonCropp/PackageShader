@@ -106,7 +106,14 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <!-- Find shaded assemblies by looking for DLLs with the project name prefix in the output directory -->
+      <!--
+        Find shaded assemblies by looking for DLLs with the project name prefix in the output directory.
+
+        Note: We scan the output directory instead of using CopyLocalPathsToAdd from ShadeTask because
+        that output item is only available during build. When running 'dotnet pack --no-build' or when
+        IncludeBuildOutput=false, the build targets don't run during pack, so CopyLocalPathsToAdd is empty.
+        Scanning the output directory works reliably in all scenarios.
+      -->
       <_AllOutputDlls Include="$(OutputPath)*.dll" />
       <_ProjectShadedDlls Include="@(_AllOutputDlls)"
                           Condition="$([System.String]::Copy('%(Filename)').StartsWith('$(AssemblyName).'))" />
