@@ -370,7 +370,8 @@ public class TaskTests
 
         // Get the actual built version from the PackageShader.MsBuild assembly
         var packageVersion = typeof(ShadeTask).Assembly
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!;
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!
+            .InformationalVersion;
 
         // Create test project with IncludeBuildOutput=false (MSBuild task package pattern)
         var projectContent =
