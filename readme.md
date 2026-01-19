@@ -237,16 +237,23 @@ Configure shading via MSBuild properties in the project file:
 ```xml
 <!-- Mark references to shade with Shade="true" -->
 <ItemGroup>
-  <PackageReference Include="Newtonsoft.Json" Shade="true" />
+  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" Shade="true" />
   <ProjectReference Include="..\MyLibrary\MyLibrary.csproj" Shade="true" />
 </ItemGroup>
 
-<!-- Make shaded types internal (optional, default: false) -->
+<!-- Optional MSBuild properties -->
 <PropertyGroup>
+  <!-- Make shaded types internal (default: false) -->
   <Shader_Internalize>true</Shader_Internalize>
+
+  <!-- Add suffix to shaded assembly names (optional) -->
+  <Shader_Suffix>_Shaded</Shader_Suffix>
+
+  <!-- Or add prefix to shaded assembly names (optional) -->
+  <Shader_Prefix>Shaded_</Shader_Prefix>
 </PropertyGroup>
 ```
-<sup><a href='/src/msbuild-config.include.xml#L1-L12' title='Snippet source file'>snippet source</a> | <a href='#snippet-MsBuildConfig' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/msbuild-config.include.xml#L1-L19' title='Snippet source file'>snippet source</a> | <a href='#snippet-MsBuildConfig' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 
@@ -255,11 +262,14 @@ Configure shading via MSBuild properties in the project file:
 The MSBuild package:
 
 1. Runs after the `AfterCompile` target
-1. Processes the intermediate assembly and its `ReferenceCopyLocalPaths`
-1. Renames assemblies matching the pattern (all except those in `Shader_AssembliesToSkipRename`)
-1. Fixes assembly references
-1. Optionally internalizes types and adds `InternalsVisibleTo` attributes
-1. Signs with the project's `AssemblyOriginatorKeyFile` if `SignAssembly` is true
+2. Identifies `PackageReference` and `ProjectReference` items marked with `Shade="true"`
+3. Matches those references to assemblies in `ReferenceCopyLocalPaths`
+4. Renames the matched assemblies with the specified prefix/suffix (default: `_Shaded`)
+5. Updates all assembly references to point to the renamed assemblies
+6. Optionally internalizes types and adds `InternalsVisibleTo` attributes
+7. Signs assemblies with the project's `AssemblyOriginatorKeyFile` if `SignAssembly` is true
+8. Excludes shaded dependencies from the NuGet package dependency list (sets `PrivateAssets="all"`)
+9. Includes shaded assemblies in the NuGet package output
 
 
 ### Full Example
@@ -270,7 +280,6 @@ The MSBuild package:
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <Shader_Suffix>_Shaded</Shader_Suffix>
     <Shader_Internalize>true</Shader_Internalize>
 
     <!-- Optional: strong name signing -->
@@ -280,12 +289,13 @@ The MSBuild package:
 
   <ItemGroup>
     <PackageReference Include="PackageShader.MsBuild" PrivateAssets="all" />
-    <PackageReference Include="Newtonsoft.Json" />
-  </ItemGroup>
 
-  <!-- Don't shade these assemblies -->
-  <ItemGroup>
-    <Shader_AssembliesToSkipRename Include="$(AssemblyName)" />
+    <!-- Mark dependencies to shade with Shade="true" -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" Shade="true" />
+    <PackageReference Include="Serilog" Version="3.1.0" Shade="true" />
+
+    <!-- Dependencies without Shade="true" are not shaded -->
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
   </ItemGroup>
 </Project>
 ```
@@ -294,11 +304,12 @@ The MSBuild package:
 
 This configuration will:
 
-- Shade all referenced assemblies except the project's own assembly
-- Add `_Shaded` suffix to shaded assembly names
+- Shade `Newtonsoft.Json` and `Serilog` (marked with `Shade="true"`)
+- Leave `Microsoft.Extensions.Logging` unchanged
 - Make all types in shaded assemblies internal
-- Add `InternalsVisibleTo` attributes so the main assembly can still access internal types
+- Add `InternalsVisibleTo` attributes so the main assembly can access shaded types
 - Sign all assemblies with `mykey.snk`
+- Exclude shaded dependencies from the NuGet package dependency list
 
 
 ## Icon

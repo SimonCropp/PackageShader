@@ -2,7 +2,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <Shader_Suffix>_Shaded</Shader_Suffix>
     <Shader_Internalize>true</Shader_Internalize>
 
     <!-- Optional: strong name signing -->
@@ -12,12 +11,13 @@
 
   <ItemGroup>
     <PackageReference Include="PackageShader.MsBuild" PrivateAssets="all" />
-    <PackageReference Include="Newtonsoft.Json" />
-  </ItemGroup>
 
-  <!-- Don't shade these assemblies -->
-  <ItemGroup>
-    <Shader_AssembliesToSkipRename Include="$(AssemblyName)" />
+    <!-- Mark dependencies to shade with Shade="true" -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" Shade="true" />
+    <PackageReference Include="Serilog" Version="3.1.0" Shade="true" />
+
+    <!-- Dependencies without Shade="true" are not shaded -->
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
   </ItemGroup>
 </Project>
 <!-- end-snippet -->

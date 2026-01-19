@@ -1,12 +1,19 @@
 <!-- begin-snippet: MsBuildConfig -->
 <!-- Mark references to shade with Shade="true" -->
 <ItemGroup>
-  <PackageReference Include="Newtonsoft.Json" Shade="true" />
+  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" Shade="true" />
   <ProjectReference Include="..\MyLibrary\MyLibrary.csproj" Shade="true" />
 </ItemGroup>
 
-<!-- Make shaded types internal (optional, default: false) -->
+<!-- Optional MSBuild properties -->
 <PropertyGroup>
+  <!-- Make shaded types internal (default: false) -->
   <Shader_Internalize>true</Shader_Internalize>
+
+  <!-- Add suffix to shaded assembly names (optional) -->
+  <Shader_Suffix>_Shaded</Shader_Suffix>
+
+  <!-- Or add prefix to shaded assembly names (optional) -->
+  <Shader_Prefix>Shaded_</Shader_Prefix>
 </PropertyGroup>
 <!-- end-snippet -->
