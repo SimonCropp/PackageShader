@@ -1,0 +1,352 @@
+using Argon;
+
+[Collection("Sequential")]
+public class AssemblyRoundTripTests
+{
+    [Fact]
+    public async Task RoundTripVariousAssemblyScenarios()
+    {
+        using var tempDir = new TempDirectory();
+        var scenariosDir = Path.Combine(tempDir, "Scenarios");
+        Directory.CreateDirectory(scenariosDir);
+
+        // Generate all test assemblies
+        var assemblies = await GenerateTestAssemblies(scenariosDir);
+
+        var results = new List<AssemblyRoundTripResult>();
+
+        foreach (var assembly in assemblies)
+        {
+            var result = await RoundTripAssembly(assembly, tempDir);
+            results.Add(result);
+        }
+
+        // Verify all results
+        await Verify(results)
+            .UseDirectory("Snapshots");
+    }
+
+    static async Task<List<TestAssembly>> GenerateTestAssemblies(string outputDir)
+    {
+        var assemblies = new List<TestAssembly>();
+
+        // Try to build assemblies for different frameworks
+        // Skip frameworks that fail (like net48 on non-Windows or when .NET Framework is not installed)
+        var scenarios = new[]
+        {
+            ("Net48_StrongNamed", "net48", true, "external"),
+            ("Net80_StrongNamed", "net8.0", true, "embedded"),
+            ("Net90_StrongNamed", "net9.0", true, "embedded"),
+            ("Net100_StrongNamed", "net10.0", true, "none"),
+            ("NetStandard20_StrongNamed", "netstandard2.0", true, "external"),
+            ("Net48_NoStrongName", "net48", false, "external"),
+            ("Net80_NoStrongName", "net8.0", false, "embedded"),
+            ("Net90_NoStrongName", "net9.0", false, "none"),
+            ("NetStandard20_NoStrongName", "netstandard2.0", false, "external"),
+            ("Net80_EmbeddedPdb", "net8.0", false, "embedded"),
+            ("Net80_ExternalPdb", "net8.0", false, "external"),
+            ("Net80_NoPdb", "net8.0", false, "none"),
+            ("NetStandard21_StrongNamed_EmbeddedPdb", "netstandard2.1", true, "embedded"),
+            ("Net48_StrongNamed_NoPdb", "net48", true, "none")
+        };
+
+        foreach (var (name, targetFramework, strongNamed, pdbType) in scenarios)
+        {
+            try
+            {
+                var assembly = await CreateAssembly(outputDir, name, targetFramework, strongNamed, pdbType);
+                assemblies.Add(assembly);
+            }
+            catch (Exception ex)
+            {
+                // Skip assemblies that fail to build (e.g., net48 on Linux)
+                Console.WriteLine($"Skipped {name}: {ex.Message}");
+            }
+        }
+
+        if (assemblies.Count == 0)
+        {
+            throw new Exception("No assemblies could be built - check that SDK is installed");
+        }
+
+        return assemblies;
+    }
+
+    static async Task<TestAssembly> CreateAssembly(
+        string baseDir,
+        string name,
+        string targetFramework,
+        bool strongNamed,
+        string pdbType)
+    {
+        var categoryDir = Path.Combine(baseDir, $"{targetFramework}_{(strongNamed ? "StrongNamed" : "NoStrongName")}");
+        Directory.CreateDirectory(categoryDir);
+
+        var projectDir = Path.Combine(categoryDir, name);
+        Directory.CreateDirectory(projectDir);
+
+        // Create minimal C# source
+        var sourceCode = $$"""
+namespace {{name}};
+
+public class TestClass
+{
+    public string GetMessage() => "Hello from {{name}}";
+
+    public int Add(int a, int b) => a + b;
+
+    public void ThrowException()
+    {
+        throw new System.InvalidOperationException("Test exception");
+    }
+}
+
+internal class InternalClass
+{
+    internal string InternalMethod() => "Internal";
+}
+""";
+
+        await File.WriteAllTextAsync(Path.Combine(projectDir, "Class.cs"), sourceCode);
+
+        // Create key file if strong named
+        string? keyFile = null;
+        if (strongNamed)
+        {
+            keyFile = Path.Combine(projectDir, "key.snk");
+            await CreateStrongNameKey(keyFile);
+        }
+
+        // Determine debug type
+        var debugType = pdbType switch
+        {
+            "embedded" => "embedded",
+            "external" => "portable",
+            "none" => "none",
+            _ => "portable"
+        };
+
+        // Create project file
+        var projectContent = $$"""
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>{{targetFramework}}</TargetFramework>
+    <DebugType>{{debugType}}</DebugType>
+    <DebugSymbols>{{(pdbType != "none" ? "true" : "false")}}</DebugSymbols>
+{{(strongNamed ? $"    <SignAssembly>true</SignAssembly>\n    <AssemblyOriginatorKeyFile>key.snk</AssemblyOriginatorKeyFile>" : "")}}
+  </PropertyGroup>
+</Project>
+""";
+
+        var projectPath = Path.Combine(projectDir, $"{name}.csproj");
+        await File.WriteAllTextAsync(projectPath, projectContent);
+
+        // Build the project
+        var result = await Cli.Wrap("dotnet")
+            .WithArguments(["build", projectPath, "-c", "Release", "--nologo", "-v", "quiet"])
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync();
+
+        if (result.ExitCode != 0)
+        {
+            throw new Exception($"Failed to build {name}: {result.StandardError}");
+        }
+
+        var outputPath = Path.Combine(projectDir, "bin", "Release", targetFramework, $"{name}.dll");
+        if (!File.Exists(outputPath))
+        {
+            throw new Exception($"Assembly not found at {outputPath}");
+        }
+
+        // Copy assembly to a cleaner location
+        var finalDir = Path.Combine(categoryDir, "assemblies");
+        Directory.CreateDirectory(finalDir);
+        var finalPath = Path.Combine(finalDir, $"{name}.dll");
+        File.Copy(outputPath, finalPath, true);
+
+        // Copy PDB if external
+        if (pdbType == "external")
+        {
+            var pdbPath = Path.Combine(projectDir, "bin", "Release", targetFramework, $"{name}.pdb");
+            if (File.Exists(pdbPath))
+            {
+                File.Copy(pdbPath, Path.Combine(finalDir, $"{name}.pdb"), true);
+            }
+        }
+
+        // Delete the project directory to clean up
+        Directory.Delete(projectDir, true);
+
+        return new TestAssembly
+        {
+            Name = name,
+            Path = finalPath,
+            TargetFramework = targetFramework,
+            IsStrongNamed = strongNamed,
+            PdbType = pdbType
+        };
+    }
+
+    static Task CreateStrongNameKey(string keyPath)
+    {
+        // Copy from existing test key
+        var testKeyPath = Path.Combine(ProjectFiles.ProjectDirectory.Path, "test.snk");
+        if (!File.Exists(testKeyPath))
+        {
+            throw new FileNotFoundException($"Test key file not found at {testKeyPath}");
+        }
+
+        File.Copy(testKeyPath, keyPath, true);
+        return Task.CompletedTask;
+    }
+
+    static async Task<AssemblyRoundTripResult> RoundTripAssembly(TestAssembly assembly, string tempDir)
+    {
+        var roundTripDir = Path.Combine(tempDir, "RoundTrip", assembly.Name);
+        Directory.CreateDirectory(roundTripDir);
+
+        var outputPath = Path.Combine(roundTripDir, Path.GetFileName(assembly.Path));
+
+        // Read original metadata
+        var originalMetadata = ReadAssemblyMetadata(assembly.Path);
+
+        // Round-trip the assembly (read and write without modifications)
+        using (var modifier = StreamingAssemblyModifier.Open(assembly.Path))
+        {
+            modifier.Save(outputPath);
+        }
+
+        // Read modified metadata
+        var roundTrippedMetadata = ReadAssemblyMetadata(outputPath);
+
+        // Validate the assembly can still be loaded
+        var isLoadable = TryLoadAssembly(outputPath);
+
+        return new AssemblyRoundTripResult
+        {
+            Name = assembly.Name,
+            TargetFramework = assembly.TargetFramework,
+            IsStrongNamed = assembly.IsStrongNamed,
+            PdbType = assembly.PdbType,
+            OriginalMetadata = originalMetadata,
+            RoundTrippedMetadata = roundTrippedMetadata,
+            IsLoadable = isLoadable,
+            ValidationErrors = ValidateMetadata(originalMetadata, roundTrippedMetadata)
+        };
+    }
+
+    static AssemblyMetadataInfo ReadAssemblyMetadata(string assemblyPath)
+    {
+        using var fs = File.OpenRead(assemblyPath);
+        using var peReader = new PEReader(fs);
+        var reader = peReader.GetMetadataReader();
+
+        var assemblyDef = reader.GetAssemblyDefinition();
+        var publicKey = reader.GetBlobBytes(assemblyDef.PublicKey);
+
+        return new AssemblyMetadataInfo
+        {
+            Name = reader.GetString(assemblyDef.Name),
+            Version = assemblyDef.Version.ToString(),
+            HasPublicKey = publicKey.Length > 0,
+            PublicKeyToken = publicKey.Length > 0 ? MetadataHelper.FormatPublicKeyToken(publicKey) : "null",
+            TypeCount = reader.TypeDefinitions.Count,
+            MethodCount = reader.MethodDefinitions.Count,
+            AssemblyRefCount = reader.AssemblyReferences.Count,
+            HasDebugInfo = peReader.ReadDebugDirectory().Any(),
+            HasEmbeddedPdb = peReader.ReadDebugDirectory().Any(d => d.Type == DebugDirectoryEntryType.EmbeddedPortablePdb),
+            StringHeapSize = reader.GetHeapSize(HeapIndex.String),
+            BlobHeapSize = reader.GetHeapSize(HeapIndex.Blob),
+            GuidHeapSize = reader.GetHeapSize(HeapIndex.Guid),
+            UserStringHeapSize = reader.GetHeapSize(HeapIndex.UserString)
+        };
+    }
+
+    static bool TryLoadAssembly(string path)
+    {
+        var loadContext = new AssemblyLoadContext($"RoundTripTest_{Guid.NewGuid()}", isCollectible: true);
+        try
+        {
+            var bytes = File.ReadAllBytes(path);
+            using var stream = new MemoryStream(bytes);
+            var assembly = loadContext.LoadFromStream(stream);
+            return assembly != null;
+        }
+        catch
+        {
+            return false;
+        }
+        finally
+        {
+            loadContext.Unload();
+        }
+    }
+
+    static List<string> ValidateMetadata(AssemblyMetadataInfo original, AssemblyMetadataInfo roundTripped)
+    {
+        var errors = new List<string>();
+
+        if (original.Name != roundTripped.Name)
+            errors.Add($"Name mismatch: {original.Name} != {roundTripped.Name}");
+
+        if (original.Version != roundTripped.Version)
+            errors.Add($"Version mismatch: {original.Version} != {roundTripped.Version}");
+
+        if (original.HasPublicKey != roundTripped.HasPublicKey)
+            errors.Add($"PublicKey presence mismatch: {original.HasPublicKey} != {roundTripped.HasPublicKey}");
+
+        if (original.PublicKeyToken != roundTripped.PublicKeyToken)
+            errors.Add($"PublicKeyToken mismatch: {original.PublicKeyToken} != {roundTripped.PublicKeyToken}");
+
+        if (original.TypeCount != roundTripped.TypeCount)
+            errors.Add($"TypeCount mismatch: {original.TypeCount} != {roundTripped.TypeCount}");
+
+        if (original.MethodCount != roundTripped.MethodCount)
+            errors.Add($"MethodCount mismatch: {original.MethodCount} != {roundTripped.MethodCount}");
+
+        if (original.AssemblyRefCount != roundTripped.AssemblyRefCount)
+            errors.Add($"AssemblyRefCount mismatch: {original.AssemblyRefCount} != {roundTripped.AssemblyRefCount}");
+
+        // Heap sizes may differ slightly due to padding/alignment, so we'll just record them but not fail
+
+        return errors;
+    }
+
+    record TestAssembly
+    {
+        public required string Name { get; init; }
+        public required string Path { get; init; }
+        public required string TargetFramework { get; init; }
+        public required bool IsStrongNamed { get; init; }
+        public required string PdbType { get; init; }
+    }
+
+    record AssemblyRoundTripResult
+    {
+        public required string Name { get; init; }
+        public required string TargetFramework { get; init; }
+        public required bool IsStrongNamed { get; init; }
+        public required string PdbType { get; init; }
+        public required AssemblyMetadataInfo OriginalMetadata { get; init; }
+        public required AssemblyMetadataInfo RoundTrippedMetadata { get; init; }
+        public required bool IsLoadable { get; init; }
+        public required List<string> ValidationErrors { get; init; }
+    }
+
+    record AssemblyMetadataInfo
+    {
+        public required string Name { get; init; }
+        public required string Version { get; init; }
+        public required bool HasPublicKey { get; init; }
+        public required string PublicKeyToken { get; init; }
+        public required int TypeCount { get; init; }
+        public required int MethodCount { get; init; }
+        public required int AssemblyRefCount { get; init; }
+        public required bool HasDebugInfo { get; init; }
+        public required bool HasEmbeddedPdb { get; init; }
+        public required int StringHeapSize { get; init; }
+        public required int BlobHeapSize { get; init; }
+        public required int GuidHeapSize { get; init; }
+        public required int UserStringHeapSize { get; init; }
+    }
+}
