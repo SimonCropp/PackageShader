@@ -483,4 +483,94 @@ public class TaskTests
         });
     }
 #endif
+
+    [Fact]
+    public async Task NuGetPackExcludesShadedDependencies()
+    {
+        using var tempDir = new TempDirectory();
+
+        // Create a minimal library project with a shaded PackageReference
+        var projectContent = """
+                             <Project Sdk="Microsoft.NET.Sdk">
+                               <PropertyGroup>
+                                 <TargetFramework>net8.0</TargetFramework>
+                                 <PackageId>TestLibWithShadedDeps</PackageId>
+                                 <Version>1.0.0</Version>
+                                 <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+                               </PropertyGroup>
+                               <ItemGroup>
+                                 <PackageReference Include="Argon" Version="0.28.0" Shade="true" />
+                               </ItemGroup>
+                               <Import Project="$MsBuildTargetsPath$" />
+                             </Project>
+                             """;
+
+        // Point to the actual targets file
+        var targetsPath = Path.Combine(ProjectFiles.ProjectDirectory.Path, "..", "PackageShader.MsBuild", "build", "PackageShader.MsBuild.targets");
+        projectContent = projectContent.Replace("$MsBuildTargetsPath$", targetsPath);
+
+        var projectPath = Path.Combine(tempDir, "TestLib.csproj");
+        await File.WriteAllTextAsync(projectPath, projectContent, TestContext.Current.CancellationToken);
+
+        // Create a minimal class file
+        var classContent = """
+                           namespace TestLib;
+                           public class MyClass
+                           {
+                               public string GetJson() => Argon.JObject.Parse("{}").ToString();
+                           }
+                           """;
+        await File.WriteAllTextAsync(Path.Combine(tempDir, "MyClass.cs"), classContent, TestContext.Current.CancellationToken);
+
+        // Restore first
+        await Cli.Wrap("dotnet")
+            .WithArguments("restore")
+            .WithWorkingDirectory(tempDir)
+            .ExecuteAsync(TestContext.Current.CancellationToken);
+
+        // Build and Pack together (pack --no-build skips shader target which runs AfterCompile)
+        var packResult = await Cli.Wrap("dotnet")
+            .WithArguments("pack -c Release -o .")
+            .WithWorkingDirectory(tempDir)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
+
+        if (packResult.ExitCode != 0)
+        {
+            throw new($"Pack failed:\n{packResult.StandardOutput}\n{packResult.StandardError}");
+        }
+
+        // Debug: Check what files are in the output directory
+        var outputDir = Path.Combine(tempDir, "bin", "Release", "net8.0");
+        var outputFiles = Directory.Exists(outputDir)
+            ? Directory.GetFiles(outputDir, "*.dll").Select(Path.GetFileName).ToList()
+            : [];
+
+        // Inspect the nupkg
+        var nupkgPath = Path.Combine(tempDir, "TestLibWithShadedDeps.1.0.0.nupkg");
+        Assert.True(File.Exists(nupkgPath), $"NuGet package should exist at {nupkgPath}");
+
+        await using var archive = await ZipFile.OpenReadAsync(nupkgPath, TestContext.Current.CancellationToken);
+        var entries = archive.Entries.Select(_ => _.FullName).ToList();
+
+        var libEntries = entries.Where(e => e.StartsWith("lib/")).ToList();
+
+        // Read nuspec from package to verify no dependency on Argon
+        var nuspecEntry = archive.Entries.FirstOrDefault(e => e.Name.EndsWith(".nuspec"));
+        Assert.NotNull(nuspecEntry);
+
+        await using var nuspecStream = await nuspecEntry.OpenAsync(TestContext.Current.CancellationToken);
+        using var reader = new StreamReader(nuspecStream);
+        var nuspecContent = await reader.ReadToEndAsync(TestContext.Current.CancellationToken);
+
+        // Verify Argon is NOT listed as a dependency
+        Assert.DoesNotContain("Argon", nuspecContent);
+
+        await Verify(new
+        {
+            OutputFiles = outputFiles.OrderBy(_ => _).ToList(),
+            LibEntries = libEntries.OrderBy(_ => _).ToList(),
+            NuspecHasArgonDependency = nuspecContent.Contains("Argon")
+        });
+    }
 }

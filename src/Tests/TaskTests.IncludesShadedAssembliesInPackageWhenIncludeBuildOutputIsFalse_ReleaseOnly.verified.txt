@@ -1,0 +1,6 @@
+﻿{
+  LibEntries: [
+    lib/netstandard2.0/TestProject.Newtonsoft.Json.dll
+  ],
+  HasOriginalAssembly: false
+}
