@@ -80,7 +80,7 @@ public class ShadeTask :
 
         // Assemblies that reference shaded ones but aren't shaded themselves
         var assembliesToTarget = assemblyCopyLocalPaths
-            .Where(x => !assembliesToShadeSet.Contains(x))
+            .Where(_ => !assembliesToShadeSet.Contains(_))
             .ToList();
 
         assembliesToTarget.Insert(0, IntermediateAssembly);

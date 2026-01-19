@@ -11,6 +11,8 @@
     <File Path="Directory.Packages.props" />
     <File Path="global.json" />
     <File Path="mdsnippets.json" />
+    <File Path="msbuild-config.include.xml" />
+    <File Path="msbuild-full.include.xml" />
   </Folder>
   <Project Path="AssemblyToInclude/AssemblyToInclude.csproj" />
   <Project Path="AssemblyToProcess/AssemblyToProcess.csproj">
