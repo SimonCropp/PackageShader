@@ -1,9 +1,7 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <ShaderAssembly>$(MSBuildThisFileDirectory)..\task\PackageShader.MsBuild.dll</ShaderAssembly>
-    <ShaderAssembly Condition="!Exists($(ShaderAssembly))">$(MSBuildThisFileDirectory)..\bin\Debug\PackageShader.MsBuild.dll</ShaderAssembly>
-    <ShaderAssembly Condition="!Exists($(ShaderAssembly))">$(MSBuildThisFileDirectory)..\bin\Release\PackageShader.MsBuild.dll</ShaderAssembly>
-    <ShaderAssembly Condition="!Exists($(ShaderAssembly))">$(MSBuildThisFileDirectory)..\bin\IncludeTask\PackageShader.MsBuild.dll</ShaderAssembly>
+    <ShaderAssembly Condition="!Exists($(ShaderAssembly))">$(MSBuildThisFileDirectory)..\bin\$(Configuration)\PackageShader.MsBuild.dll</ShaderAssembly>
   </PropertyGroup>
 
   <UsingTask
