@@ -1,5 +1,6 @@
 ﻿// Global using directives
 
+global using System.IO.Compression;
 global using System.Reflection;
 global using System.Reflection.Metadata;
 global using System.Reflection.Metadata.Ecma335;

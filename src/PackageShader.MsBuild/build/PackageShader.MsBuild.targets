@@ -1,24 +1,74 @@
-﻿<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <ShaderAssembly>$(MSBuildThisFileDirectory)..\task\PackageShader.MsBuild.dll</ShaderAssembly>
-    <ShaderAssembly Condition="!Exists($(ShaderAssembly))">$(MSBuildThisFileDirectory)..\bin\IncludeTask\PackageShader.MsBuild.dll</ShaderAssembly>
+    <ShaderAssembly Condition="!Exists($(ShaderAssembly))">$(MSBuildThisFileDirectory)..\bin\$(Configuration)\PackageShader.MsBuild.dll</ShaderAssembly>
   </PropertyGroup>
 
   <UsingTask
     TaskName="PackageShader.ShadeTask"
     AssemblyFile="$(ShaderAssembly)" />
+
+  <UsingTask
+    TaskName="PackageShader.DepsJsonPatcherTask"
+    AssemblyFile="$(ShaderAssembly)" />
+
+  <!-- Target 1: Collect PackageReference and ProjectReference items with Shade="true" -->
+  <Target Name="_CollectShadedReferences"
+          BeforeTargets="ShadeTarget"
+          Condition="'@(PackageReference)' != '' Or '@(ProjectReference)' != ''">
+    <ItemGroup>
+      <_ShadedPackageNames Include="@(PackageReference->'%(Identity)')"
+                            Condition="'%(PackageReference.Shade)' == 'true'" />
+      <_ShadedProjectFiles Include="@(ProjectReference->'%(FullPath)')"
+                            Condition="'%(ProjectReference.Shade)' == 'true'" />
+    </ItemGroup>
+    <PropertyGroup>
+      <_ShadedPackageNamesJoined>;@(_ShadedPackageNames);</_ShadedPackageNamesJoined>
+      <_ShadedProjectFilesJoined>;@(_ShadedProjectFiles);</_ShadedProjectFilesJoined>
+    </PropertyGroup>
+  </Target>
+
+  <!-- Target 2: Match shaded references to ReferenceCopyLocalPaths -->
+  <Target Name="_MatchShadedAssemblies"
+          AfterTargets="_CollectShadedReferences"
+          BeforeTargets="ShadeTarget"
+          Condition="'$(_ShadedPackageNamesJoined)' != ';;' Or '$(_ShadedProjectFilesJoined)' != ';;'">
+    <ItemGroup>
+      <!-- Match PackageReference by NuGetPackageId metadata -->
+      <_AssembliesToShade Include="@(ReferenceCopyLocalPaths)"
+        Condition="'%(ReferenceCopyLocalPaths.NuGetPackageId)' != '' And $(_ShadedPackageNamesJoined.Contains(';%(ReferenceCopyLocalPaths.NuGetPackageId);'))" />
+      <!-- Match ProjectReference by MSBuildSourceProjectFile metadata -->
+      <_AssembliesToShade Include="@(ReferenceCopyLocalPaths)"
+        Condition="'%(ReferenceCopyLocalPaths.MSBuildSourceProjectFile)' != '' And $(_ShadedProjectFilesJoined.Contains(';%(ReferenceCopyLocalPaths.MSBuildSourceProjectFile);'))" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Target 3: Mark shaded packages as PrivateAssets=all for NuGet pack -->
+  <Target Name="_ExcludeShadedFromNuGetDeps"
+          BeforeTargets="_GetPackageFiles;_WalkEachTargetPerFramework;GenerateNuspec"
+          AfterTargets="CollectPackageReferences"
+          Condition="'@(PackageReference)' != ''">
+    <ItemGroup>
+      <PackageReference Condition="'%(PackageReference.Shade)' == 'true'">
+        <PrivateAssets>all</PrivateAssets>
+      </PackageReference>
+    </ItemGroup>
+  </Target>
+
+  <!-- Main shading target -->
   <Target
     Name="ShadeTarget"
     AfterTargets="AfterCompile"
-    Condition="Exists(@(IntermediateAssembly)) And ($(DesignTimeBuild) != true Or $(BuildingForLiveUnitTesting) == true)" >
+    DependsOnTargets="_CollectShadedReferences;_MatchShadedAssemblies"
+    Condition="'@(IntermediateAssembly)' != '' And $(DesignTimeBuild) != true">
+    <!-- Condition on _AssembliesToShade moved here because DependsOnTargets runs after target condition is evaluated -->
     <PackageShader.ShadeTask
+      Condition="'@(_AssembliesToShade)' != ''"
       IntermediateAssembly="@(IntermediateAssembly)"
       IntermediateDirectory="$(ProjectDir)$(IntermediateOutputPath)"
       SignAssembly="$(SignAssembly)"
       Internalize="$(Shader_Internalize)"
-      AssembliesToSkipRename="@(Shader_AssembliesToSkipRename)"
-      Suffix="$(Shader_Suffix)"
-      Prefix="$(Shader_Prefix)"
+      AssembliesToShade="@(_AssembliesToShade)"
       SolutionDir="$(SolutionDir)"
       ReferenceCopyLocalPaths="@(ReferenceCopyLocalPaths)"
       AssemblyOriginatorKeyFile="$(AssemblyOriginatorKeyFile)">
@@ -29,14 +79,41 @@
       <Output
         TaskParameter="CopyLocalPathsToRemove"
         ItemName="CopyLocalPathsToRemove" />
+      <Output
+        TaskParameter="ShadedNameMappings"
+        ItemName="_ShadedNameMappings" />
 
     </PackageShader.ShadeTask>
 
-    <ItemGroup>
+    <ItemGroup Condition="'@(_AssembliesToShade)' != ''">
       <ReferenceCopyLocalPaths Remove="@(CopyLocalPathsToRemove)" />
       <ReferenceCopyLocalPaths Include="@(CopyLocalPathsToAdd)" />
+      <!-- Mark shaded assemblies for inclusion in NuGet package -->
+      <_ShadedDllsToAdd Include="@(CopyLocalPathsToAdd)" Condition="'%(Extension)' == '.dll'" />
     </ItemGroup>
+  </Target>
 
-    <!--<Message Text="@(ReferenceCopyLocalPaths,'%0a')" Importance="high" />-->
+  <!-- Target 4: Include shaded assemblies in NuGet package -->
+  <Target Name="_IncludeShadedInPackage"
+          AfterTargets="ShadeTarget"
+          BeforeTargets="_GetBuildOutputFilesWithTfm"
+          Condition="'@(_ShadedDllsToAdd)' != ''">
+    <ItemGroup>
+      <BuildOutputInPackage Include="@(_ShadedDllsToAdd)">
+        <TargetPath>%(Filename)%(Extension)</TargetPath>
+      </BuildOutputInPackage>
+    </ItemGroup>
+  </Target>
+
+  <!-- Target 5: Patch deps.json to use shaded assembly names -->
+  <Target Name="_PatchDepsJson"
+          AfterTargets="GenerateBuildDependencyFile"
+          Condition="'@(_ShadedNameMappings)' != ''">
+    <PropertyGroup>
+      <_DepsJsonPath>$(ProjectDir)$(OutputPath)$(AssemblyName).deps.json</_DepsJsonPath>
+    </PropertyGroup>
+    <PackageShader.DepsJsonPatcherTask
+      DepsJsonPath="$(_DepsJsonPath)"
+      ShadedNameMappings="@(_ShadedNameMappings)" />
   </Target>
 </Project>

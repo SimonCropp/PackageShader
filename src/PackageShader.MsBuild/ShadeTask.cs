@@ -16,10 +16,8 @@ public class ShadeTask :
     public string IntermediateDirectory { get; set; } = null!;
     public string? SolutionDir { get; set; }
     public string? AssemblyOriginatorKeyFile { get; set; }
-    public string? Prefix { get; set; }
-    public string? Suffix { get; set; }
 
-    public ITaskItem[]? AssembliesToSkipRename { get; set; }
+    public ITaskItem[]? AssembliesToShade { get; set; }
 
     public bool SignAssembly { get; set; }
     public bool Internalize { get; set; }
@@ -29,6 +27,14 @@ public class ShadeTask :
 
     [Output]
     public ITaskItem[] CopyLocalPathsToAdd { get; set; } = null!;
+
+    /// <summary>
+    /// Output: Mappings from original assembly names to shaded names.
+    /// ItemSpec = shaded name (e.g., "MyApp.Newtonsoft.Json")
+    /// OriginalName metadata = original name (e.g., "Newtonsoft.Json")
+    /// </summary>
+    [Output]
+    public ITaskItem[] ShadedNameMappings { get; set; } = null!;
 
     public override bool Execute()
     {
@@ -51,34 +57,30 @@ public class ShadeTask :
 
     void InnerExecute()
     {
-        if (string.IsNullOrEmpty(Prefix) && string.IsNullOrEmpty(Suffix))
-        {
-            throw new ErrorException("Either Shader_Prefix or Shader_Suffix must be specified");
-        }
+        // Derive prefix from the consuming assembly's name
+        var assemblyName = Path.GetFileNameWithoutExtension(IntermediateAssembly);
+        var prefix = $"{assemblyName}.";
 
-        List<string> assembliesToSkipRename;
-        if (AssembliesToSkipRename == null)
-        {
-            assembliesToSkipRename = new();
-        }
-        else
-        {
-            assembliesToSkipRename = AssembliesToSkipRename.Select(_ => _.ItemSpec).ToList();
-        }
+        // Get the set of assemblies to shade from the explicit input
+        var assembliesToShadeSet = new HashSet<string>(
+            (AssembliesToShade ?? []).Select(item => item.ItemSpec),
+            StringComparer.OrdinalIgnoreCase);
 
         var referenceCopyLocalPaths = ReferenceCopyLocalPaths
             .Select(_ => _.ItemSpec)
             .ToList();
         var assemblyCopyLocalPaths = referenceCopyLocalPaths
-            .Where(x=>Path.GetExtension(x).ToLowerInvariant() ==".dll")
+            .Where(x => Path.GetExtension(x).Equals(".dll", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
+        // Only shade assemblies in the explicit shade list
         var assembliesToShade = assemblyCopyLocalPaths
-            .Where(x => !assembliesToSkipRename.Contains(Path.GetFileNameWithoutExtension(x)))
+            .Where(x => assembliesToShadeSet.Contains(x))
             .ToList();
 
+        // Assemblies that reference shaded ones but aren't shaded themselves
         var assembliesToTarget = assemblyCopyLocalPaths
-            .Where(x => assembliesToSkipRename.Contains(Path.GetFileNameWithoutExtension(x)))
+            .Where(x => !assembliesToShadeSet.Contains(x))
             .ToList();
 
         assembliesToTarget.Insert(0, IntermediateAssembly);
@@ -86,6 +88,7 @@ public class ShadeTask :
         var sourceTargetInfos = new List<SourceTargetInfo>();
         var copyLocalPathsToRemove = new List<ITaskItem>();
         var copyLocalPathsToAdd = new List<ITaskItem>();
+        var shadedNameMappings = new List<ITaskItem>();
 
         void ProcessCopyLocal(string sourcePath, string targetPath)
         {
@@ -111,13 +114,18 @@ public class ShadeTask :
             }
         }
 
-        foreach (var sourcePath in assembliesToShade )
+        foreach (var sourcePath in assembliesToShade)
         {
             var sourceName = Path.GetFileNameWithoutExtension(sourcePath);
-            var targetName = $"{Prefix}{sourceName}{Suffix}";
+            var targetName = $"{prefix}{sourceName}";
             var targetPath = Path.Combine(IntermediateDirectory, $"{targetName}.dll");
             sourceTargetInfos.Add(new(sourceName, sourcePath, targetName, targetPath, true));
             ProcessCopyLocal(sourcePath, targetPath);
+
+            // Record the mapping for deps.json patching
+            var mapping = new TaskItem(targetName);
+            mapping.SetMetadata("OriginalName", sourceName);
+            shadedNameMappings.Add(mapping);
         }
 
         foreach (var sourcePath in assembliesToTarget)
@@ -133,8 +141,7 @@ public class ShadeTask :
         var strongNameKey = GetKey();
         var inputs = $"""
 
-                      Prefix: {Prefix}
-                      Suffix: {Suffix}
+                      Prefix: {prefix}
                       Internalize: {Internalize}
                       StrongName: {strongNameKey != null}
                       AssembliesToShade: {separator}{string.Join(separator, assembliesToShade.Select(Path.GetFileNameWithoutExtension))}
@@ -148,6 +155,7 @@ public class ShadeTask :
         Shader.Run(sourceTargetInfos, Internalize, strongNameKey);
         CopyLocalPathsToRemove = copyLocalPathsToRemove.ToArray();
         CopyLocalPathsToAdd = copyLocalPathsToAdd.ToArray();
+        ShadedNameMappings = shadedNameMappings.ToArray();
     }
 
     StrongNameKey? GetKey()

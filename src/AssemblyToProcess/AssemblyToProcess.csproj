@@ -3,21 +3,18 @@
     <Version>1.0.0</Version>
     <TargetFramework>net8.0</TargetFramework>
     <SignAssembly>false</SignAssembly>
-    <Shader_Prefix>Prefix_</Shader_Prefix>
-    <Shader_Suffix>_Suffix</Shader_Suffix>
     <Shader_Internalize>true</Shader_Internalize>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" />
-    <ProjectReference Include="..\AssemblyWithEmbeddedSymbols\AssemblyWithEmbeddedSymbols.csproj" />
-    <ProjectReference Include="..\AssemblyWithNoStrongName\AssemblyWithNoStrongName.csproj" />
-    <ProjectReference Include="..\AssemblyWithNoSymbols\AssemblyWithNoSymbols.csproj" />
-    <ProjectReference Include="..\AssemblyWithPdb\AssemblyWithPdb.csproj" />
-    <ProjectReference Include="..\AssemblyWithResources\AssemblyWithResources.csproj" />
-    <ProjectReference Include="..\AssemblyWithStrongName\AssemblyWithStrongName.csproj" />
+    <PackageReference Include="Newtonsoft.Json" Shade="true" />
+    <ProjectReference Include="..\AssemblyWithEmbeddedSymbols\AssemblyWithEmbeddedSymbols.csproj" Shade="true" />
+    <ProjectReference Include="..\AssemblyWithNoStrongName\AssemblyWithNoStrongName.csproj" Shade="true" />
+    <ProjectReference Include="..\AssemblyWithNoSymbols\AssemblyWithNoSymbols.csproj" Shade="true" />
+    <ProjectReference Include="..\AssemblyWithPdb\AssemblyWithPdb.csproj" Shade="true" />
+    <ProjectReference Include="..\AssemblyWithResources\AssemblyWithResources.csproj" Shade="true" />
+    <ProjectReference Include="..\AssemblyWithStrongName\AssemblyWithStrongName.csproj" Shade="true" />
     <ProjectReference Include="..\AssemblyToInclude\AssemblyToInclude.csproj" />
-    <Shader_AssembliesToSkipRename Include="AssemblyToInclude" />
   </ItemGroup>
   <Import Condition="$(Configuration) == 'IncludeTask'" Project="$(ProjectDir)..\PackageShader.MsBuild\build\PackageShader.MsBuild.targets" />
 </Project>

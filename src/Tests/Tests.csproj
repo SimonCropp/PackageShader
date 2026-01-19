@@ -2,6 +2,7 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <OutputType>Exe</OutputType>
+    <IsTestProject>true</IsTestProject>
     <DebugType>embedded</DebugType>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -27,6 +28,7 @@
     <ProjectReference Include="..\DummyAssembly\DummyAssembly.csproj" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
     <PackageReference Include="MarkdownSnippets.MsBuild" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Nullable" PrivateAssets="All" />
     <PackageReference Include="ProjectDefaults" PrivateAssets = "all" />
     <PackageReference Include="Verify.DiffPlex" />
