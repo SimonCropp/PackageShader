@@ -263,7 +263,7 @@ The MSBuild package:
 6. Optionally internalizes types and adds `InternalsVisibleTo` attributes
 7. Signs assemblies with the project's `AssemblyOriginatorKeyFile` if `SignAssembly` is true
 8. Excludes shaded dependencies from the NuGet package dependency list (sets `PrivateAssets="all"`)
-9. Includes shaded assemblies in the NuGet package output
+9. Includes shaded assemblies in the NuGet package output, automatically co-located with the primary assembly
 
 
 ### Full Example
@@ -304,6 +304,41 @@ This configuration will:
 - Add `InternalsVisibleTo` attributes so the main assembly can access shaded types
 - Sign all assemblies with `mykey.snk`
 - Exclude shaded dependencies from the NuGet package dependency list
+
+
+### NuGet Package Path Behavior
+
+By default, shaded assemblies are placed in `lib/$(TargetFramework)` in the NuGet package.
+
+**Automatic Co-location**: If the project uses custom `TfmSpecificPackageFile` entries to place the primary assembly in a non-standard location (e.g., `task/$(TargetFramework)` for MSBuild task packages), shaded assemblies are automatically co-located with the primary assembly.
+
+Example for MSBuild task package:
+
+```xml
+<PropertyGroup>
+  <IncludeBuildOutput>false</IncludeBuildOutput>
+</PropertyGroup>
+
+<ItemGroup>
+  <!-- Place primary DLL in task/ folder -->
+  <TfmSpecificPackageFile Include="$(OutputPath)$(TargetFileName)">
+    <PackagePath>task/$(TargetFramework)</PackagePath>
+    <Pack>true</Pack>
+  </TfmSpecificPackageFile>
+
+  <!-- Shaded assemblies will automatically go to task/$(TargetFramework) -->
+  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" Shade="true" />
+</ItemGroup>
+```
+
+**Manual Override**: To explicitly specify the package path for shaded assemblies, use the `ShadedAssembliesPackagePath` property:
+
+```xml
+<PropertyGroup>
+  <!-- Manually specify where shaded assemblies should be placed -->
+  <ShadedAssembliesPackagePath>tools/$(TargetFramework)</ShadedAssembliesPackagePath>
+</PropertyGroup>
+```
 
 
 ## Icon

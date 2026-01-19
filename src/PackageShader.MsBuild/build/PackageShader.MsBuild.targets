@@ -111,10 +111,24 @@
   <!-- Target 4: Include shaded assemblies in NuGet package -->
   <!-- This target is called via TargetsForTfmSpecificContentInPackage during pack -->
   <Target Name="_IncludeShadedInPackage">
+    <!-- Try to auto-detect the primary assembly's package path from TfmSpecificPackageFile -->
+    <ItemGroup>
+      <_PrimaryOutputPackageFile Include="@(TfmSpecificPackageFile)"
+        Condition="$([System.IO.Path]::GetFileName('%(Identity)')) == '$(TargetFileName)'" />
+    </ItemGroup>
+
+    <!-- Extract the package path (without the filename) by transforming the item and reading it back -->
+    <ItemGroup Condition="'@(_PrimaryOutputPackageFile)' != ''">
+      <_PackagePathExtracted Include="%(_PrimaryOutputPackageFile.PackagePath)" />
+    </ItemGroup>
+
     <PropertyGroup>
-      <!-- Default to lib folder, but allow override via ShadedAssembliesPackagePath -->
-      <_ShadedPackagePath Condition="'$(ShadedAssembliesPackagePath)' == ''">lib\$(TargetFramework)</_ShadedPackagePath>
-      <_ShadedPackagePath Condition="'$(ShadedAssembliesPackagePath)' != ''">$(ShadedAssembliesPackagePath)</_ShadedPackagePath>
+      <!-- Use auto-detected path if found -->
+      <_ShadedPackagePath Condition="'@(_PackagePathExtracted)' != ''">@(_PackagePathExtracted)</_ShadedPackagePath>
+      <!-- Otherwise use explicit override -->
+      <_ShadedPackagePath Condition="'$(_ShadedPackagePath)' == '' And '$(ShadedAssembliesPackagePath)' != ''">$(ShadedAssembliesPackagePath)</_ShadedPackagePath>
+      <!-- Finally fall back to default -->
+      <_ShadedPackagePath Condition="'$(_ShadedPackagePath)' == ''">lib\$(TargetFramework)</_ShadedPackagePath>
       <_ShadedDllsListFile>$(IntermediateOutputPath)PackageShader.ShadedDlls.txt</_ShadedDllsListFile>
     </PropertyGroup>
 
