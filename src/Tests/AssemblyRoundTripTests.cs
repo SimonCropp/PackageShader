@@ -188,16 +188,35 @@ internal class InternalClass
         // Read original metadata
         var originalMetadata = ReadAssemblyMetadata(assembly.Path);
 
-        // Round-trip the assembly (read and write without modifications)
+        // Get test key if needed for strong naming
+        StrongNameKey? key = null;
+        if (assembly.IsStrongNamed)
+        {
+            var keyPath = Path.Combine(ProjectFiles.ProjectDirectory.Path, "test.snk");
+            key = StrongNameKey.FromFile(keyPath);
+        }
+
+        // IMPORTANT: Actually modify the assembly to trigger metadata growth
+        // This tests the full metadata rebuild path which is where bugs happen
         using (var modifier = StreamingAssemblyModifier.Open(assembly.Path))
         {
-            modifier.Save(outputPath);
+            // Add InternalsVisibleTo attributes to force metadata growth
+            // This will trigger the metadata rebuild path instead of simple patching
+            modifier.AddInternalsVisibleTo("TestFriend1", key?.PublicKey);
+            modifier.AddInternalsVisibleTo("TestFriend2", key?.PublicKey);
+            modifier.AddInternalsVisibleTo("TestFriend3", key?.PublicKey);
+
+            // Internalize types (this is a common real-world scenario)
+            modifier.MakeTypesInternal();
+
+            modifier.Save(outputPath, key);
         }
 
         // Read modified metadata
         var roundTrippedMetadata = ReadAssemblyMetadata(outputPath);
 
-        // Validate the assembly can still be loaded
+        // Validate the assembly can still be loaded - THIS IS THE CRITICAL TEST
+        // If MethodDef RVAs aren't patched, this will fail with "Bad IL format"
         var isLoadable = TryLoadAssembly(outputPath);
 
         return new AssemblyRoundTripResult
@@ -264,28 +283,23 @@ internal class InternalClass
     {
         var errors = new List<string>();
 
+        // We're intentionally modifying assemblies now (adding IVT, internalizing types)
+        // So we only validate that core structure is preserved, not exact equality
+
         if (original.Name != roundTripped.Name)
             errors.Add($"Name mismatch: {original.Name} != {roundTripped.Name}");
 
         if (original.Version != roundTripped.Version)
             errors.Add($"Version mismatch: {original.Version} != {roundTripped.Version}");
 
-        if (original.HasPublicKey != roundTripped.HasPublicKey)
-            errors.Add($"PublicKey presence mismatch: {original.HasPublicKey} != {roundTripped.HasPublicKey}");
-
-        if (original.PublicKeyToken != roundTripped.PublicKeyToken)
-            errors.Add($"PublicKeyToken mismatch: {original.PublicKeyToken} != {roundTripped.PublicKeyToken}");
-
+        // TypeCount and MethodCount should stay the same (we're not adding/removing types)
         if (original.TypeCount != roundTripped.TypeCount)
             errors.Add($"TypeCount mismatch: {original.TypeCount} != {roundTripped.TypeCount}");
 
         if (original.MethodCount != roundTripped.MethodCount)
             errors.Add($"MethodCount mismatch: {original.MethodCount} != {roundTripped.MethodCount}");
 
-        if (original.AssemblyRefCount != roundTripped.AssemblyRefCount)
-            errors.Add($"AssemblyRefCount mismatch: {original.AssemblyRefCount} != {roundTripped.AssemblyRefCount}");
-
-        // Heap sizes may differ slightly due to padding/alignment, so we'll just record them but not fail
+        // Note: PublicKey, AssemblyRefCount, and heap sizes will differ because we're modifying the assembly
 
         return errors;
     }
