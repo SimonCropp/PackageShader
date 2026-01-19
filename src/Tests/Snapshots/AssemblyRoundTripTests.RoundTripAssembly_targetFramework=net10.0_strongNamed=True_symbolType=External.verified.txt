@@ -1,0 +1,37 @@
+﻿{
+  Name: net100_StrongNamed_External,
+  TargetFramework: net10.0,
+  IsStrongNamed: true,
+  SymbolType: External,
+  OriginalMetadata: {
+    Name: net100_StrongNamed_External,
+    Version: 1.0.0.0,
+    HasPublicKey: true,
+    PublicKeyToken: fba2ec45388e2af0,
+    TypeCount: 3,
+    MethodCount: 6,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: false,
+    StringHeapSize: 616,
+    BlobHeapSize: 396,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 128
+  },
+  RoundTrippedMetadata: {
+    Name: net100_StrongNamed_External,
+    Version: 1.0.0.0,
+    HasPublicKey: true,
+    PublicKeyToken: fba2ec45388e2af0,
+    TypeCount: 3,
+    MethodCount: 6,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: false,
+    StringHeapSize: 616,
+    BlobHeapSize: 396,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 128
+  },
+  IsLoadable: true
+}

@@ -1,0 +1,36 @@
+﻿{
+  Name: net80_NoStrongName_None,
+  TargetFramework: net8.0,
+  IsStrongNamed: false,
+  OriginalMetadata: {
+    Name: net80_NoStrongName_None,
+    Version: 1.0.0.0,
+    HasPublicKey: false,
+    PublicKeyToken: null,
+    TypeCount: 3,
+    MethodCount: 6,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: false,
+    StringHeapSize: 608,
+    BlobHeapSize: 228,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 120
+  },
+  RoundTrippedMetadata: {
+    Name: net80_NoStrongName_None,
+    Version: 1.0.0.0,
+    HasPublicKey: false,
+    PublicKeyToken: null,
+    TypeCount: 3,
+    MethodCount: 6,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: false,
+    StringHeapSize: 608,
+    BlobHeapSize: 228,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 120
+  },
+  IsLoadable: true
+}

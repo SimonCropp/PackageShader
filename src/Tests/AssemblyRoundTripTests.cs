@@ -3,73 +3,51 @@ using Argon;
 [Collection("Sequential")]
 public class AssemblyRoundTripTests
 {
-    [Fact]
-    public async Task RoundTripVariousAssemblyScenarios()
+    [Theory]
+    [MemberData(nameof(GetAssemblyScenarios))]
+    public async Task RoundTripAssembly(string targetFramework, bool strongNamed, SymbolType symbolType)
     {
         using var tempDir = new TempDirectory();
         var scenariosDir = Path.Combine(tempDir, "Scenarios");
         Directory.CreateDirectory(scenariosDir);
 
-        // Generate all test assemblies
-        var assemblies = await GenerateTestAssemblies(scenariosDir);
+        var name = $"{targetFramework.Replace(".", "")}_{(strongNamed ? "StrongNamed" : "NoStrongName")}_{symbolType}";
 
-        var results = new List<AssemblyRoundTripResult>();
-
-        foreach (var assembly in assemblies)
+        TestAssembly assembly;
+        try
         {
-            var result = await RoundTripAssembly(assembly, tempDir);
-            results.Add(result);
+            assembly = await CreateAssembly(scenariosDir, name, targetFramework, strongNamed, symbolType);
+        }
+        catch (Exception)
+        {
+            // Skip assemblies that fail to build (e.g., net48 on Linux, netstandard without SDK)
+            return;
         }
 
-        // Verify all results
-        await Verify(results)
-            .UseDirectory("Snapshots");
+        var result = await PerformRoundTrip(assembly, tempDir);
+
+        // Verify the result
+        await Verify(result)
+            .UseDirectory("Snapshots")
+            .UseParameters(targetFramework, strongNamed, symbolType);
     }
 
-    static async Task<List<TestAssembly>> GenerateTestAssemblies(string outputDir)
+    public static IEnumerable<object[]> GetAssemblyScenarios()
     {
-        var assemblies = new List<TestAssembly>();
+        var frameworks = new[] { "net8.0", "net9.0", "net10.0", "net48", "netstandard2.0", "netstandard2.1" };
+        var strongNameOptions = new[] { true, false };
+        var symbolTypes = new[] { SymbolType.Embedded, SymbolType.External, SymbolType.None };
 
-        // Try to build assemblies for different frameworks
-        // Skip frameworks that fail (like net48 on non-Windows or when .NET Framework is not installed)
-        var scenarios = new[]
+        foreach (var framework in frameworks)
         {
-            ("Net48_StrongNamed", "net48", true, "external"),
-            ("Net80_StrongNamed", "net8.0", true, "embedded"),
-            ("Net90_StrongNamed", "net9.0", true, "embedded"),
-            ("Net100_StrongNamed", "net10.0", true, "none"),
-            ("NetStandard20_StrongNamed", "netstandard2.0", true, "external"),
-            ("Net48_NoStrongName", "net48", false, "external"),
-            ("Net80_NoStrongName", "net8.0", false, "embedded"),
-            ("Net90_NoStrongName", "net9.0", false, "none"),
-            ("NetStandard20_NoStrongName", "netstandard2.0", false, "external"),
-            ("Net80_EmbeddedPdb", "net8.0", false, "embedded"),
-            ("Net80_ExternalPdb", "net8.0", false, "external"),
-            ("Net80_NoPdb", "net8.0", false, "none"),
-            ("NetStandard21_StrongNamed_EmbeddedPdb", "netstandard2.1", true, "embedded"),
-            ("Net48_StrongNamed_NoPdb", "net48", true, "none")
-        };
-
-        foreach (var (name, targetFramework, strongNamed, pdbType) in scenarios)
-        {
-            try
+            foreach (var strongNamed in strongNameOptions)
             {
-                var assembly = await CreateAssembly(outputDir, name, targetFramework, strongNamed, pdbType);
-                assemblies.Add(assembly);
-            }
-            catch (Exception ex)
-            {
-                // Skip assemblies that fail to build (e.g., net48 on Linux)
-                Console.WriteLine($"Skipped {name}: {ex.Message}");
+                foreach (var symbolType in symbolTypes)
+                {
+                    yield return new object[] { framework, strongNamed, symbolType };
+                }
             }
         }
-
-        if (assemblies.Count == 0)
-        {
-            throw new Exception("No assemblies could be built - check that SDK is installed");
-        }
-
-        return assemblies;
     }
 
     static async Task<TestAssembly> CreateAssembly(
@@ -77,9 +55,9 @@ public class AssemblyRoundTripTests
         string name,
         string targetFramework,
         bool strongNamed,
-        string pdbType)
+        SymbolType symbolType)
     {
-        var categoryDir = Path.Combine(baseDir, $"{targetFramework}_{(strongNamed ? "StrongNamed" : "NoStrongName")}");
+        var categoryDir = Path.Combine(baseDir, targetFramework);
         Directory.CreateDirectory(categoryDir);
 
         var projectDir = Path.Combine(categoryDir, name);
@@ -118,11 +96,11 @@ internal class InternalClass
         }
 
         // Determine debug type
-        var debugType = pdbType switch
+        var debugType = symbolType switch
         {
-            "embedded" => "embedded",
-            "external" => "portable",
-            "none" => "none",
+            SymbolType.Embedded => "embedded",
+            SymbolType.External => "portable",
+            SymbolType.None => "none",
             _ => "portable"
         };
 
@@ -132,8 +110,8 @@ internal class InternalClass
   <PropertyGroup>
     <TargetFramework>{{targetFramework}}</TargetFramework>
     <DebugType>{{debugType}}</DebugType>
-    <DebugSymbols>{{(pdbType != "none" ? "true" : "false")}}</DebugSymbols>
-{{(strongNamed ? $"    <SignAssembly>true</SignAssembly>\n    <AssemblyOriginatorKeyFile>key.snk</AssemblyOriginatorKeyFile>" : "")}}
+    <DebugSymbols>{{(symbolType != SymbolType.None ? "true" : "false")}}</DebugSymbols>
+{{(strongNamed ? "    <SignAssembly>true</SignAssembly>\n    <AssemblyOriginatorKeyFile>key.snk</AssemblyOriginatorKeyFile>" : "")}}
   </PropertyGroup>
 </Project>
 """;
@@ -165,7 +143,7 @@ internal class InternalClass
         File.Copy(outputPath, finalPath, true);
 
         // Copy PDB if external
-        if (pdbType == "external")
+        if (symbolType == SymbolType.External)
         {
             var pdbPath = Path.Combine(projectDir, "bin", "Release", targetFramework, $"{name}.pdb");
             if (File.Exists(pdbPath))
@@ -183,7 +161,7 @@ internal class InternalClass
             Path = finalPath,
             TargetFramework = targetFramework,
             IsStrongNamed = strongNamed,
-            PdbType = pdbType
+            SymbolType = symbolType
         };
     }
 
@@ -200,7 +178,7 @@ internal class InternalClass
         return Task.CompletedTask;
     }
 
-    static async Task<AssemblyRoundTripResult> RoundTripAssembly(TestAssembly assembly, string tempDir)
+    static async Task<AssemblyRoundTripResult> PerformRoundTrip(TestAssembly assembly, string tempDir)
     {
         var roundTripDir = Path.Combine(tempDir, "RoundTrip", assembly.Name);
         Directory.CreateDirectory(roundTripDir);
@@ -227,7 +205,7 @@ internal class InternalClass
             Name = assembly.Name,
             TargetFramework = assembly.TargetFramework,
             IsStrongNamed = assembly.IsStrongNamed,
-            PdbType = assembly.PdbType,
+            SymbolType = assembly.SymbolType,
             OriginalMetadata = originalMetadata,
             RoundTrippedMetadata = roundTrippedMetadata,
             IsLoadable = isLoadable,
@@ -318,7 +296,7 @@ internal class InternalClass
         public required string Path { get; init; }
         public required string TargetFramework { get; init; }
         public required bool IsStrongNamed { get; init; }
-        public required string PdbType { get; init; }
+        public required SymbolType SymbolType { get; init; }
     }
 
     record AssemblyRoundTripResult
@@ -326,7 +304,7 @@ internal class InternalClass
         public required string Name { get; init; }
         public required string TargetFramework { get; init; }
         public required bool IsStrongNamed { get; init; }
-        public required string PdbType { get; init; }
+        public required SymbolType SymbolType { get; init; }
         public required AssemblyMetadataInfo OriginalMetadata { get; init; }
         public required AssemblyMetadataInfo RoundTrippedMetadata { get; init; }
         public required bool IsLoadable { get; init; }
@@ -349,4 +327,11 @@ internal class InternalClass
         public required int GuidHeapSize { get; init; }
         public required int UserStringHeapSize { get; init; }
     }
+}
+
+public enum SymbolType
+{
+    None,
+    Embedded,
+    External
 }

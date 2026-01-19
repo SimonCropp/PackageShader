@@ -1,0 +1,36 @@
+﻿{
+  Name: net100_StrongNamed_None,
+  TargetFramework: net10.0,
+  IsStrongNamed: true,
+  OriginalMetadata: {
+    Name: net100_StrongNamed_None,
+    Version: 1.0.0.0,
+    HasPublicKey: true,
+    PublicKeyToken: fba2ec45388e2af0,
+    TypeCount: 3,
+    MethodCount: 6,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: false,
+    StringHeapSize: 608,
+    BlobHeapSize: 392,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 120
+  },
+  RoundTrippedMetadata: {
+    Name: net100_StrongNamed_None,
+    Version: 1.0.0.0,
+    HasPublicKey: true,
+    PublicKeyToken: fba2ec45388e2af0,
+    TypeCount: 3,
+    MethodCount: 6,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: false,
+    StringHeapSize: 608,
+    BlobHeapSize: 392,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 120
+  },
+  IsLoadable: true
+}
