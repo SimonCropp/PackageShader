@@ -370,11 +370,18 @@ public class RoundTrip
             throw new DirectoryNotFoundException($"Pack directory not found: {packsDir}");
         }
 
-        // Find the highest installed version
+        // Extract major.minor from target framework
+        // "net8.0" -> "8.0", "netstandard2.1" -> "2.1"
+        var tfmVersion = targetFramework
+            .Replace("netstandard", "")
+            .Replace("net", "");
+
+        // Find versions matching the target framework (e.g., for net8.0, use 8.0.x not 10.0.x)
+        // Use the lowest matching version for consistency across machines
         var versions = Directory.GetDirectories(packsDir)
             .Select(Path.GetFileName)
-            .Where(v => v != null)
-            .OrderByDescending(v => v)
+            .Where(v => v != null && v.StartsWith(tfmVersion + "."))
+            .OrderBy(v => v)
             .ToList();
 
         foreach (var version in versions)
@@ -386,7 +393,7 @@ public class RoundTrip
             }
         }
 
-        throw new DirectoryNotFoundException($"No reference assemblies found for {targetFramework} in {packsDir}");
+        throw new DirectoryNotFoundException($"No reference assemblies found for {targetFramework} (version {tfmVersion}.x) in {packsDir}");
     }
 
     static string FindNetStandardReferenceAssemblies(string targetFramework)
