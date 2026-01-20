@@ -12,4 +12,5 @@ global using CliWrap.Buffered;
 global using CommandLine;
 global using Microsoft.CodeAnalysis;
 global using Microsoft.CodeAnalysis.CSharp;
+global using Microsoft.CodeAnalysis.Emit;
 global using PackageShader;

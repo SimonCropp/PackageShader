@@ -1,7 +1,3 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Emit;
-
 [Collection("Sequential")]
 public class AssemblyRoundTripTests
 {
@@ -25,10 +21,10 @@ public class AssemblyRoundTripTests
 
     public static IEnumerable<object[]> GetAssemblyScenarios()
     {
-        var frameworks = new[] { "net8.0", "net9.0", "net10.0", "net48", "netstandard2.0", "netstandard2.1" };
-        var strongNameOptions = new[] { true, false };
-        var symbolTypes = new[] { SymbolType.Embedded, SymbolType.External, SymbolType.None };
-        var compilationMethods = new[] { CompilationMethod.DotNetBuild, CompilationMethod.Roslyn };
+        var frameworks = new[] {"net8.0", "net9.0", "net10.0", "net48", "netstandard2.0", "netstandard2.1"};
+        var strongNameOptions = new[] {true, false};
+        var symbolTypes = new[] {SymbolType.Embedded, SymbolType.External, SymbolType.None};
+        var compilationMethods = new[] {CompilationMethod.DotNetBuild, CompilationMethod.Roslyn};
 
         foreach (var framework in frameworks)
         {
@@ -99,10 +95,13 @@ public class AssemblyRoundTripTests
 
         // Set assembly version to 1.0.0.0
         var assemblyVersion = new Version(1, 0, 0, 0);
-        var assemblyInfo = CSharpSyntaxTree.ParseText($@"
-using System.Reflection;
-[assembly: AssemblyVersion(""{assemblyVersion}"")]
-", encoding: Encoding.UTF8);
+        var assemblyInfo = CSharpSyntaxTree.ParseText(
+            $"""
+
+             using System.Reflection;
+             [assembly: AssemblyVersion("{assemblyVersion}")]
+
+             """, encoding: Encoding.UTF8);
 
         var compilation = CSharpCompilation.Create(
             name,
@@ -196,16 +195,16 @@ using System.Reflection;
         };
 
         // Create project file
-        var projectContent = $$"""
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>{{targetFramework}}</TargetFramework>
-    <DebugType>{{debugType}}</DebugType>
-    <DebugSymbols>{{(symbolType != SymbolType.None ? "true" : "false")}}</DebugSymbols>
-{{(strongNamed ? "    <SignAssembly>true</SignAssembly>\n    <AssemblyOriginatorKeyFile>key.snk</AssemblyOriginatorKeyFile>" : "")}}
-  </PropertyGroup>
-</Project>
-""";
+        var projectContent = $"""
+                              <Project Sdk="Microsoft.NET.Sdk">
+                                <PropertyGroup>
+                                  <TargetFramework>{targetFramework}</TargetFramework>
+                                  <DebugType>{debugType}</DebugType>
+                                  <DebugSymbols>{(symbolType != SymbolType.None ? "true" : "false")}</DebugSymbols>
+                              {(strongNamed ? "    <SignAssembly>true</SignAssembly>\n    <AssemblyOriginatorKeyFile>key.snk</AssemblyOriginatorKeyFile>" : "")}
+                                </PropertyGroup>
+                              </Project>
+                              """;
 
         var projectPath = Path.Combine(projectDir, $"{name}.csproj");
         await File.WriteAllTextAsync(projectPath, projectContent);
@@ -258,25 +257,25 @@ using System.Reflection;
     }
 
     static string GetTestSourceCode(string name) => $$"""
-namespace {{name}};
+                                                      namespace {{name}};
 
-public class TestClass
-{
-    public string GetMessage() => "Hello from {{name}}";
+                                                      public class TestClass
+                                                      {
+                                                          public string GetMessage() => "Hello from {{name}}";
 
-    public int Add(int a, int b) => a + b;
+                                                          public int Add(int a, int b) => a + b;
 
-    public void ThrowException()
-    {
-        throw new System.InvalidOperationException("Test exception");
-    }
-}
+                                                          public void ThrowException()
+                                                          {
+                                                              throw new System.InvalidOperationException("Test exception");
+                                                          }
+                                                      }
 
-internal class InternalClass
-{
-    internal string InternalMethod() => "Internal";
-}
-""";
+                                                      internal class InternalClass
+                                                      {
+                                                          internal string InternalMethod() => "Internal";
+                                                      }
+                                                      """;
 
     static List<MetadataReference> GetMetadataReferences(string targetFramework)
     {
@@ -498,6 +497,7 @@ internal class InternalClass
                     Console.WriteLine($"  Inner: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
                 }
             }
+
             return false;
         }
         finally
