@@ -22,8 +22,6 @@ Infrastructure (CLI)
 Partitions I to VI
 
 
-![Figure](images/page1_img1.jpeg)
-
 <!-- Page 2 -->
 COPYRIGHT PROTECTED DOCUMENT
 
@@ -72,7 +70,6 @@ ANY OWNERSHIP RIGHTS OR ANY IMPLIED WARRANTIES OF MERCHANTABILITY OR FITNESS FOR
 A PARTICULAR PURPOSE."
 
 
-![Figure](images/page3_img1.jpeg)
 
 <!-- Page 4 -->
 
