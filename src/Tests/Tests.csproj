@@ -39,6 +39,9 @@
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="Argon" />
     <PackageReference Include="Microsoft.Build.Framework" />
+    <!-- Pin reference assemblies for deterministic test compilation across all environments -->
+    <PackageReference Include="Microsoft.NETCore.App.Ref" ExcludeAssets="all" GeneratePathProperty="true" PrivateAssets="all" />
+    <PackageReference Include="NETStandard.Library.Ref" ExcludeAssets="all" GeneratePathProperty="true" PrivateAssets="all" />
     <None Update="test.snk">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

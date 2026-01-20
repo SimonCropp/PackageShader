@@ -362,38 +362,72 @@ public class RoundTrip
 
     static string FindReferenceAssemblies(string packName, string targetFramework)
     {
-        var packsDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-            "dotnet", "packs", packName);
-
-        if (!Directory.Exists(packsDir))
+        // Pin to specific versions for deterministic builds across all machines
+        // These versions match the NuGet packages referenced in Tests.csproj
+        var pinnedVersion = targetFramework switch
         {
-            throw new DirectoryNotFoundException($"Pack directory not found: {packsDir}");
-        }
+            "net8.0" => "8.0.0",
+            "net9.0" => "9.0.0",
+            "net10.0" => "10.0.0",
+            "netstandard2.1" => "2.1.0",
+            _ => null
+        };
 
-        // Extract major.minor from target framework
-        // "net8.0" -> "8.0", "netstandard2.1" -> "2.1"
-        var tfmVersion = targetFramework
-            .Replace("netstandard", "")
-            .Replace("net", "");
-
-        // Find versions matching the target framework (e.g., for net8.0, use 8.0.x not 10.0.x)
-        // Use the lowest matching version for consistency across machines
-        var versions = Directory.GetDirectories(packsDir)
-            .Select(Path.GetFileName)
-            .Where(v => v != null && v.StartsWith(tfmVersion + "."))
-            .OrderBy(v => Version.TryParse(v, out var parsed) ? parsed : new Version(0, 0))
-            .ToList();
-
-        foreach (var version in versions)
+        // First, try NuGet packages directory (where our pinned packages are restored)
+        if (pinnedVersion != null)
         {
-            var refPath = Path.Combine(packsDir, version!, "ref", targetFramework);
-            if (Directory.Exists(refPath))
+            var nugetPackagesDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".nuget", "packages", packName.ToLowerInvariant());
+
+            if (Directory.Exists(nugetPackagesDir))
             {
-                return refPath;
+                var nugetRefPath = Path.Combine(nugetPackagesDir, pinnedVersion, "ref", targetFramework);
+                if (Directory.Exists(nugetRefPath))
+                {
+                    return nugetRefPath;
+                }
             }
         }
 
-        throw new DirectoryNotFoundException($"No reference assemblies found for {targetFramework} (version {tfmVersion}.x) in {packsDir}");
+        // Fallback to SDK packs directory
+        var packsDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            "dotnet", "packs", packName);
+
+        if (Directory.Exists(packsDir))
+        {
+            // If we have a pinned version, try it first in packs dir
+            if (pinnedVersion != null)
+            {
+                var pinnedPath = Path.Combine(packsDir, pinnedVersion, "ref", targetFramework);
+                if (Directory.Exists(pinnedPath))
+                {
+                    return pinnedPath;
+                }
+            }
+
+            // Find any matching version (for local development flexibility)
+            var tfmVersion = targetFramework
+                .Replace("netstandard", "")
+                .Replace("net", "");
+
+            var versions = Directory.GetDirectories(packsDir)
+                .Select(Path.GetFileName)
+                .Where(v => v != null && v.StartsWith(tfmVersion + "."))
+                .OrderBy(v => Version.TryParse(v, out var parsed) ? parsed : new Version(0, 0))
+                .ToList();
+
+            foreach (var version in versions)
+            {
+                var refPath = Path.Combine(packsDir, version!, "ref", targetFramework);
+                if (Directory.Exists(refPath))
+                {
+                    return refPath;
+                }
+            }
+        }
+
+        throw new DirectoryNotFoundException($"No reference assemblies found for {targetFramework}. Please ensure .NET SDK or NuGet package '{packName}' version {pinnedVersion ?? "compatible"} is installed.");
     }
 
     static string FindNetStandardReferenceAssemblies(string targetFramework)
@@ -408,7 +442,15 @@ public class RoundTrip
             throw new DirectoryNotFoundException($"NETStandard.Library NuGet package not found at {nugetPackagesDir}");
         }
 
-        // Find the lowest installed version for deterministic builds
+        // Pin to specific version for deterministic builds
+        var pinnedVersion = "2.0.3";
+        var pinnedPath = Path.Combine(nugetPackagesDir, pinnedVersion, "build", targetFramework, "ref");
+        if (Directory.Exists(pinnedPath))
+        {
+            return pinnedPath;
+        }
+
+        // Fallback: Find any installed version (for local development flexibility)
         var versions = Directory.GetDirectories(nugetPackagesDir)
             .Select(Path.GetFileName)
             .Where(v => v != null)
