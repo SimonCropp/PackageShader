@@ -1,6 +1,12 @@
 [Collection("Sequential")]
-public class RoundTrip
+public partial class RoundTrip
 {
+    [GeneratedRegex("^All Classes and Methods.*", RegexOptions.Multiline)]
+    private static partial Regex AllClassesAndMethodsRegex();
+
+    [GeneratedRegex(@"\[offset [^\]]*\]")]
+    private static partial Regex OffsetInfoRegex();
+
     static string GetSnapshotsDirectory() => Path.Combine(ProjectFiles.ProjectDirectory.Path, "Snapshots");
 
     static string GetBeforeAssemblyFileName(string framework, bool signed, Symbol symbol, Compilation compilation) =>
@@ -656,12 +662,12 @@ public class RoundTrip
 
         if (!process.WaitForExit(10000))
         {
-            throw new Exception("PeVerify failed to exit");
+            throw new("PeVerify failed to exit");
         }
 
         // Clean up output
-        output = Regex.Replace(output, "^All Classes and Methods.*", "", RegexOptions.Multiline);
-        output = Regex.Replace(output, @"\[offset [^\]]*\]", ""); // Remove offset info for comparison
+        output = AllClassesAndMethodsRegex().Replace(output, "");
+        output = OffsetInfoRegex().Replace(output, ""); // Remove offset info for comparison
         output = output.Trim();
 
         if (string.IsNullOrEmpty(output))
