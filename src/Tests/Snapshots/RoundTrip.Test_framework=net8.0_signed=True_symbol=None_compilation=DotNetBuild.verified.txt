@@ -13,7 +13,7 @@
     HasDebugInfo: true,
     HasEmbeddedPdb: false,
     StringHeapSize: 630,
-    BlobHeapSize: 400,
+    BlobHeapSize: 388,
     GuidHeapSize: 16,
     UserStringHeapSize: 144
   },
@@ -28,7 +28,7 @@
     HasDebugInfo: true,
     HasEmbeddedPdb: false,
     StringHeapSize: 698,
-    BlobHeapSize: 1468,
+    BlobHeapSize: 1456,
     GuidHeapSize: 16,
     UserStringHeapSize: 144
   }
