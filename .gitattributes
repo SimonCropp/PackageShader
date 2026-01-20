@@ -3,6 +3,7 @@
 *.snk binary
 *.dll binary
 *.pdb binary
+*.pdf binary
 
 
 .editorconfig text eol=lf working-tree-encoding=UTF-8
