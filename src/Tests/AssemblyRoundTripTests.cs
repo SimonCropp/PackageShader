@@ -613,13 +613,13 @@ public class RoundTrip
     static void ValidateNoNewErrors(string inputPath, string outputPath, string targetFramework)
     {
         // ILVerify check
-        var inputILVerifyErrors = GetILVerifyErrors(inputPath).ToHashSet();
-        var outputILVerifyErrors = GetILVerifyErrors(outputPath);
-        var newILVerifyErrors = outputILVerifyErrors.Where(e => !inputILVerifyErrors.Contains(e)).ToList();
+        var inputIlVerifyErrors = GetILVerifyErrors(inputPath).ToHashSet();
+        var outputIlVerifyErrors = GetILVerifyErrors(outputPath);
+        var newIlVerifyErrors = outputIlVerifyErrors.Where(e => !inputIlVerifyErrors.Contains(e)).ToList();
 
-        if (newILVerifyErrors.Count > 0)
+        if (newIlVerifyErrors.Count > 0)
         {
-            throw new Exception($"ILVerify found {newILVerifyErrors.Count} new error(s) in output assembly {Path.GetFileName(outputPath)}:\n{string.Join('\n', newILVerifyErrors)}");
+            throw new($"ILVerify found {newIlVerifyErrors.Count} new error(s) in output assembly {Path.GetFileName(outputPath)}:\n{string.Join('\n', newIlVerifyErrors)}");
         }
 
         // PeVerify check (only for .NET Framework assemblies - PeVerify cannot verify .NET Core assemblies)
@@ -632,7 +632,7 @@ public class RoundTrip
 
             if (newPeVerifyErrors.Count > 0)
             {
-                throw new Exception($"PeVerify found {newPeVerifyErrors.Count} new error(s) in output assembly {Path.GetFileName(outputPath)}:\n{string.Join('\n', newPeVerifyErrors)}");
+                throw new($"PeVerify found {newPeVerifyErrors.Count} new error(s) in output assembly {Path.GetFileName(outputPath)}:\n{string.Join('\n', newPeVerifyErrors)}");
             }
         }
     }
