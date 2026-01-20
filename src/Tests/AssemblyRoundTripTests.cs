@@ -26,10 +26,8 @@ public class AssemblyRoundTripTests
 
         var result = PerformRoundTrip(assembly, tempDir);
 
-        // Verify the result
         await Verify(result)
-            .UseDirectory("Snapshots")
-            .UseParameters(targetFramework, strongNamed, symbolType);
+            .UseDirectory("Snapshots");
     }
 
     public static IEnumerable<object[]> GetAssemblyScenarios()
