@@ -27,8 +27,8 @@
     AssemblyRefCount: 1,
     HasDebugInfo: true,
     HasEmbeddedPdb: false,
-    StringHeapSize: 610,
-    BlobHeapSize: 232,
+    StringHeapSize: 678,
+    BlobHeapSize: 300,
     GuidHeapSize: 16,
     UserStringHeapSize: 124
   },
