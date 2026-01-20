@@ -20,7 +20,7 @@ public class RoundTrip
             .UseDirectory("Snapshots")
             .IgnoreMember("Path");
 
-        ValidateNoNewErrors(assembly.Path, result.Path);
+        ValidateNoNewErrors(assembly.Path, result.Path, framework);
     }
 
     public static IEnumerable<object[]> GetAssemblyScenarios()
@@ -610,7 +610,7 @@ public class RoundTrip
             .ToList();
     }
 
-    static void ValidateNoNewErrors(string inputPath, string outputPath)
+    static void ValidateNoNewErrors(string inputPath, string outputPath, string targetFramework)
     {
         // ILVerify check
         var inputILVerifyErrors = GetILVerifyErrors(inputPath).ToHashSet();
@@ -622,8 +622,9 @@ public class RoundTrip
             throw new Exception($"ILVerify found {newILVerifyErrors.Count} new error(s) in output assembly {Path.GetFileName(outputPath)}:\n{string.Join('\n', newILVerifyErrors)}");
         }
 
-        // PeVerify check (only available on Windows with .NET Framework SDK)
-        if (PeVerifyTool.FoundPeVerify)
+        // PeVerify check (only for .NET Framework assemblies - PeVerify cannot verify .NET Core assemblies)
+        var isNetFramework = targetFramework.StartsWith("net4", StringComparison.OrdinalIgnoreCase);
+        if (PeVerifyTool.FoundPeVerify && isNetFramework)
         {
             var inputPeVerifyErrors = GetPeVerifyErrors(inputPath).ToHashSet();
             var outputPeVerifyErrors = GetPeVerifyErrors(outputPath);
