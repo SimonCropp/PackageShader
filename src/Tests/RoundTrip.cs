@@ -437,8 +437,8 @@ public class RoundTrip
         // Find all matching versions, sorted by semantic version (lowest first)
         var versions = Directory.GetDirectories(packsDir)
             .Select(Path.GetFileName)
-            .Where(v => v != null && v.StartsWith(tfmVersion + "."))
-            .OrderBy(v => Version.TryParse(v, out var parsed) ? parsed : new Version(0, 0))
+            .Where(_ => _ != null && _.StartsWith(tfmVersion + "."))
+            .OrderBy(_ => Version.TryParse(_, out var parsed) ? parsed : new(0, 0))
             .ToList();
 
         foreach (var version in versions)
@@ -469,7 +469,7 @@ public class RoundTrip
         var versions = Directory.GetDirectories(nugetPackagesDir)
             .Select(Path.GetFileName)
             .Where(v => v != null)
-            .OrderBy(v => Version.TryParse(v, out var parsed) ? parsed : new Version(0, 0))
+            .OrderBy(v => Version.TryParse(v, out var parsed) ? parsed : new(0, 0))
             .ToList();
 
         foreach (var version in versions)
