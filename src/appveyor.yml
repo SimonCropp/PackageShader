@@ -11,6 +11,8 @@ build_script:
     if ($isWindows) {
       Invoke-WebRequest "https://dot.net/v1/dotnet-install.ps1" -OutFile "./dotnet-install.ps1"
       ./dotnet-install.ps1 -JSonFile src/global.json -Architecture x64 -InstallDir 'C:\Program Files\dotnet'
+      ./dotnet-install.ps1 -Version 9.0.310 -Architecture x64 -InstallDir 'C:\Program Files\dotnet'
+      ./dotnet-install.ps1 -Version 8.0.417 -Architecture x64 -InstallDir 'C:\Program Files\dotnet'
     }
     else {
       Invoke-WebRequest "https://dot.net/v1/dotnet-install.sh" -OutFile "./dotnet-install.sh"
