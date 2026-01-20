@@ -96,3 +96,4 @@ Integration/Directory.Build.props
 # Verify
 *.received.*
 *.received/
+nul
