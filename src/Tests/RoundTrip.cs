@@ -381,7 +381,7 @@ public class RoundTrip
         var versions = Directory.GetDirectories(packsDir)
             .Select(Path.GetFileName)
             .Where(v => v != null && v.StartsWith(tfmVersion + "."))
-            .OrderBy(v => v)
+            .OrderBy(v => Version.TryParse(v, out var parsed) ? parsed : new Version(0, 0))
             .ToList();
 
         foreach (var version in versions)
@@ -408,11 +408,11 @@ public class RoundTrip
             throw new DirectoryNotFoundException($"NETStandard.Library NuGet package not found at {nugetPackagesDir}");
         }
 
-        // Find the highest installed version
+        // Find the lowest installed version for deterministic builds
         var versions = Directory.GetDirectories(nugetPackagesDir)
             .Select(Path.GetFileName)
             .Where(v => v != null)
-            .OrderByDescending(v => v)
+            .OrderBy(v => Version.TryParse(v, out var parsed) ? parsed : new Version(0, 0))
             .ToList();
 
         foreach (var version in versions)
