@@ -6,17 +6,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 PackageShader is a .NET assembly shading/aliasing tool that resolves dependency conflicts by renaming assemblies and patching all references. It's designed as a modern alternative to Costura, ILMerge, and ILRepack for plugin/extension scenarios where multiple versions of the same assembly need to coexist.
 
+## Code Style
+
+Follow `.editorconfig` for formatting and code style conventions. Respect `.gitattributes` for line endings and file handling.
+
 ## Build Commands
+
+**Solution file**: `src/PackageShader.slnx`
 
 ```bash
 # Build the solution
-dotnet build src --configuration Release
+dotnet build src --configuration Debug
 
 # Run tests
-dotnet run --project src/Tests --configuration Release
+dotnet run --project src/Tests --configuration Debug
 
 # Build specific project
-dotnet build src/PackageShader/PackageShader.csproj
+dotnet build src/PackageShader/PackageShader.csproj --configuration Debug
 ```
 
 **Requirements**: .NET SDK 10.0.102+ (see `src/global.json`)
