@@ -1,3 +1,5 @@
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
 
 [Collection("Sequential")]
@@ -5,29 +7,20 @@ public class AssemblyRoundTripTests
 {
     [Theory]
     [MemberData(nameof(GetAssemblyScenarios))]
-    public async Task RoundTripAssembly(string targetFramework, bool strongNamed, SymbolType symbolType)
+    public async Task RoundTripAssembly(string targetFramework, bool strongNamed, SymbolType symbolType, CompilationMethod compilationMethod)
     {
         using var tempDir = new TempDirectory();
         var scenariosDir = Path.Combine(tempDir, "Scenarios");
         Directory.CreateDirectory(scenariosDir);
 
-        var name = $"{targetFramework.Replace(".", "")}_{(strongNamed ? "StrongNamed" : "NoStrongName")}_{symbolType}";
+        var name = $"{targetFramework.Replace(".", "")}_{(strongNamed ? "StrongNamed" : "NoStrongName")}_{symbolType}_{compilationMethod}";
 
-        TestAssembly assembly;
-        try
-        {
-            assembly = CreateAssembly(scenariosDir, name, targetFramework, strongNamed, symbolType);
-        }
-        catch (Exception)
-        {
-            // Skip assemblies that fail to build (e.g., net48 on Linux, netstandard without SDK)
-            return;
-        }
-
+        var assembly = await CreateAssembly(scenariosDir, name, targetFramework, strongNamed, symbolType, compilationMethod);
         var result = PerformRoundTrip(assembly, tempDir);
 
         await Verify(result)
-            .UseDirectory("Snapshots");
+            .UseDirectory("Snapshots")
+            .UseParameters(targetFramework, strongNamed, symbolType, compilationMethod);
     }
 
     public static IEnumerable<object[]> GetAssemblyScenarios()
@@ -35,6 +28,7 @@ public class AssemblyRoundTripTests
         var frameworks = new[] { "net8.0", "net9.0", "net10.0", "net48", "netstandard2.0", "netstandard2.1" };
         var strongNameOptions = new[] { true, false };
         var symbolTypes = new[] { SymbolType.Embedded, SymbolType.External, SymbolType.None };
+        var compilationMethods = new[] { CompilationMethod.DotNetBuild, CompilationMethod.Roslyn };
 
         foreach (var framework in frameworks)
         {
@@ -42,13 +36,27 @@ public class AssemblyRoundTripTests
             {
                 foreach (var symbolType in symbolTypes)
                 {
-                    yield return [framework, strongNamed, symbolType];
+                    foreach (var compilationMethod in compilationMethods)
+                    {
+                        yield return [framework, strongNamed, symbolType, compilationMethod];
+                    }
                 }
             }
         }
     }
 
-    static TestAssembly CreateAssembly(
+    static async Task<TestAssembly> CreateAssembly(
+        string baseDir,
+        string name,
+        string targetFramework,
+        bool strongNamed,
+        SymbolType symbolType,
+        CompilationMethod compilationMethod) =>
+        compilationMethod == CompilationMethod.Roslyn
+            ? CreateAssemblyWithRoslyn(baseDir, name, targetFramework, strongNamed, symbolType)
+            : await CreateAssemblyWithDotNetBuild(baseDir, name, targetFramework, strongNamed, symbolType);
+
+    static TestAssembly CreateAssemblyWithRoslyn(
         string baseDir,
         string name,
         string targetFramework,
@@ -63,26 +71,7 @@ public class AssemblyRoundTripTests
         var finalPath = Path.Combine(finalDir, $"{name}.dll");
 
         // Create minimal C# source
-        var sourceCode = $$"""
-namespace {{name}};
-
-public class TestClass
-{
-    public string GetMessage() => "Hello from {{name}}";
-
-    public int Add(int a, int b) => a + b;
-
-    public void ThrowException()
-    {
-        throw new System.InvalidOperationException("Test exception");
-    }
-}
-
-internal class InternalClass
-{
-    internal string InternalMethod() => "Internal";
-}
-""";
+        var sourceCode = GetTestSourceCode(name);
 
         // Compile using Roslyn APIs (much faster than spawning dotnet build)
         var syntaxTree = CSharpSyntaxTree.ParseText(
@@ -168,9 +157,126 @@ using System.Reflection;
             Path = finalPath,
             TargetFramework = targetFramework,
             IsStrongNamed = strongNamed,
-            SymbolType = symbolType
+            SymbolType = symbolType,
+            CompilationMethod = CompilationMethod.Roslyn
         };
     }
+
+    static async Task<TestAssembly> CreateAssemblyWithDotNetBuild(
+        string baseDir,
+        string name,
+        string targetFramework,
+        bool strongNamed,
+        SymbolType symbolType)
+    {
+        var categoryDir = Path.Combine(baseDir, targetFramework);
+        Directory.CreateDirectory(categoryDir);
+
+        var projectDir = Path.Combine(categoryDir, name);
+        Directory.CreateDirectory(projectDir);
+
+        // Create minimal C# source
+        var sourceCode = GetTestSourceCode(name);
+        await File.WriteAllTextAsync(Path.Combine(projectDir, "Class.cs"), sourceCode);
+
+        // Create key file if strong named
+        if (strongNamed)
+        {
+            var keyFile = Path.Combine(projectDir, "key.snk");
+            await CreateStrongNameKey(keyFile);
+        }
+
+        // Determine debug type
+        var debugType = symbolType switch
+        {
+            SymbolType.Embedded => "embedded",
+            SymbolType.External => "portable",
+            SymbolType.None => "none",
+            _ => "portable"
+        };
+
+        // Create project file
+        var projectContent = $$"""
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>{{targetFramework}}</TargetFramework>
+    <DebugType>{{debugType}}</DebugType>
+    <DebugSymbols>{{(symbolType != SymbolType.None ? "true" : "false")}}</DebugSymbols>
+{{(strongNamed ? "    <SignAssembly>true</SignAssembly>\n    <AssemblyOriginatorKeyFile>key.snk</AssemblyOriginatorKeyFile>" : "")}}
+  </PropertyGroup>
+</Project>
+""";
+
+        var projectPath = Path.Combine(projectDir, $"{name}.csproj");
+        await File.WriteAllTextAsync(projectPath, projectContent);
+
+        // Build the project
+        var result = await Cli.Wrap("dotnet")
+            .WithArguments(["build", projectPath, "-c", "Release", "--nologo", "-v", "quiet"])
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync();
+
+        if (result.ExitCode != 0)
+        {
+            throw new Exception($"Failed to build {name}: {result.StandardError}");
+        }
+
+        var outputPath = Path.Combine(projectDir, "bin", "Release", targetFramework, $"{name}.dll");
+        if (!File.Exists(outputPath))
+        {
+            throw new Exception($"Assembly not found at {outputPath}");
+        }
+
+        // Copy assembly to a cleaner location
+        var finalDir = Path.Combine(categoryDir, "assemblies");
+        Directory.CreateDirectory(finalDir);
+        var finalPath = Path.Combine(finalDir, $"{name}.dll");
+        File.Copy(outputPath, finalPath, true);
+
+        // Copy PDB if external
+        if (symbolType == SymbolType.External)
+        {
+            var pdbPath = Path.Combine(projectDir, "bin", "Release", targetFramework, $"{name}.pdb");
+            if (File.Exists(pdbPath))
+            {
+                File.Copy(pdbPath, Path.Combine(finalDir, $"{name}.pdb"), true);
+            }
+        }
+
+        // Delete the project directory to clean up
+        Directory.Delete(projectDir, true);
+
+        return new TestAssembly
+        {
+            Name = name,
+            Path = finalPath,
+            TargetFramework = targetFramework,
+            IsStrongNamed = strongNamed,
+            SymbolType = symbolType,
+            CompilationMethod = CompilationMethod.DotNetBuild
+        };
+    }
+
+    static string GetTestSourceCode(string name) => $$"""
+namespace {{name}};
+
+public class TestClass
+{
+    public string GetMessage() => "Hello from {{name}}";
+
+    public int Add(int a, int b) => a + b;
+
+    public void ThrowException()
+    {
+        throw new System.InvalidOperationException("Test exception");
+    }
+}
+
+internal class InternalClass
+{
+    internal string InternalMethod() => "Internal";
+}
+""";
 
     static List<MetadataReference> GetMetadataReferences(string targetFramework)
     {
@@ -193,13 +299,43 @@ using System.Reflection;
         }
 
         // Load all DLLs from the reference assemblies directory
+        // Some directories (like .NET Framework 4.8) contain non-managed DLLs, so skip those
         var references = new List<MetadataReference>();
         foreach (var dll in Directory.GetFiles(refAssembliesPath, "*.dll"))
         {
-            references.Add(MetadataReference.CreateFromFile(dll));
+            if (IsManagedAssembly(dll))
+            {
+                references.Add(MetadataReference.CreateFromFile(dll));
+            }
         }
 
         return references;
+    }
+
+    static bool IsManagedAssembly(string path)
+    {
+        try
+        {
+            using var fs = File.OpenRead(path);
+            using var peReader = new PEReader(fs);
+
+            if (!peReader.HasMetadata)
+            {
+                return false;
+            }
+
+            // Some files have HasMetadata = true but aren't actually usable as references
+            // (e.g., System.EnterpriseServices.Wrapper.dll in net48)
+            // Try to read the metadata to verify it's actually valid
+            var reader = peReader.GetMetadataReader();
+            _ = reader.GetAssemblyDefinition(); // This will throw if metadata is invalid
+
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     static string FindReferenceAssemblies(string packName, string targetFramework)
@@ -251,6 +387,14 @@ using System.Reflection;
 
         var outputPath = Path.Combine(roundTripDir, Path.GetFileName(assembly.Path));
 
+        // Save original for debugging if it's a Roslyn strong-named embedded assembly
+        if (assembly.Name.Contains("net80_StrongNamed_Embedded_Roslyn"))
+        {
+            var origPath = Path.Combine(ProjectFiles.ProjectDirectory.Path, "original_Roslyn_assembly.dll");
+            File.Copy(assembly.Path, origPath, true);
+            Console.WriteLine($"Copied ORIGINAL assembly to: {origPath}");
+        }
+
         // Read original metadata
         var originalMetadata = ReadAssemblyMetadata(assembly.Path);
 
@@ -284,6 +428,15 @@ using System.Reflection;
         // Validate the assembly can still be loaded - THIS IS THE CRITICAL TEST
         // If MethodDef RVAs aren't patched, this will fail with "Bad IL format"
         var isLoadable = TryLoadAssembly(outputPath);
+
+        // Copy both working and failing assemblies for comparison
+        if (assembly.Name.Contains("net80_StrongNamed_Embedded"))
+        {
+            var suffix = isLoadable ? "working" : "failing";
+            var debugPath = Path.Combine(ProjectFiles.ProjectDirectory.Path, $"{suffix}_{assembly.CompilationMethod}_assembly.dll");
+            File.Copy(outputPath, debugPath, true);
+            Console.WriteLine($"Copied {suffix} assembly ({assembly.CompilationMethod}) to: {debugPath}");
+        }
 
         return new()
         {
@@ -335,8 +488,16 @@ using System.Reflection;
             loadContext.LoadFromStream(stream);
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            if (path.Contains("StrongNamed") && path.Contains("Roslyn") && (path.Contains("Embedded") || path.Contains("None")))
+            {
+                Console.WriteLine($"LOAD ERROR for {Path.GetFileName(path)}: {ex.GetType().Name}: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"  Inner: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
+                }
+            }
             return false;
         }
         finally
@@ -377,6 +538,7 @@ using System.Reflection;
         public required string TargetFramework { get; init; }
         public required bool IsStrongNamed { get; init; }
         public required SymbolType SymbolType { get; init; }
+        public required CompilationMethod CompilationMethod { get; init; }
     }
 
     record AssemblyRoundTripResult
@@ -414,4 +576,10 @@ public enum SymbolType
     None,
     Embedded,
     External
+}
+
+public enum CompilationMethod
+{
+    DotNetBuild,
+    Roslyn
 }
