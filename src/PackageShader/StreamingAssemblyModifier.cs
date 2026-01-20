@@ -18,6 +18,7 @@ sealed class StreamingAssemblyModifier : IDisposable
     StreamingMetadataReader metadata;
     ModificationPlan plan;
     bool disposed;
+    uint? cachedIvtConstructorRid;
 
     StreamingAssemblyModifier(StreamingPEFile peFile, StreamingMetadataReader metadata, ModificationPlan plan)
     {
@@ -114,13 +115,21 @@ sealed class StreamingAssemblyModifier : IDisposable
 
     uint FindOrCreateInternalsVisibleToConstructor()
     {
+        // Return cached value if already created
+        if (cachedIvtConstructorRid.HasValue)
+        {
+            return cachedIvtConstructorRid.Value;
+        }
+
         // Look for existing TypeRef to InternalsVisibleToAttribute
         var typeRefRid = metadata.FindTypeRef("InternalsVisibleToAttribute", "System.Runtime.CompilerServices");
 
         if (typeRefRid.HasValue)
         {
             // Look for existing MemberRef to .ctor, or create one
-            return metadata.FindMemberRef(typeRefRid.Value, ".ctor") ?? CreateCtorMemberRef(typeRefRid.Value);
+            var ctorRid = metadata.FindMemberRef(typeRefRid.Value, ".ctor") ?? CreateCtorMemberRef(typeRefRid.Value);
+            cachedIvtConstructorRid = ctorRid;
+            return ctorRid;
         }
 
         // Find resolution scope (System.Runtime or mscorlib)
@@ -138,7 +147,9 @@ sealed class StreamingAssemblyModifier : IDisposable
                 NamespaceIndex = plan.GetOrAddString("System.Runtime.CompilerServices")
             });
 
-        return CreateCtorMemberRef(newTypeRefRid);
+        var newCtorRid = CreateCtorMemberRef(newTypeRefRid);
+        cachedIvtConstructorRid = newCtorRid;
+        return newCtorRid;
     }
 
     uint CreateCtorMemberRef(uint typeRefRid) =>
