@@ -85,7 +85,10 @@ internal class InternalClass
 """;
 
         // Compile using Roslyn APIs (much faster than spawning dotnet build)
-        var syntaxTree = CSharpSyntaxTree.ParseText(sourceCode, path: $"{name}.cs");
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            sourceCode,
+            path: $"{name}.cs",
+            encoding: Encoding.UTF8);
 
         var references = GetMetadataReferences(targetFramework);
 
@@ -105,9 +108,16 @@ internal class InternalClass
                 .WithStrongNameProvider(strongNameProvider);
         }
 
+        // Set assembly version to 1.0.0.0
+        var assemblyVersion = new Version(1, 0, 0, 0);
+        var assemblyInfo = CSharpSyntaxTree.ParseText($@"
+using System.Reflection;
+[assembly: AssemblyVersion(""{assemblyVersion}"")]
+", encoding: Encoding.UTF8);
+
         var compilation = CSharpCompilation.Create(
             name,
-            [syntaxTree],
+            [syntaxTree, assemblyInfo],
             references,
             compilationOptions);
 
@@ -167,18 +177,13 @@ internal class InternalClass
         // Get the reference assemblies path for the target framework
         var refAssembliesPath = targetFramework switch
         {
-            "netstandard2.0" => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-                "dotnet", "packs", "NETStandard.Library.Ref", "2.1.0", "ref", "netstandard2.0"),
-            "netstandard2.1" => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-                "dotnet", "packs", "NETStandard.Library.Ref", "2.1.0", "ref", "netstandard2.1"),
+            "netstandard2.0" => FindReferenceAssemblies("NETStandard.Library.Ref", "netstandard2.0"),
+            "netstandard2.1" => FindReferenceAssemblies("NETStandard.Library.Ref", "netstandard2.1"),
             "net48" => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
                 "Reference Assemblies", "Microsoft", "Framework", ".NETFramework", "v4.8"),
-            "net8.0" => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-                "dotnet", "packs", "Microsoft.NETCore.App.Ref", "8.0.0", "ref", "net8.0"),
-            "net9.0" => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-                "dotnet", "packs", "Microsoft.NETCore.App.Ref", "9.0.0", "ref", "net9.0"),
-            "net10.0" => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-                "dotnet", "packs", "Microsoft.NETCore.App.Ref", "10.0.0", "ref", "net10.0"),
+            "net8.0" => FindReferenceAssemblies("Microsoft.NETCore.App.Ref", "net8.0"),
+            "net9.0" => FindReferenceAssemblies("Microsoft.NETCore.App.Ref", "net9.0"),
+            "net10.0" => FindReferenceAssemblies("Microsoft.NETCore.App.Ref", "net10.0"),
             _ => throw new NotSupportedException($"Target framework {targetFramework} not supported")
         };
 
@@ -195,6 +200,35 @@ internal class InternalClass
         }
 
         return references;
+    }
+
+    static string FindReferenceAssemblies(string packName, string targetFramework)
+    {
+        var packsDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            "dotnet", "packs", packName);
+
+        if (!Directory.Exists(packsDir))
+        {
+            throw new DirectoryNotFoundException($"Pack directory not found: {packsDir}");
+        }
+
+        // Find the highest installed version
+        var versions = Directory.GetDirectories(packsDir)
+            .Select(Path.GetFileName)
+            .Where(v => v != null)
+            .OrderByDescending(v => v)
+            .ToList();
+
+        foreach (var version in versions)
+        {
+            var refPath = Path.Combine(packsDir, version!, "ref", targetFramework);
+            if (Directory.Exists(refPath))
+            {
+                return refPath;
+            }
+        }
+
+        throw new DirectoryNotFoundException($"No reference assemblies found for {targetFramework} in {packsDir}");
     }
 
     static Task CreateStrongNameKey(string keyPath)

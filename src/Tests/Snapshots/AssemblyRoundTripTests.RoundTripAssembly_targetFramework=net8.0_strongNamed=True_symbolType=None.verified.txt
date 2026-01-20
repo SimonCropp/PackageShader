@@ -11,9 +11,9 @@
     MethodCount: 6,
     AssemblyRefCount: 1,
     HasDebugInfo: true,
-    HasEmbeddedPdb: false,
-    StringHeapSize: 606,
-    BlobHeapSize: 388,
+    HasEmbeddedPdb: true,
+    StringHeapSize: 366,
+    BlobHeapSize: 260,
     GuidHeapSize: 16,
     UserStringHeapSize: 120
   },
@@ -26,11 +26,11 @@
     MethodCount: 6,
     AssemblyRefCount: 1,
     HasDebugInfo: true,
-    HasEmbeddedPdb: false,
-    StringHeapSize: 674,
-    BlobHeapSize: 1456,
+    HasEmbeddedPdb: true,
+    StringHeapSize: 434,
+    BlobHeapSize: 1328,
     GuidHeapSize: 16,
     UserStringHeapSize: 120
   },
-  IsLoadable: true
+  IsLoadable: false
 }

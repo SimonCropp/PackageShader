@@ -1,37 +1,37 @@
 ﻿{
-  Name: net90_NoStrongName_External,
-  TargetFramework: net9.0,
+  Name: netstandard21_NoStrongName_External,
+  TargetFramework: netstandard2.1,
   IsStrongNamed: false,
   SymbolType: External,
   OriginalMetadata: {
-    Name: net90_NoStrongName_External,
+    Name: netstandard21_NoStrongName_External,
     Version: 1.0.0.0,
     HasPublicKey: false,
     PublicKeyToken: null,
-    TypeCount: 3,
-    MethodCount: 6,
+    TypeCount: 5,
+    MethodCount: 8,
     AssemblyRefCount: 1,
     HasDebugInfo: true,
     HasEmbeddedPdb: false,
-    StringHeapSize: 376,
-    BlobHeapSize: 100,
+    StringHeapSize: 506,
+    BlobHeapSize: 152,
     GuidHeapSize: 16,
-    UserStringHeapSize: 128
+    UserStringHeapSize: 144
   },
   RoundTrippedMetadata: {
-    Name: net90_NoStrongName_External,
+    Name: netstandard21_NoStrongName_External,
     Version: 1.0.0.0,
     HasPublicKey: false,
     PublicKeyToken: null,
-    TypeCount: 3,
-    MethodCount: 6,
+    TypeCount: 5,
+    MethodCount: 8,
     AssemblyRefCount: 1,
     HasDebugInfo: true,
     HasEmbeddedPdb: false,
-    StringHeapSize: 442,
-    BlobHeapSize: 168,
+    StringHeapSize: 574,
+    BlobHeapSize: 220,
     GuidHeapSize: 16,
-    UserStringHeapSize: 128
+    UserStringHeapSize: 144
   },
   IsLoadable: true
 }
