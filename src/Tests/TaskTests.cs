@@ -704,7 +704,6 @@ public class TaskTests
         {
             TaskEntries = taskEntries,
             LibEntries = libEntries,
-            ShadedInTaskFolder = shadedEntryInTask != null,
             ShadedInLibFolder = shadedEntryInLib != null
         });
     }

@@ -1,4 +1,6 @@
-using Argon;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Emit;
 
 [Collection("Sequential")]
 public class AssemblyRoundTripTests
@@ -44,13 +46,13 @@ public class AssemblyRoundTripTests
             {
                 foreach (var symbolType in symbolTypes)
                 {
-                    yield return new object[] { framework, strongNamed, symbolType };
+                    yield return [framework, strongNamed, symbolType];
                 }
             }
         }
     }
 
-    static async Task<TestAssembly> CreateAssembly(
+    static Task<TestAssembly> CreateAssembly(
         string baseDir,
         string name,
         string targetFramework,
@@ -60,8 +62,9 @@ public class AssemblyRoundTripTests
         var categoryDir = Path.Combine(baseDir, targetFramework);
         Directory.CreateDirectory(categoryDir);
 
-        var projectDir = Path.Combine(categoryDir, name);
-        Directory.CreateDirectory(projectDir);
+        var finalDir = Path.Combine(categoryDir, "assemblies");
+        Directory.CreateDirectory(finalDir);
+        var finalPath = Path.Combine(finalDir, $"{name}.dll");
 
         // Create minimal C# source
         var sourceCode = $$"""
@@ -85,84 +88,119 @@ internal class InternalClass
 }
 """;
 
-        await File.WriteAllTextAsync(Path.Combine(projectDir, "Class.cs"), sourceCode);
+        // Compile using Roslyn APIs (much faster than spawning dotnet build)
+        var syntaxTree = CSharpSyntaxTree.ParseText(sourceCode, path: $"{name}.cs");
 
-        // Create key file if strong named
-        string? keyFile = null;
+        var references = GetMetadataReferences(targetFramework);
+
+        var compilationOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+            .WithOptimizationLevel(OptimizationLevel.Release)
+            .WithPlatform(Platform.AnyCpu);
+
+        // Handle strong naming
+        StrongNameProvider? strongNameProvider = null;
         if (strongNamed)
         {
-            keyFile = Path.Combine(projectDir, "key.snk");
-            await CreateStrongNameKey(keyFile);
+            var testKeyPath = Path.Combine(ProjectFiles.ProjectDirectory.Path, "test.snk");
+            strongNameProvider = new DesktopStrongNameProvider(
+                keyFileSearchPaths: [Path.GetDirectoryName(testKeyPath)!]);
+
+            compilationOptions = compilationOptions
+                .WithCryptoKeyFile(testKeyPath)
+                .WithStrongNameProvider(strongNameProvider);
         }
 
-        // Determine debug type
-        var debugType = symbolType switch
+        var compilation = CSharpCompilation.Create(
+            name,
+            [syntaxTree],
+            references,
+            compilationOptions);
+
+        // Emit assembly with appropriate PDB options
+        using var peStream = new FileStream(finalPath, FileMode.Create, FileAccess.ReadWrite);
+        Stream? pdbStream = null;
+        string? pdbPath = null;
+
+        try
         {
-            SymbolType.Embedded => "embedded",
-            SymbolType.External => "portable",
-            SymbolType.None => "none",
-            _ => "portable"
-        };
+            var emitOptions = new EmitOptions();
 
-        // Create project file
-        var projectContent = $$"""
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>{{targetFramework}}</TargetFramework>
-    <DebugType>{{debugType}}</DebugType>
-    <DebugSymbols>{{(symbolType != SymbolType.None ? "true" : "false")}}</DebugSymbols>
-{{(strongNamed ? "    <SignAssembly>true</SignAssembly>\n    <AssemblyOriginatorKeyFile>key.snk</AssemblyOriginatorKeyFile>" : "")}}
-  </PropertyGroup>
-</Project>
-""";
-
-        var projectPath = Path.Combine(projectDir, $"{name}.csproj");
-        await File.WriteAllTextAsync(projectPath, projectContent);
-
-        // Build the project
-        var result = await Cli.Wrap("dotnet")
-            .WithArguments(["build", projectPath, "-c", "Release", "--nologo", "-v", "quiet"])
-            .WithValidation(CommandResultValidation.None)
-            .ExecuteBufferedAsync();
-
-        if (result.ExitCode != 0)
-        {
-            throw new Exception($"Failed to build {name}: {result.StandardError}");
-        }
-
-        var outputPath = Path.Combine(projectDir, "bin", "Release", targetFramework, $"{name}.dll");
-        if (!File.Exists(outputPath))
-        {
-            throw new Exception($"Assembly not found at {outputPath}");
-        }
-
-        // Copy assembly to a cleaner location
-        var finalDir = Path.Combine(categoryDir, "assemblies");
-        Directory.CreateDirectory(finalDir);
-        var finalPath = Path.Combine(finalDir, $"{name}.dll");
-        File.Copy(outputPath, finalPath, true);
-
-        // Copy PDB if external
-        if (symbolType == SymbolType.External)
-        {
-            var pdbPath = Path.Combine(projectDir, "bin", "Release", targetFramework, $"{name}.pdb");
-            if (File.Exists(pdbPath))
+            if (symbolType == SymbolType.Embedded)
             {
-                File.Copy(pdbPath, Path.Combine(finalDir, $"{name}.pdb"), true);
+                emitOptions = emitOptions.WithDebugInformationFormat(DebugInformationFormat.Embedded);
+            }
+            else if (symbolType == SymbolType.External)
+            {
+                pdbPath = Path.Combine(finalDir, $"{name}.pdb");
+                pdbStream = new FileStream(pdbPath, FileMode.Create, FileAccess.ReadWrite);
+                emitOptions = emitOptions.WithDebugInformationFormat(DebugInformationFormat.PortablePdb);
+            }
+            else
+            {
+                emitOptions = emitOptions.WithDebugInformationFormat(DebugInformationFormat.Embedded);
+            }
+
+            var result = compilation.Emit(
+                peStream: peStream,
+                pdbStream: symbolType == SymbolType.External ? pdbStream : null,
+                options: emitOptions);
+
+            if (!result.Success)
+            {
+                var errors = string.Join("\n", result.Diagnostics
+                    .Where(d => d.Severity == DiagnosticSeverity.Error)
+                    .Select(d => d.ToString()));
+                throw new Exception($"Compilation failed:\n{errors}");
             }
         }
+        finally
+        {
+            pdbStream?.Dispose();
+        }
 
-        // Delete the project directory to clean up
-        Directory.Delete(projectDir, true);
-
-        return new TestAssembly
+        return Task.FromResult(new TestAssembly
         {
             Name = name,
             Path = finalPath,
             TargetFramework = targetFramework,
             IsStrongNamed = strongNamed,
             SymbolType = symbolType
+        });
+    }
+
+    static List<MetadataReference> GetMetadataReferences(string targetFramework)
+    {
+        // Get the reference assemblies path for the target framework
+        var refAssembliesPath = targetFramework switch
+        {
+            "netstandard2.0" => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                "dotnet", "packs", "NETStandard.Library.Ref", "2.1.0", "ref", "netstandard2.0"),
+            "netstandard2.1" => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                "dotnet", "packs", "NETStandard.Library.Ref", "2.1.0", "ref", "netstandard2.1"),
+            "net48" => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                "Reference Assemblies", "Microsoft", "Framework", ".NETFramework", "v4.8"),
+            "net8.0" => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                "dotnet", "packs", "Microsoft.NETCore.App.Ref", "8.0.0", "ref", "net8.0"),
+            "net9.0" => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                "dotnet", "packs", "Microsoft.NETCore.App.Ref", "9.0.0", "ref", "net9.0"),
+            "net10.0" => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                "dotnet", "packs", "Microsoft.NETCore.App.Ref", "10.0.0", "ref", "net10.0"),
+            _ => throw new NotSupportedException($"Target framework {targetFramework} not supported")
         };
+
+        if (!Directory.Exists(refAssembliesPath))
+        {
+            throw new DirectoryNotFoundException($"Reference assemblies not found at {refAssembliesPath}");
+        }
+
+        // Load all DLLs from the reference assemblies directory
+        var references = new List<MetadataReference>();
+        foreach (var dll in Directory.GetFiles(refAssembliesPath, "*.dll"))
+        {
+            references.Add(MetadataReference.CreateFromFile(dll));
+        }
+
+        return references;
     }
 
     static Task CreateStrongNameKey(string keyPath)
