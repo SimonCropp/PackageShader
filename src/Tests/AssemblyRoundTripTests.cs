@@ -1,5 +1,3 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
 
 [Collection("Sequential")]
@@ -18,7 +16,7 @@ public class AssemblyRoundTripTests
         TestAssembly assembly;
         try
         {
-            assembly = await CreateAssembly(scenariosDir, name, targetFramework, strongNamed, symbolType);
+            assembly = CreateAssembly(scenariosDir, name, targetFramework, strongNamed, symbolType);
         }
         catch (Exception)
         {
@@ -26,7 +24,7 @@ public class AssemblyRoundTripTests
             return;
         }
 
-        var result = await PerformRoundTrip(assembly, tempDir);
+        var result = PerformRoundTrip(assembly, tempDir);
 
         // Verify the result
         await Verify(result)
@@ -52,7 +50,7 @@ public class AssemblyRoundTripTests
         }
     }
 
-    static Task<TestAssembly> CreateAssembly(
+    static TestAssembly CreateAssembly(
         string baseDir,
         string name,
         string targetFramework,
@@ -98,11 +96,10 @@ internal class InternalClass
             .WithPlatform(Platform.AnyCpu);
 
         // Handle strong naming
-        StrongNameProvider? strongNameProvider = null;
         if (strongNamed)
         {
             var testKeyPath = Path.Combine(ProjectFiles.ProjectDirectory.Path, "test.snk");
-            strongNameProvider = new DesktopStrongNameProvider(
+            var strongNameProvider = new DesktopStrongNameProvider(
                 keyFileSearchPaths: [Path.GetDirectoryName(testKeyPath)!]);
 
             compilationOptions = compilationOptions
@@ -119,7 +116,6 @@ internal class InternalClass
         // Emit assembly with appropriate PDB options
         using var peStream = new FileStream(finalPath, FileMode.Create, FileAccess.ReadWrite);
         Stream? pdbStream = null;
-        string? pdbPath = null;
 
         try
         {
@@ -131,7 +127,7 @@ internal class InternalClass
             }
             else if (symbolType == SymbolType.External)
             {
-                pdbPath = Path.Combine(finalDir, $"{name}.pdb");
+                var pdbPath = Path.Combine(finalDir, $"{name}.pdb");
                 pdbStream = new FileStream(pdbPath, FileMode.Create, FileAccess.ReadWrite);
                 emitOptions = emitOptions.WithDebugInformationFormat(DebugInformationFormat.PortablePdb);
             }
@@ -150,7 +146,7 @@ internal class InternalClass
                 var errors = string.Join("\n", result.Diagnostics
                     .Where(d => d.Severity == DiagnosticSeverity.Error)
                     .Select(d => d.ToString()));
-                throw new Exception($"Compilation failed:\n{errors}");
+                throw new($"Compilation failed:\n{errors}");
             }
         }
         finally
@@ -158,14 +154,14 @@ internal class InternalClass
             pdbStream?.Dispose();
         }
 
-        return Task.FromResult(new TestAssembly
+        return new()
         {
             Name = name,
             Path = finalPath,
             TargetFramework = targetFramework,
             IsStrongNamed = strongNamed,
             SymbolType = symbolType
-        });
+        };
     }
 
     static List<MetadataReference> GetMetadataReferences(string targetFramework)
@@ -216,7 +212,7 @@ internal class InternalClass
         return Task.CompletedTask;
     }
 
-    static async Task<AssemblyRoundTripResult> PerformRoundTrip(TestAssembly assembly, string tempDir)
+    static AssemblyRoundTripResult PerformRoundTrip(TestAssembly assembly, string tempDir)
     {
         var roundTripDir = Path.Combine(tempDir, "RoundTrip", assembly.Name);
         Directory.CreateDirectory(roundTripDir);
@@ -257,7 +253,7 @@ internal class InternalClass
         // If MethodDef RVAs aren't patched, this will fail with "Bad IL format"
         var isLoadable = TryLoadAssembly(outputPath);
 
-        return new AssemblyRoundTripResult
+        return new()
         {
             Name = assembly.Name,
             TargetFramework = assembly.TargetFramework,
@@ -279,7 +275,7 @@ internal class InternalClass
         var assemblyDef = reader.GetAssemblyDefinition();
         var publicKey = reader.GetBlobBytes(assemblyDef.PublicKey);
 
-        return new AssemblyMetadataInfo
+        return new()
         {
             Name = reader.GetString(assemblyDef.Name),
             Version = assemblyDef.Version.ToString(),
@@ -304,8 +300,8 @@ internal class InternalClass
         {
             var bytes = File.ReadAllBytes(path);
             using var stream = new MemoryStream(bytes);
-            var assembly = loadContext.LoadFromStream(stream);
-            return assembly != null;
+            loadContext.LoadFromStream(stream);
+            return true;
         }
         catch
         {
