@@ -1,0 +1,36 @@
+﻿{
+  Name: netstandard20_StrongNamed_Embedded_Roslyn,
+  TargetFramework: netstandard2.0,
+  IsStrongNamed: true,
+  Symbol: Embedded,
+  OriginalMetadata: {
+    Name: netstandard20_StrongNamed_Embedded_Roslyn,
+    Version: 1.0.0.0,
+    HasPublicKey: true,
+    PublicKeyToken: fba2ec45388e2af0,
+    TypeCount: 5,
+    MethodCount: 8,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: true,
+    StringHeapSize: 518,
+    BlobHeapSize: 316,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 156
+  },
+  RoundTrippedMetadata: {
+    Name: netstandard20_StrongNamed_Embedded_Roslyn,
+    Version: 1.0.0.0,
+    HasPublicKey: true,
+    PublicKeyToken: fba2ec45388e2af0,
+    TypeCount: 5,
+    MethodCount: 8,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: true,
+    StringHeapSize: 586,
+    BlobHeapSize: 1384,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 156
+  }
+}

@@ -220,13 +220,13 @@ public class RoundTrip
             var errorOutput = string.IsNullOrWhiteSpace(result.StandardError)
                 ? result.StandardOutput
                 : result.StandardError;
-            throw new Exception($"Failed to build {name}:\n{errorOutput}");
+            throw new($"Failed to build {name}:\n{errorOutput}");
         }
 
         var outputPath = Path.Combine(projectDir, "bin", "Release", targetFramework, $"{name}.dll");
         if (!File.Exists(outputPath))
         {
-            throw new Exception($"Assembly not found at {outputPath}");
+            throw new($"Assembly not found at {outputPath}");
         }
 
         // Copy assembly to a cleaner location
@@ -248,7 +248,7 @@ public class RoundTrip
         // Delete the project directory to clean up
         Directory.Delete(projectDir, true);
 
-        return new TestAssembly
+        return new()
         {
             Name = name,
             Path = finalPath,
@@ -286,7 +286,7 @@ public class RoundTrip
         // Get the reference assemblies path for the target framework
         var refAssembliesPath = targetFramework switch
         {
-            "netstandard2.0" => FindReferenceAssemblies("NETStandard.Library.Ref", "netstandard2.0"),
+            "netstandard2.0" => FindNetStandardReferenceAssemblies("netstandard2.0"),
             "netstandard2.1" => FindReferenceAssemblies("NETStandard.Library.Ref", "netstandard2.1"),
             "net48" => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
                 "Reference Assemblies", "Microsoft", "Framework", ".NETFramework", "v4.8"),
@@ -368,6 +368,37 @@ public class RoundTrip
         }
 
         throw new DirectoryNotFoundException($"No reference assemblies found for {targetFramework} in {packsDir}");
+    }
+
+    static string FindNetStandardReferenceAssemblies(string targetFramework)
+    {
+        // netstandard2.0 reference assemblies come from NuGet package, not from packs folder
+        var nugetPackagesDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".nuget", "packages", "netstandard.library");
+
+        if (!Directory.Exists(nugetPackagesDir))
+        {
+            throw new DirectoryNotFoundException($"NETStandard.Library NuGet package not found at {nugetPackagesDir}");
+        }
+
+        // Find the highest installed version
+        var versions = Directory.GetDirectories(nugetPackagesDir)
+            .Select(Path.GetFileName)
+            .Where(v => v != null)
+            .OrderByDescending(v => v)
+            .ToList();
+
+        foreach (var version in versions)
+        {
+            var refPath = Path.Combine(nugetPackagesDir, version!, "build", targetFramework, "ref");
+            if (Directory.Exists(refPath))
+            {
+                return refPath;
+            }
+        }
+
+        throw new DirectoryNotFoundException($"No reference assemblies found for {targetFramework} in {nugetPackagesDir}");
     }
 
     static Task CreateStrongNameKey(string keyPath)
@@ -522,9 +553,9 @@ public class RoundTrip
 
     sealed class TestAssemblyResolver : ILVerify.IResolver, IDisposable
     {
-        readonly string assemblyPath;
-        readonly Dictionary<string, PEReader> cache = new(StringComparer.OrdinalIgnoreCase);
-        readonly string referenceAssembliesPath;
+        string assemblyPath;
+        Dictionary<string, PEReader> cache = new(StringComparer.OrdinalIgnoreCase);
+        string referenceAssembliesPath;
 
         public string SystemModuleName { get; }
 
