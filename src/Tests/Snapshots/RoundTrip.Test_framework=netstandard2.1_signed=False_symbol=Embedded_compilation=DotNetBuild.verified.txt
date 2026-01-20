@@ -1,0 +1,36 @@
+﻿{
+  Name: netstandard21_NoStrongName_Embedded_DotNetBuild,
+  TargetFramework: netstandard2.1,
+  IsStrongNamed: false,
+  Symbol: Embedded,
+  OriginalMetadata: {
+    Name: netstandard21_NoStrongName_Embedded_DotNetBuild,
+    Version: 1.0.0.0,
+    HasPublicKey: false,
+    PublicKeyToken: null,
+    TypeCount: 5,
+    MethodCount: 8,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: true,
+    StringHeapSize: 770,
+    BlobHeapSize: 316,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 168
+  },
+  RoundTrippedMetadata: {
+    Name: netstandard21_NoStrongName_Embedded_DotNetBuild,
+    Version: 1.0.0.0,
+    HasPublicKey: false,
+    PublicKeyToken: null,
+    TypeCount: 5,
+    MethodCount: 8,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: true,
+    StringHeapSize: 838,
+    BlobHeapSize: 384,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 168
+  }
+}

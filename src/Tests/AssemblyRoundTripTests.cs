@@ -198,6 +198,7 @@ public class RoundTrip
                               <Project Sdk="Microsoft.NET.Sdk">
                                 <PropertyGroup>
                                   <TargetFramework>{targetFramework}</TargetFramework>
+                                  <LangVersion>latest</LangVersion>
                                   <DebugType>{debugType}</DebugType>
                                   <DebugSymbols>{(symbol != Symbol.None ? "true" : "false")}</DebugSymbols>
                               {(strongNamed ? "    <SignAssembly>true</SignAssembly>\n    <AssemblyOriginatorKeyFile>key.snk</AssemblyOriginatorKeyFile>" : "")}
@@ -216,7 +217,10 @@ public class RoundTrip
 
         if (result.ExitCode != 0)
         {
-            throw new Exception($"Failed to build {name}: {result.StandardError}");
+            var errorOutput = string.IsNullOrWhiteSpace(result.StandardError)
+                ? result.StandardOutput
+                : result.StandardError;
+            throw new Exception($"Failed to build {name}:\n{errorOutput}");
         }
 
         var outputPath = Path.Combine(projectDir, "bin", "Release", targetFramework, $"{name}.dll");
