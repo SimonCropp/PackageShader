@@ -46,10 +46,15 @@ public class RoundTrip
         string targetFramework,
         bool strongNamed,
         Symbol symbol,
-        Compilation compilation) =>
-        compilation == Compilation.Roslyn
-            ? CreateAssemblyWithRoslyn(baseDir, name, targetFramework, strongNamed, symbol)
-            : await CreateAssemblyWithDotNetBuild(baseDir, name, targetFramework, strongNamed, symbol);
+        Compilation compilation)
+    {
+        if (compilation == Compilation.Roslyn)
+        {
+            return CreateAssemblyWithRoslyn(baseDir, name, targetFramework, strongNamed, symbol);
+        }
+
+        return await CreateAssemblyWithDotNetBuild(baseDir, name, targetFramework, strongNamed, symbol);
+    }
 
     static TestAssembly CreateAssemblyWithRoslyn(
         string baseDir,
@@ -138,9 +143,11 @@ public class RoundTrip
 
             if (!result.Success)
             {
-                var errors = string.Join("\n", result.Diagnostics
-                    .Where(d => d.Severity == DiagnosticSeverity.Error)
-                    .Select(d => d.ToString()));
+                var errors = string.Join(
+                    '\n',
+                    result.Diagnostics
+                        .Where(_ => _.Severity == DiagnosticSeverity.Error)
+                        .Select(_ => _.ToString()));
                 throw new($"Compilation failed:\n{errors}");
             }
         }
@@ -547,7 +554,7 @@ public class RoundTrip
 
         if (errors.Count > 0)
         {
-            throw new Exception($"IL verification failed for {Path.GetFileName(assemblyPath)}:\n{string.Join("\n", errors)}");
+            throw new Exception($"IL verification failed for {Path.GetFileName(assemblyPath)}:\n{string.Join('\n', errors)}");
         }
     }
 
