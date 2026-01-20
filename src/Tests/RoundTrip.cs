@@ -499,18 +499,14 @@ public class RoundTrip
 
     static AssemblyRoundTripResult PerformRoundTrip(string assemblyPath, string framework, bool signed, Symbol symbol, string tempDir)
     {
-        // Extract friendly name from the before assembly file
-        var fileName = Path.GetFileNameWithoutExtension(assemblyPath);
-        var assemblyInfo = ReadAssemblyMetadata(assemblyPath);
-        var friendlyName = assemblyInfo.Name;
+        // Read original metadata
+        var originalMetadata = ReadAssemblyMetadata(assemblyPath);
+        var friendlyName = originalMetadata.Name;
 
         var roundTripDir = Path.Combine(tempDir, "RoundTrip", friendlyName);
         Directory.CreateDirectory(roundTripDir);
 
         var outputPath = Path.Combine(roundTripDir, Path.GetFileName(assemblyPath));
-
-        // Read original metadata
-        var originalMetadata = ReadAssemblyMetadata(assemblyPath);
 
         // Get test key if needed for strong naming
         StrongNameKey? key = null;
