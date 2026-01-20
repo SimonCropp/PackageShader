@@ -1,0 +1,36 @@
+﻿{
+  Name: net90_StrongNamed_Embedded_DotNetBuild,
+  TargetFramework: net9.0,
+  IsStrongNamed: true,
+  Symbol: Embedded,
+  OriginalMetadata: {
+    Name: net90_StrongNamed_Embedded_DotNetBuild,
+    Version: 1.0.0.0,
+    HasPublicKey: true,
+    PublicKeyToken: fba2ec45388e2af0,
+    TypeCount: 3,
+    MethodCount: 6,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: true,
+    StringHeapSize: 638,
+    BlobHeapSize: 404,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 152
+  },
+  RoundTrippedMetadata: {
+    Name: net90_StrongNamed_Embedded_DotNetBuild,
+    Version: 1.0.0.0,
+    HasPublicKey: true,
+    PublicKeyToken: fba2ec45388e2af0,
+    TypeCount: 3,
+    MethodCount: 6,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: true,
+    StringHeapSize: 706,
+    BlobHeapSize: 1472,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 152
+  }
+}

@@ -1,0 +1,36 @@
+﻿{
+  Name: net80_NoStrongName_External_Roslyn,
+  TargetFramework: net8.0,
+  IsStrongNamed: false,
+  Symbol: External,
+  OriginalMetadata: {
+    Name: net80_NoStrongName_External_Roslyn,
+    Version: 1.0.0.0,
+    HasPublicKey: false,
+    PublicKeyToken: null,
+    TypeCount: 3,
+    MethodCount: 6,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: false,
+    StringHeapSize: 390,
+    BlobHeapSize: 100,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 144
+  },
+  RoundTrippedMetadata: {
+    Name: net80_NoStrongName_External_Roslyn,
+    Version: 1.0.0.0,
+    HasPublicKey: false,
+    PublicKeyToken: null,
+    TypeCount: 3,
+    MethodCount: 6,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: false,
+    StringHeapSize: 458,
+    BlobHeapSize: 168,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 144
+  }
+}

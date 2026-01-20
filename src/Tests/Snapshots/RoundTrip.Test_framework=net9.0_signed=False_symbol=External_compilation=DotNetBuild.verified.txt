@@ -1,0 +1,36 @@
+﻿{
+  Name: net90_NoStrongName_External_DotNetBuild,
+  TargetFramework: net9.0,
+  IsStrongNamed: false,
+  Symbol: External,
+  OriginalMetadata: {
+    Name: net90_NoStrongName_External_DotNetBuild,
+    Version: 1.0.0.0,
+    HasPublicKey: false,
+    PublicKeyToken: null,
+    TypeCount: 3,
+    MethodCount: 6,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: false,
+    StringHeapSize: 640,
+    BlobHeapSize: 244,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 152
+  },
+  RoundTrippedMetadata: {
+    Name: net90_NoStrongName_External_DotNetBuild,
+    Version: 1.0.0.0,
+    HasPublicKey: false,
+    PublicKeyToken: null,
+    TypeCount: 3,
+    MethodCount: 6,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: false,
+    StringHeapSize: 706,
+    BlobHeapSize: 312,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 152
+  }
+}

@@ -1,0 +1,36 @@
+﻿{
+  Name: netstandard21_StrongNamed_External_Roslyn,
+  TargetFramework: netstandard2.1,
+  IsStrongNamed: true,
+  Symbol: External,
+  OriginalMetadata: {
+    Name: netstandard21_StrongNamed_External_Roslyn,
+    Version: 1.0.0.0,
+    HasPublicKey: true,
+    PublicKeyToken: fba2ec45388e2af0,
+    TypeCount: 5,
+    MethodCount: 8,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: false,
+    StringHeapSize: 518,
+    BlobHeapSize: 316,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 156
+  },
+  RoundTrippedMetadata: {
+    Name: netstandard21_StrongNamed_External_Roslyn,
+    Version: 1.0.0.0,
+    HasPublicKey: true,
+    PublicKeyToken: fba2ec45388e2af0,
+    TypeCount: 5,
+    MethodCount: 8,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: false,
+    StringHeapSize: 586,
+    BlobHeapSize: 1384,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 156
+  }
+}

@@ -1,0 +1,36 @@
+﻿{
+  Name: net80_StrongNamed_External_DotNetBuild,
+  TargetFramework: net8.0,
+  IsStrongNamed: true,
+  Symbol: External,
+  OriginalMetadata: {
+    Name: net80_StrongNamed_External_DotNetBuild,
+    Version: 1.0.0.0,
+    HasPublicKey: true,
+    PublicKeyToken: fba2ec45388e2af0,
+    TypeCount: 3,
+    MethodCount: 6,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: false,
+    StringHeapSize: 638,
+    BlobHeapSize: 404,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 152
+  },
+  RoundTrippedMetadata: {
+    Name: net80_StrongNamed_External_DotNetBuild,
+    Version: 1.0.0.0,
+    HasPublicKey: true,
+    PublicKeyToken: fba2ec45388e2af0,
+    TypeCount: 3,
+    MethodCount: 6,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: false,
+    StringHeapSize: 706,
+    BlobHeapSize: 1472,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 152
+  }
+}
