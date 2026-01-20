@@ -1,26 +1,81 @@
 [Collection("Sequential")]
 public class RoundTrip
 {
+    static string GetSnapshotsDirectory() => Path.Combine(ProjectFiles.ProjectDirectory.Path, "Snapshots");
+
+    static string GetBeforeAssemblyFileName(string framework, bool signed, Symbol symbol, Compilation compilation) =>
+        $"RoundTrip.Test_framework={framework}_signed={signed}_symbol={symbol}_compilation={compilation}#before.dll";
+
+    static string GetBeforeAssemblyPath(string framework, bool signed, Symbol symbol, Compilation compilation) =>
+        Path.Combine(GetSnapshotsDirectory(), GetBeforeAssemblyFileName(framework, signed, symbol, compilation));
+
     [Theory]
     [MemberData(nameof(GetAssemblyScenarios))]
     public async Task Test(string framework, bool signed, Symbol symbol, Compilation compilation)
     {
+        // Load pre-generated "before" assembly from Snapshots directory
+        var beforeAssemblyPath = GetBeforeAssemblyPath(framework, signed, symbol, compilation);
+        if (!File.Exists(beforeAssemblyPath))
+        {
+            throw new FileNotFoundException(
+                $"Pre-generated before assembly not found at: {beforeAssemblyPath}\n" +
+                "Please run the GenerateBeforeAssemblies test first to generate all before assemblies.");
+        }
+
         using var tempDir = new TempDirectory();
-        var scenariosDir = Path.Combine(tempDir, "Scenarios");
-        Directory.CreateDirectory(scenariosDir);
-
-        var name = $"{framework.Replace(".", "")}_{(signed ? "StrongNamed" : "NoStrongName")}_{symbol}_{compilation}";
-
-        var assembly = await CreateAssembly(scenariosDir, name, framework, signed, symbol, compilation);
-        var result = PerformRoundTrip(assembly, tempDir);
+        var result = PerformRoundTrip(beforeAssemblyPath, framework, signed, symbol, tempDir);
 
         await Verify(result)
-            .AppendFile(assembly.Path, "before")
             .AppendFile(result.Path, "after")
             .UseDirectory("Snapshots")
             .IgnoreMember("Path");
 
-        ValidateNoNewErrors(assembly.Path, result.Path, framework);
+        ValidateNoNewErrors(beforeAssemblyPath, result.Path, framework);
+    }
+
+    [Fact(Skip = "Run manually to regenerate all before assemblies when needed")]
+    public static async Task GenerateBeforeAssemblies()
+    {
+        var snapshotsDir = GetSnapshotsDirectory();
+        Directory.CreateDirectory(snapshotsDir);
+
+        using var tempDir = new TempDirectory();
+        var scenariosDir = Path.Combine(tempDir, "Scenarios");
+        Directory.CreateDirectory(scenariosDir);
+
+        var scenarios = GetAssemblyScenarios().ToList();
+        var generated = 0;
+
+        foreach (var scenario in scenarios)
+        {
+            var framework = (string)scenario[0];
+            var signed = (bool)scenario[1];
+            var symbol = (Symbol)scenario[2];
+            var compilation = (Compilation)scenario[3];
+
+            var name = $"{framework.Replace(".", "")}_{(signed ? "StrongNamed" : "NoStrongName")}_{symbol}_{compilation}";
+            var assembly = await CreateAssembly(scenariosDir, name, framework, signed, symbol, compilation);
+
+            var targetPath = GetBeforeAssemblyPath(framework, signed, symbol, compilation);
+            File.Copy(assembly.Path, targetPath, overwrite: true);
+
+            Console.WriteLine($"Generated: {Path.GetFileName(targetPath)}");
+
+            // Copy PDB if external symbols
+            if (symbol == Symbol.External)
+            {
+                var sourcePdb = Path.ChangeExtension(assembly.Path, ".pdb");
+                var targetPdb = Path.ChangeExtension(targetPath, ".pdb");
+                if (File.Exists(sourcePdb))
+                {
+                    File.Copy(sourcePdb, targetPdb, overwrite: true);
+                }
+            }
+
+            generated++;
+        }
+
+        Console.WriteLine($"Generated {generated} before assemblies in {snapshotsDir}");
     }
 
     public static IEnumerable<object[]> GetAssemblyScenarios()
@@ -362,72 +417,40 @@ public class RoundTrip
 
     static string FindReferenceAssemblies(string packName, string targetFramework)
     {
-        // Pin to specific versions for deterministic builds across all machines
-        // These versions match the NuGet packages referenced in Tests.csproj
-        var pinnedVersion = targetFramework switch
-        {
-            "net8.0" => "8.0.0",
-            "net9.0" => "9.0.0",
-            "net10.0" => "10.0.0",
-            "netstandard2.1" => "2.1.0",
-            _ => null
-        };
-
-        // First, try NuGet packages directory (where our pinned packages are restored)
-        if (pinnedVersion != null)
-        {
-            var nugetPackagesDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                ".nuget", "packages", packName.ToLowerInvariant());
-
-            if (Directory.Exists(nugetPackagesDir))
-            {
-                var nugetRefPath = Path.Combine(nugetPackagesDir, pinnedVersion, "ref", targetFramework);
-                if (Directory.Exists(nugetRefPath))
-                {
-                    return nugetRefPath;
-                }
-            }
-        }
-
-        // Fallback to SDK packs directory
+        // Use SDK packs directory - always use the LOWEST available version for determinism
+        // This ensures that as long as machines have at least one compatible SDK version,
+        // they'll produce the same output
         var packsDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
             "dotnet", "packs", packName);
 
-        if (Directory.Exists(packsDir))
+        if (!Directory.Exists(packsDir))
         {
-            // If we have a pinned version, try it first in packs dir
-            if (pinnedVersion != null)
+            throw new DirectoryNotFoundException($"Pack directory not found: {packsDir}. Please ensure .NET SDK is installed.");
+        }
+
+        // Extract major.minor from target framework
+        // "net8.0" -> "8.0", "netstandard2.1" -> "2.1"
+        var tfmVersion = targetFramework
+            .Replace("netstandard", "")
+            .Replace("net", "");
+
+        // Find all matching versions, sorted by semantic version (lowest first)
+        var versions = Directory.GetDirectories(packsDir)
+            .Select(Path.GetFileName)
+            .Where(v => v != null && v.StartsWith(tfmVersion + "."))
+            .OrderBy(v => Version.TryParse(v, out var parsed) ? parsed : new Version(0, 0))
+            .ToList();
+
+        foreach (var version in versions)
+        {
+            var refPath = Path.Combine(packsDir, version!, "ref", targetFramework);
+            if (Directory.Exists(refPath))
             {
-                var pinnedPath = Path.Combine(packsDir, pinnedVersion, "ref", targetFramework);
-                if (Directory.Exists(pinnedPath))
-                {
-                    return pinnedPath;
-                }
-            }
-
-            // Find any matching version (for local development flexibility)
-            var tfmVersion = targetFramework
-                .Replace("netstandard", "")
-                .Replace("net", "");
-
-            var versions = Directory.GetDirectories(packsDir)
-                .Select(Path.GetFileName)
-                .Where(v => v != null && v.StartsWith(tfmVersion + "."))
-                .OrderBy(v => Version.TryParse(v, out var parsed) ? parsed : new Version(0, 0))
-                .ToList();
-
-            foreach (var version in versions)
-            {
-                var refPath = Path.Combine(packsDir, version!, "ref", targetFramework);
-                if (Directory.Exists(refPath))
-                {
-                    return refPath;
-                }
+                return refPath;
             }
         }
 
-        throw new DirectoryNotFoundException($"No reference assemblies found for {targetFramework}. Please ensure .NET SDK or NuGet package '{packName}' version {pinnedVersion ?? "compatible"} is installed.");
+        throw new DirectoryNotFoundException($"No reference assemblies found for {targetFramework} (version {tfmVersion}.x) in {packsDir}. Please ensure .NET SDK with reference assemblies for {targetFramework} is installed.");
     }
 
     static string FindNetStandardReferenceAssemblies(string targetFramework)
@@ -442,15 +465,7 @@ public class RoundTrip
             throw new DirectoryNotFoundException($"NETStandard.Library NuGet package not found at {nugetPackagesDir}");
         }
 
-        // Pin to specific version for deterministic builds
-        var pinnedVersion = "2.0.3";
-        var pinnedPath = Path.Combine(nugetPackagesDir, pinnedVersion, "build", targetFramework, "ref");
-        if (Directory.Exists(pinnedPath))
-        {
-            return pinnedPath;
-        }
-
-        // Fallback: Find any installed version (for local development flexibility)
+        // Find the LOWEST installed version for deterministic builds
         var versions = Directory.GetDirectories(nugetPackagesDir)
             .Select(Path.GetFileName)
             .Where(v => v != null)
@@ -482,19 +497,24 @@ public class RoundTrip
         return Task.CompletedTask;
     }
 
-    static AssemblyRoundTripResult PerformRoundTrip(TestAssembly assembly, string tempDir)
+    static AssemblyRoundTripResult PerformRoundTrip(string assemblyPath, string framework, bool signed, Symbol symbol, string tempDir)
     {
-        var roundTripDir = Path.Combine(tempDir, "RoundTrip", assembly.Name);
+        // Extract friendly name from the before assembly file
+        var fileName = Path.GetFileNameWithoutExtension(assemblyPath);
+        var assemblyInfo = ReadAssemblyMetadata(assemblyPath);
+        var friendlyName = assemblyInfo.Name;
+
+        var roundTripDir = Path.Combine(tempDir, "RoundTrip", friendlyName);
         Directory.CreateDirectory(roundTripDir);
 
-        var outputPath = Path.Combine(roundTripDir, Path.GetFileName(assembly.Path));
+        var outputPath = Path.Combine(roundTripDir, Path.GetFileName(assemblyPath));
 
         // Read original metadata
-        var originalMetadata = ReadAssemblyMetadata(assembly.Path);
+        var originalMetadata = ReadAssemblyMetadata(assemblyPath);
 
         // Get test key if needed for strong naming
         StrongNameKey? key = null;
-        if (assembly.IsStrongNamed)
+        if (signed)
         {
             var keyPath = Path.Combine(ProjectFiles.ProjectDirectory.Path, "test.snk");
             key = StrongNameKey.FromFile(keyPath);
@@ -502,7 +522,7 @@ public class RoundTrip
 
         // IMPORTANT: Actually modify the assembly to trigger metadata growth
         // This tests the full metadata rebuild path which is where bugs happen
-        using (var modifier = StreamingAssemblyModifier.Open(assembly.Path))
+        using (var modifier = StreamingAssemblyModifier.Open(assemblyPath))
         {
             // Add InternalsVisibleTo attributes to force metadata growth
             // This will trigger the metadata rebuild path instead of simple patching
@@ -522,10 +542,10 @@ public class RoundTrip
         return new()
         {
             Path = outputPath,
-            Name = assembly.Name,
-            TargetFramework = assembly.TargetFramework,
-            IsStrongNamed = assembly.IsStrongNamed,
-            Symbol = assembly.Symbol,
+            Name = friendlyName,
+            TargetFramework = framework,
+            IsStrongNamed = signed,
+            Symbol = symbol,
             OriginalMetadata = originalMetadata,
             RoundTrippedMetadata = roundTrippedMetadata,
             ValidationErrors = ValidateMetadata(originalMetadata, roundTrippedMetadata)
