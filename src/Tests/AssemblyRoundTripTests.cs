@@ -15,7 +15,12 @@ public class RoundTrip
         var result = PerformRoundTrip(assembly, tempDir);
 
         await Verify(result)
-            .UseDirectory("Snapshots");
+            .AppendFile(assembly.Path, "before")
+            .AppendFile(result.Path, "after")
+            .UseDirectory("Snapshots")
+            .IgnoreMember("Path");
+
+        ValidateNoNewErrors(assembly.Path, result.Path);
     }
 
     public static IEnumerable<object[]> GetAssemblyScenarios()
@@ -74,16 +79,18 @@ public class RoundTrip
         var sourceCode = GetTestSourceCode(name);
 
         // Compile using Roslyn APIs (much faster than spawning dotnet build)
+        // Use a fixed deterministic path for the source file (no temp directory paths)
         var syntaxTree = CSharpSyntaxTree.ParseText(
             sourceCode,
-            path: $"{name}.cs",
+            path: $"/_/{name}.cs",
             encoding: Encoding.UTF8);
 
         var references = GetMetadataReferences(targetFramework);
 
         var compilationOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
             .WithOptimizationLevel(OptimizationLevel.Release)
-            .WithPlatform(Platform.AnyCpu);
+            .WithPlatform(Platform.AnyCpu)
+            .WithDeterministic(true);
 
         // Handle strong naming
         if (strongNamed)
@@ -105,7 +112,9 @@ public class RoundTrip
              using System.Reflection;
              [assembly: AssemblyVersion("{assemblyVersion}")]
 
-             """, encoding: Encoding.UTF8);
+             """,
+            path: "/_/AssemblyInfo.cs",
+            encoding: Encoding.UTF8);
 
         var compilation = CSharpCompilation.Create(
             name,
@@ -208,6 +217,9 @@ public class RoundTrip
                                   <LangVersion>latest</LangVersion>
                                   <DebugType>{debugType}</DebugType>
                                   <DebugSymbols>{(symbol != Symbol.None ? "true" : "false")}</DebugSymbols>
+                                  <Deterministic>true</Deterministic>
+                                  <Version>1.0.0.0</Version>
+                                  <PathMap>$(MSBuildProjectDirectory)=/_/</PathMap>
                               {(strongNamed ? "    <SignAssembly>true</SignAssembly>\n    <AssemblyOriginatorKeyFile>key.snk</AssemblyOriginatorKeyFile>" : "")}
                                 </PropertyGroup>
                               </Project>
@@ -458,10 +470,9 @@ public class RoundTrip
         // Read modified metadata
         var roundTrippedMetadata = ReadAssemblyMetadata(outputPath);
 
-        Validate(outputPath);
-
         return new()
         {
+            Path = outputPath,
             Name = assembly.Name,
             TargetFramework = assembly.TargetFramework,
             IsStrongNamed = assembly.IsStrongNamed,
@@ -524,7 +535,7 @@ public class RoundTrip
         return errors;
     }
 
-    static void Validate(string assemblyPath)
+    static List<string> GetILVerifyErrors(string assemblyPath)
     {
         using var resolver = new TestAssemblyResolver(assemblyPath);
         var verifier = new ILVerify.Verifier(resolver);
@@ -552,9 +563,108 @@ public class RoundTrip
             }
         }
 
-        if (errors.Count > 0)
+        return errors;
+    }
+
+    static List<string> GetPeVerifyErrors(string assemblyPath)
+    {
+        if (!PeVerifyTool.FoundPeVerify)
         {
-            throw new Exception($"IL verification failed for {Path.GetFileName(assemblyPath)}:\n{string.Join('\n', errors)}");
+            return [];
+        }
+
+        var ignoreCodes = new List<string> { "0x80070002", "0x80131252" };
+        var workingDirectory = Path.GetDirectoryName(assemblyPath)!;
+
+        var arguments = $"\"{assemblyPath}\" /hresult /nologo /ignore={string.Join(",", ignoreCodes)}";
+        var processStartInfo = new ProcessStartInfo(PeVerifyTool.PeVerifyPath!)
+        {
+            Arguments = arguments,
+            WorkingDirectory = workingDirectory,
+            CreateNoWindow = true,
+            UseShellExecute = false,
+            RedirectStandardOutput = true
+        };
+
+        using var process = Process.Start(processStartInfo)!;
+        var output = process.StandardOutput.ReadToEnd();
+
+        if (!process.WaitForExit(10000))
+        {
+            throw new Exception("PeVerify failed to exit");
+        }
+
+        // Clean up output
+        output = Regex.Replace(output, "^All Classes and Methods.*", "", RegexOptions.Multiline);
+        output = Regex.Replace(output, @"\[offset [^\]]*\]", ""); // Remove offset info for comparison
+        output = output.Trim();
+
+        if (string.IsNullOrEmpty(output))
+        {
+            return [];
+        }
+
+        return output.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Trim())
+            .Where(line => !string.IsNullOrEmpty(line))
+            .ToList();
+    }
+
+    static void ValidateNoNewErrors(string inputPath, string outputPath)
+    {
+        // ILVerify check
+        var inputILVerifyErrors = GetILVerifyErrors(inputPath).ToHashSet();
+        var outputILVerifyErrors = GetILVerifyErrors(outputPath);
+        var newILVerifyErrors = outputILVerifyErrors.Where(e => !inputILVerifyErrors.Contains(e)).ToList();
+
+        if (newILVerifyErrors.Count > 0)
+        {
+            throw new Exception($"ILVerify found {newILVerifyErrors.Count} new error(s) in output assembly {Path.GetFileName(outputPath)}:\n{string.Join('\n', newILVerifyErrors)}");
+        }
+
+        // PeVerify check (only available on Windows with .NET Framework SDK)
+        if (PeVerifyTool.FoundPeVerify)
+        {
+            var inputPeVerifyErrors = GetPeVerifyErrors(inputPath).ToHashSet();
+            var outputPeVerifyErrors = GetPeVerifyErrors(outputPath);
+            var newPeVerifyErrors = outputPeVerifyErrors.Where(e => !inputPeVerifyErrors.Contains(e)).ToList();
+
+            if (newPeVerifyErrors.Count > 0)
+            {
+                throw new Exception($"PeVerify found {newPeVerifyErrors.Count} new error(s) in output assembly {Path.GetFileName(outputPath)}:\n{string.Join('\n', newPeVerifyErrors)}");
+            }
+        }
+    }
+
+    static class PeVerifyTool
+    {
+        public static readonly bool FoundPeVerify;
+        public static readonly string? PeVerifyPath;
+
+        static PeVerifyTool() =>
+            FoundPeVerify = TryFindPeVerify(out PeVerifyPath);
+
+        static bool TryFindPeVerify(out string? path)
+        {
+            var programFilesPath = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+            var windowsSdkDirectory = Path.Combine(programFilesPath, @"Microsoft SDKs\Windows");
+
+            if (!Directory.Exists(windowsSdkDirectory))
+            {
+                path = null;
+                return false;
+            }
+
+            path = Directory.EnumerateFiles(windowsSdkDirectory, "peverify.exe", SearchOption.AllDirectories)
+                .Where(x => !x.Contains("x64", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(x =>
+                {
+                    var info = FileVersionInfo.GetVersionInfo(x);
+                    return new Version(info.FileMajorPart, info.FileMinorPart, info.FileBuildPart);
+                })
+                .FirstOrDefault();
+
+            return path != null;
         }
     }
 
@@ -643,6 +753,7 @@ public class RoundTrip
         public required AssemblyMetadataInfo OriginalMetadata { get; init; }
         public required AssemblyMetadataInfo RoundTrippedMetadata { get; init; }
         public required List<string> ValidationErrors { get; init; }
+        public required string Path { get; init; }
     }
 
     record AssemblyMetadataInfo
