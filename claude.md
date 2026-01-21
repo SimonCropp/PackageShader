@@ -14,6 +14,10 @@ Follow `.editorconfig` for formatting and code style conventions. Respect `.gita
 - ✅ Good: `.OrderBy(_ => _.Property)` or `.Select(_ => _.Transform())`
 - ❌ Bad: `.OrderBy(x => x.Property)` or `.Select(item => item.Transform())`
 
+## Git Workflow
+
+**Never commit automatically.** The user always wants to review changes and commit manually. Do not use `git commit` or `git add` commands.
+
 ## Build Commands
 
 **Solution file**: `src/PackageShader.slnx`
