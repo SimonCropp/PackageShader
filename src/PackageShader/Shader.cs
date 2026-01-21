@@ -68,11 +68,21 @@ public static class Shader
             return; // No shaded assemblies, nothing to validate
         }
 
+        // Build set of assemblies reachable from root (these are the only ones that matter)
+        var reachableFromRoot = GetAssembliesReachableFromRoot(infos);
+
         // Check each non-root, unshaded assembly for references to shaded assemblies
         foreach (var info in infos)
         {
             // Skip if this is shaded (will be renamed) or root (allowed to reference shaded deps)
             if (info.IsShaded || info.IsRootAssembly)
+            {
+                continue;
+            }
+
+            // Skip if not reachable from root assembly - these are "stray" dependencies
+            // (e.g., from build tools with PrivateAssets="all") that won't affect runtime
+            if (!reachableFromRoot.Contains(info.SourceName))
             {
                 continue;
             }
@@ -116,5 +126,57 @@ public static class Shader
                     $"or remove {refList} from the list of assemblies to shade.");
             }
         }
+    }
+
+    static HashSet<string> GetAssembliesReachableFromRoot(List<SourceTargetInfo> infos)
+    {
+        var reachable = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var rootInfo = infos.FirstOrDefault(_ => _.IsRootAssembly);
+
+        if (rootInfo == null)
+        {
+            // No root assembly - consider all assemblies reachable (conservative)
+            return new HashSet<string>(
+                infos.Select(_ => _.SourceName),
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        // Group by name to handle duplicates (e.g., IntermediateAssembly may also be in ReferenceCopyLocalPaths)
+        var infoByName = infos
+            .GroupBy(_ => _.SourceName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(_ => _.Key, _ => _.First(), StringComparer.OrdinalIgnoreCase);
+        var toProcess = new Queue<SourceTargetInfo>();
+        toProcess.Enqueue(rootInfo);
+        reachable.Add(rootInfo.SourceName);
+
+        while (toProcess.Count > 0)
+        {
+            var current = toProcess.Dequeue();
+
+            if (!File.Exists(current.SourcePath))
+            {
+                continue;
+            }
+
+            // Get references from current assembly
+            using var peFile = StreamingPEFile.Open(current.SourcePath);
+            using var reader = new StreamingMetadataReader(peFile);
+
+            var refCount = reader.GetRowCount(TableIndex.AssemblyRef);
+            for (uint rid = 1; rid <= refCount; rid++)
+            {
+                var found = reader.FindAssemblyRefByRid(rid);
+                if (found != null)
+                {
+                    var refName = found.Value.name;
+                    if (reachable.Add(refName) && infoByName.TryGetValue(refName, out var refInfo))
+                    {
+                        toProcess.Enqueue(refInfo);
+                    }
+                }
+            }
+        }
+
+        return reachable;
     }
 }
