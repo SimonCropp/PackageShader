@@ -473,6 +473,12 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
             WriteUInt32(output, (uint) (resourcesRva + sizeDiff));
         }
 
+        // CRITICAL: Patch MethodDef RVAs
+        // MethodDef table contains RVA fields that point to IL code
+        // When metadata grows, IL code shifts, so these RVAs must be updated
+        // This is the bug fix for "Bad IL format" errors in MarkdownSnippets
+        PatchMethodDefRVAs(output, metadataSection, oldMetadataRvaEnd, sizeDiff);
+
         // Patch base relocation table entries that point to shifted addresses
         // The .reloc section contains fixup entries for addresses that need adjusting when the image is loaded
         // If those entries point to shifted data, we need to update the offsets
@@ -726,6 +732,93 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
             else
             {
                 WriteUInt32(output, (uint) (hintNameRva + sizeDiff));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Patches MethodDef RVAs when IL code has shifted due to metadata growth.
+    /// This is critical - without this, assemblies will have "Bad IL format" errors.
+    /// </summary>
+    void PatchMethodDefRVAs(
+        Stream output,
+        SectionInfo metadataSection,
+        uint oldMetadataRvaEnd,
+        int sizeDiff)
+    {
+        // Get the number of MethodDef rows from old metadata
+        var methodDefCount = metadata.GetRowCount(TableIndex.MethodDef);
+        if (methodDefCount == 0)
+        {
+            return; // No methods to patch
+        }
+
+        // Calculate where the NEW metadata starts in the output file
+        var metadataOffsetInSection = source.MetadataRva - metadataSection.VirtualAddress;
+        var newMetadataFileOffset = metadataSection.PointerToRawData + metadataOffsetInSection;
+
+        // Calculate where MethodDef table is in the NEW metadata
+        // We can't use old offsets directly because adding rows to tables shifts MethodDef
+        // MethodDef is table index 6 (0x06)
+        // Tables that come BEFORE MethodDef and might have added rows:
+        // - TypeRef (table 1): plan.NewTypeRefs
+        // - MemberRef (table 10): comes AFTER MethodDef, doesn't shift it
+        // - CustomAttribute (table 12): comes AFTER MethodDef, doesn't shift it
+
+        // Calculate the shift caused by added TypeRef rows (table 1 comes before MethodDef table 6)
+        var typeRefShift = 0;
+        if (plan.NewTypeRefs.Count > 0)
+        {
+            // TypeRef row size = ResolutionScope index + Name index + Namespace index
+            var typeRefRowSize = metadata.GetCodedIndexSize(CodedIndex.ResolutionScope) +
+                                metadata.StringIndexSize +
+                                metadata.StringIndexSize;
+            typeRefShift = plan.NewTypeRefs.Count * typeRefRowSize;
+        }
+
+        // Get the offset of the MethodDef table within the OLD metadata blob
+        var firstMethodDefRowFileOffset = metadata.GetRowOffset(TableIndex.MethodDef, 1);
+        var methodDefTableOffsetInMetadata = firstMethodDefRowFileOffset - source.MetadataFileOffset;
+
+        // Apply the shift to account for added rows in tables before MethodDef
+        methodDefTableOffsetInMetadata += typeRefShift;
+
+        // Calculate the absolute file offset of the MethodDef table in the NEW metadata in output
+        var methodDefTableFileOffset = newMetadataFileOffset + methodDefTableOffsetInMetadata;
+
+        // Get row size (should be same as old metadata since index sizes don't change)
+        var rowSize = metadata.GetRowSize(TableIndex.MethodDef);
+
+        // Patch each MethodDef RVA
+        for (uint rid = 1; rid <= methodDefCount; rid++)
+        {
+            var rowOffset = methodDefTableFileOffset + (rid - 1) * rowSize;
+
+            // Read the RVA (first 4 bytes of the row)
+            output.Position = rowOffset;
+            var methodRva = ReadUInt32(output);
+
+            // Skip if RVA is 0 (abstract/pinvoke methods have no IL)
+            if (methodRva == 0)
+            {
+                continue;
+            }
+
+            // Check if this RVA points to IL code that was shifted
+            // IL code is typically in the same section as metadata, after it
+            var metadataSectionRvaStart = metadataSection.VirtualAddress;
+            var metadataSectionRvaEnd = metadataSection.VirtualAddress + metadataSection.VirtualSize;
+
+            var ilInMetadataSection = methodRva >= metadataSectionRvaStart &&
+                                      methodRva < metadataSectionRvaEnd;
+
+            // Only patch if IL is in metadata section AND after where metadata ended before growth
+            if (ilInMetadataSection && methodRva >= oldMetadataRvaEnd)
+            {
+                // Patch the RVA by adding the size difference
+                var newRva = methodRva + sizeDiff;
+                output.Position = rowOffset;
+                WriteUInt32(output, (uint) newRva);
             }
         }
     }

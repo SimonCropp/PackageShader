@@ -1,0 +1,35 @@
+﻿{
+  Name: netstandard21_NoStrongName_None_Roslyn,
+  TargetFramework: netstandard2.1,
+  IsStrongNamed: false,
+  OriginalMetadata: {
+    Name: netstandard21_NoStrongName_None_Roslyn,
+    Version: 1.0.0.0,
+    HasPublicKey: false,
+    PublicKeyToken: null,
+    TypeCount: 5,
+    MethodCount: 8,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: true,
+    StringHeapSize: 512,
+    BlobHeapSize: 152,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 152
+  },
+  RoundTrippedMetadata: {
+    Name: netstandard21_NoStrongName_None_Roslyn,
+    Version: 1.0.0.0,
+    HasPublicKey: false,
+    PublicKeyToken: null,
+    TypeCount: 5,
+    MethodCount: 8,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: true,
+    StringHeapSize: 578,
+    BlobHeapSize: 208,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 152
+  }
+}

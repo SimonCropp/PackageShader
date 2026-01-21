@@ -1,0 +1,36 @@
+﻿{
+  Name: net90_StrongNamed_Embedded_Roslyn,
+  TargetFramework: net9.0,
+  IsStrongNamed: true,
+  Symbol: Embedded,
+  OriginalMetadata: {
+    Name: net90_StrongNamed_Embedded_Roslyn,
+    Version: 1.0.0.0,
+    HasPublicKey: true,
+    PublicKeyToken: fba2ec45388e2af0,
+    TypeCount: 3,
+    MethodCount: 6,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: true,
+    StringHeapSize: 388,
+    BlobHeapSize: 260,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 140
+  },
+  RoundTrippedMetadata: {
+    Name: net90_StrongNamed_Embedded_Roslyn,
+    Version: 1.0.0.0,
+    HasPublicKey: true,
+    PublicKeyToken: fba2ec45388e2af0,
+    TypeCount: 3,
+    MethodCount: 6,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: true,
+    StringHeapSize: 454,
+    BlobHeapSize: 1320,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 140
+  }
+}

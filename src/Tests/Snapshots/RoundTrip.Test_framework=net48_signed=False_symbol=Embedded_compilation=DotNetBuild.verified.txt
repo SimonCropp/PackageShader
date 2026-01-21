@@ -1,0 +1,36 @@
+﻿{
+  Name: net48_NoStrongName_Embedded_DotNetBuild,
+  TargetFramework: net48,
+  IsStrongNamed: false,
+  Symbol: Embedded,
+  OriginalMetadata: {
+    Name: net48_NoStrongName_Embedded_DotNetBuild,
+    Version: 1.0.0.0,
+    HasPublicKey: false,
+    PublicKeyToken: null,
+    TypeCount: 5,
+    MethodCount: 8,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: true,
+    StringHeapSize: 749,
+    BlobHeapSize: 296,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 152
+  },
+  RoundTrippedMetadata: {
+    Name: net48_NoStrongName_Embedded_DotNetBuild,
+    Version: 1.0.0.0,
+    HasPublicKey: false,
+    PublicKeyToken: null,
+    TypeCount: 5,
+    MethodCount: 8,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: true,
+    StringHeapSize: 818,
+    BlobHeapSize: 352,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 152
+  }
+}

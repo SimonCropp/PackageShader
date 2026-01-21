@@ -1,0 +1,36 @@
+﻿{
+  Name: netstandard20_NoStrongName_External_DotNetBuild,
+  TargetFramework: netstandard2.0,
+  IsStrongNamed: false,
+  Symbol: External,
+  OriginalMetadata: {
+    Name: netstandard20_NoStrongName_External_DotNetBuild,
+    Version: 1.0.0.0,
+    HasPublicKey: false,
+    PublicKeyToken: null,
+    TypeCount: 5,
+    MethodCount: 8,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: false,
+    StringHeapSize: 770,
+    BlobHeapSize: 304,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 168
+  },
+  RoundTrippedMetadata: {
+    Name: netstandard20_NoStrongName_External_DotNetBuild,
+    Version: 1.0.0.0,
+    HasPublicKey: false,
+    PublicKeyToken: null,
+    TypeCount: 5,
+    MethodCount: 8,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: false,
+    StringHeapSize: 838,
+    BlobHeapSize: 360,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 168
+  }
+}

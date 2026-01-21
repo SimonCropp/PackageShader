@@ -1,0 +1,35 @@
+﻿{
+  Name: net48_NoStrongName_None_Roslyn,
+  TargetFramework: net48,
+  IsStrongNamed: false,
+  OriginalMetadata: {
+    Name: net48_NoStrongName_None_Roslyn,
+    Version: 1.0.0.0,
+    HasPublicKey: false,
+    PublicKeyToken: null,
+    TypeCount: 5,
+    MethodCount: 8,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: true,
+    StringHeapSize: 491,
+    BlobHeapSize: 152,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 136
+  },
+  RoundTrippedMetadata: {
+    Name: net48_NoStrongName_None_Roslyn,
+    Version: 1.0.0.0,
+    HasPublicKey: false,
+    PublicKeyToken: null,
+    TypeCount: 5,
+    MethodCount: 8,
+    AssemblyRefCount: 1,
+    HasDebugInfo: true,
+    HasEmbeddedPdb: true,
+    StringHeapSize: 558,
+    BlobHeapSize: 208,
+    GuidHeapSize: 16,
+    UserStringHeapSize: 136
+  }
+}

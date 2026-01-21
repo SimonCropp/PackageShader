@@ -284,8 +284,9 @@ sealed class StreamingMetadataReader : IDisposable
             HashAlgId = (uint) asm.HashAlgorithm,
             MajorVersion = (ushort) asm.Version.Major,
             MinorVersion = (ushort) asm.Version.Minor,
-            BuildNumber = (ushort) asm.Version.Build,
-            RevisionNumber = (ushort) asm.Version.Revision,
+            // Use 0 for undefined components (-1) to avoid 0xFFFF which some tools treat as sentinel
+            BuildNumber = (ushort) Math.Max(0, asm.Version.Build),
+            RevisionNumber = (ushort) Math.Max(0, asm.Version.Revision),
             Flags = (uint) asm.Flags,
             PublicKeyIndex = (uint) MetadataTokens.GetHeapOffset(asm.PublicKey),
             NameIndex = (uint) MetadataTokens.GetHeapOffset(asm.Name),
@@ -304,8 +305,9 @@ sealed class StreamingMetadataReader : IDisposable
         {
             MajorVersion = (ushort) asmRef.Version.Major,
             MinorVersion = (ushort) asmRef.Version.Minor,
-            BuildNumber = (ushort) asmRef.Version.Build,
-            RevisionNumber = (ushort) asmRef.Version.Revision,
+            // Use 0 for undefined components (-1) to avoid 0xFFFF which some tools treat as sentinel
+            BuildNumber = (ushort) Math.Max(0, asmRef.Version.Build),
+            RevisionNumber = (ushort) Math.Max(0, asmRef.Version.Revision),
             Flags = (uint) asmRef.Flags,
             PublicKeyOrTokenIndex = (uint) MetadataTokens.GetHeapOffset(asmRef.PublicKeyOrToken),
             NameIndex = (uint) MetadataTokens.GetHeapOffset(asmRef.Name),
