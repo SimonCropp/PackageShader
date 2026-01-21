@@ -18,6 +18,10 @@ Follow `.editorconfig` for formatting and code style conventions. Respect `.gita
 
 **Never commit automatically.** The user always wants to review changes and commit manually. Do not use `git commit` or `git add` commands.
 
+## Console Title
+
+Always set the console title to the directory name of where Claude was launched from (the current working directory name, not the full path).
+
 ## Build Commands
 
 **Solution file**: `src/PackageShader.slnx`
