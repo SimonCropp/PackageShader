@@ -130,7 +130,11 @@ public class TaskTests
 
         var assemblyPaths = GetTestAssemblyPaths(tempDir);
         var assemblyWithPdbPath = assemblyPaths.First(p => p.Contains("AssemblyWithPdb"));
-        var referenceCopyLocalPaths = assemblyPaths.Select(p => new MockTaskItem(p)).ToArray();
+        // Exclude the original AssemblyToProcess.dll since MyCustomApp is a copy of it
+        var referenceCopyLocalPaths = assemblyPaths
+            .Where(p => !p.Contains("AssemblyToProcess.dll"))
+            .Select(p => new MockTaskItem(p))
+            .ToArray();
 
         var task = new ShadeTask
         {

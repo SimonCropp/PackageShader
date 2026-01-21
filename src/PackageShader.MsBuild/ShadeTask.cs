@@ -132,7 +132,8 @@ public class ShadeTask :
         {
             var name = Path.GetFileNameWithoutExtension(sourcePath);
             var targetPath = Path.Combine(IntermediateDirectory, $"{name}.dll");
-            sourceTargetInfos.Add(new(name, sourcePath, name, targetPath, false));
+            var isRoot = sourcePath == IntermediateAssembly;
+            sourceTargetInfos.Add(new(name, sourcePath, name, targetPath, IsShaded: false, IsRootAssembly: isRoot));
             ProcessCopyLocal(sourcePath, targetPath);
         }
 

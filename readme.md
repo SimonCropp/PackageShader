@@ -116,9 +116,10 @@ public record SourceTargetInfo(
     string SourcePath,
     string TargetName,
     string TargetPath,
-    bool IsShaded);
+    bool IsShaded,
+    bool IsRootAssembly = false);
 ```
-<sup><a href='/src/PackageShader/SourceTargetInfo.cs#L3-L10' title='Snippet source file'>snippet source</a> | <a href='#snippet-SourceTargetInfo' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/PackageShader/SourceTargetInfo.cs#L3-L11' title='Snippet source file'>snippet source</a> | <a href='#snippet-SourceTargetInfo' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 

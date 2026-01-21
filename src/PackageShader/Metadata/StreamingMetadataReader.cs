@@ -433,6 +433,31 @@ sealed class StreamingMetadataReader : IDisposable
     }
 
     /// <summary>
+    /// Gets an assembly reference by RID and returns its name.
+    /// </summary>
+    public (uint rid, string name)? FindAssemblyRefByRid(uint targetRid)
+    {
+        if (targetRid == 0 || targetRid > GetRowCount(TableIndex.AssemblyRef))
+        {
+            return null;
+        }
+
+        uint rid = 1;
+        foreach (var handle in reader.AssemblyReferences)
+        {
+            if (rid == targetRid)
+            {
+                var asmRef = reader.GetAssemblyReference(handle);
+                var refName = reader.GetString(asmRef.Name);
+                return (rid, refName);
+            }
+            rid++;
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Finds a type reference by name and namespace.
     /// </summary>
     public uint? FindTypeRef(string name, string @namespace)

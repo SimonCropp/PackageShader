@@ -90,7 +90,7 @@
     {
         if (value == 0)
         {
-            return new MetadataToken(TableIndex.Module, 0); // Null reference
+            return new(TableIndex.Module, 0); // Null reference
         }
 
         var (bits, tables) = GetCodedIndexInfo(codedIndex);
@@ -104,6 +104,6 @@
             throw new ArgumentException($"Invalid tag {tag} for coded index {codedIndex}");
         }
 
-        return new MetadataToken(tables[tag], rid);
+        return new(tables[tag], rid);
     }
 }
