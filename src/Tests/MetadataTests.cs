@@ -144,6 +144,71 @@ public class MetadataTests
     }
 
     [Fact]
+    public void FindAssemblyRef_VersionComponents_NeverReturns65535()
+    {
+        // This test verifies that FindAssemblyRef properly handles undefined version components
+        // by converting -1 to 0 (not 65535/0xFFFF which some tools misinterpret)
+        var assemblyPath = Path.Combine(binDirectory, "DummyAssembly.dll");
+
+        using var peFile = StreamingPEFile.Open(assemblyPath);
+        using var reader = new StreamingMetadataReader(peFile);
+
+        // Check all assembly references in the assembly
+        var refCount = reader.GetRowCount(TableIndex.AssemblyRef);
+        Assert.True(refCount > 0, "Test assembly should have at least one AssemblyRef");
+
+        for (uint rid = 1; rid <= refCount; rid++)
+        {
+            var refInfo = reader.FindAssemblyRefByRid(rid);
+            Assert.NotNull(refInfo);
+
+            // Now use the row-based method to get full version info
+            var row = reader.ReadAssemblyRefRow(rid);
+
+            // Version components should never be 65535 (0xFFFF)
+            // This would indicate -1 was cast to ushort without Math.Max(0, ...)
+            Assert.NotEqual((ushort)65535, row.MajorVersion);
+            Assert.NotEqual((ushort)65535, row.MinorVersion);
+            Assert.NotEqual((ushort)65535, row.BuildNumber);
+            Assert.NotEqual((ushort)65535, row.RevisionNumber);
+        }
+    }
+
+    [Fact]
+    public void FindAssemblyRef_ReturnsConsistentVersionWithReadAssemblyRefRow()
+    {
+        // Verify FindAssemblyRef and ReadAssemblyRefRow return the same version info
+        var assemblyPath = Path.Combine(binDirectory, "DummyAssembly.dll");
+
+        using var peFile = StreamingPEFile.Open(assemblyPath);
+        using var reader = new StreamingMetadataReader(peFile);
+
+        var refCount = reader.GetRowCount(TableIndex.AssemblyRef);
+        Assert.True(refCount > 0, "Test assembly should have at least one AssemblyRef");
+
+        for (uint rid = 1; rid <= refCount; rid++)
+        {
+            var refInfo = reader.FindAssemblyRefByRid(rid);
+            Assert.NotNull(refInfo);
+
+            var rowFromRead = reader.ReadAssemblyRefRow(rid);
+
+            // Find the same ref by name to get the row from FindAssemblyRef
+            var foundByName = reader.FindAssemblyRef(refInfo.Value.name);
+            Assert.NotNull(foundByName);
+
+            var (foundRid, rowFromFind) = foundByName.Value;
+            Assert.Equal(rid, foundRid);
+
+            // Version components should be identical
+            Assert.Equal(rowFromRead.MajorVersion, rowFromFind.MajorVersion);
+            Assert.Equal(rowFromRead.MinorVersion, rowFromFind.MinorVersion);
+            Assert.Equal(rowFromRead.BuildNumber, rowFromFind.BuildNumber);
+            Assert.Equal(rowFromRead.RevisionNumber, rowFromFind.RevisionNumber);
+        }
+    }
+
+    [Fact]
     public void ReadRow_InvalidRid_ReturnsEmpty()
     {
         var assemblyPath = Path.Combine(binDirectory, "DummyAssembly.dll");
