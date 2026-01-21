@@ -97,9 +97,12 @@ sealed class ModificationPlan(StreamingMetadataReader metadata)
     /// <summary>
     /// Adds a new type reference row.
     /// Returns the RID (1-based, counting from after existing rows).
+    /// ECMA-335 II.22.38: Caller must ensure no duplicate rows (same ResolutionScope, TypeName, TypeNamespace).
     /// </summary>
     public uint AddTypeRef(TypeRefRow row)
     {
+        // Note: This method does not check for duplicates. The caller is responsible for
+        // ensuring ECMA-335 II.22.38 compliance (no duplicate TypeRef rows).
         newTypeRefs.Add(row);
         hasNewRows = true;
         return (uint) (metadata.GetRowCount(TableIndex.TypeRef) + newTypeRefs.Count);
@@ -108,9 +111,11 @@ sealed class ModificationPlan(StreamingMetadataReader metadata)
     /// <summary>
     /// Adds a new member reference row.
     /// Returns the RID (1-based, counting from after existing rows).
+    /// ECMA-335 II.22.25: Duplicate rows (same Class, Name, Signature) generate [WARNING].
     /// </summary>
     public uint AddMemberRef(MemberRefRow row)
     {
+        // Note: ECMA-335 II.22.25 warns against duplicates but does not make it an error.
         newMemberRefs.Add(row);
         hasNewRows = true;
         return (uint) (metadata.GetRowCount(TableIndex.MemberRef) + newMemberRefs.Count);
@@ -131,14 +136,17 @@ sealed class ModificationPlan(StreamingMetadataReader metadata)
             return 0;
         }
 
-        // Check if we already added it
+        // Check if we already added it in this modification plan
         if (newStrings.TryGetValue(value, out var existing))
         {
             return existing;
         }
 
-        // TODO: Could search existing heap, but for now just add new
-        // This is a simplification - production code should search first
+        // ECMA-335 II.24.2.3: String heap deduplication (optimization, not required for compliance)
+        // Note: ECMA-335 allows duplicate strings in the heap ("The physical heap can contain garbage").
+        // Searching the existing heap would require building a reverse index (string -> offset) which
+        // adds complexity and memory overhead. Current implementation only deduplicates within new strings.
+        // This is a valid trade-off: correctness vs optimization.
 
         var index = nextStringIndex;
         nextStringIndex += (uint) Encoding.UTF8.GetByteCount(value) + 1; // +1 for null terminator

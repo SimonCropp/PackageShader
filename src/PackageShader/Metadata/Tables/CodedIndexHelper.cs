@@ -20,6 +20,7 @@
 
     /// <summary>
     /// Gets bit count and tables for a coded index type.
+    /// ECMA-335 II.24.2.6: Coded index encoding tables define tag bits and target tables.
     /// </summary>
     static (int bits, TableIndex[] tables) GetCodedIndexInfo(CodedIndex codedIndex) =>
         codedIndex switch
@@ -59,6 +60,7 @@
 
     /// <summary>
     /// Encodes a metadata token to a coded index value.
+    /// ECMA-335 II.24.2.6: Coded index = (RID &lt;&lt; tag_bits) | tag
     /// </summary>
     public static uint EncodeToken(CodedIndex codedIndex, MetadataToken token)
     {
@@ -78,5 +80,30 @@
         }
 
         throw new ArgumentException($"Table {token.TableIndex} not valid for coded index {codedIndex}");
+    }
+
+    /// <summary>
+    /// Decodes a coded index value to a metadata token.
+    /// ECMA-335 II.24.2.6: tag = value &amp; ((1 &lt;&lt; tag_bits) - 1), RID = value &gt;&gt; tag_bits
+    /// </summary>
+    public static MetadataToken DecodeToken(CodedIndex codedIndex, uint value)
+    {
+        if (value == 0)
+        {
+            return new MetadataToken(TableIndex.Module, 0); // Null reference
+        }
+
+        var (bits, tables) = GetCodedIndexInfo(codedIndex);
+        var tagMask = (1u << bits) - 1;
+        var tag = (int)(value & tagMask);
+        var rid = value >> bits;
+
+        // ECMA-335 II.24.2.6: Tag must be valid for this coded index type
+        if (tag >= tables.Length || (byte)tables[tag] == 0xFF)
+        {
+            throw new ArgumentException($"Invalid tag {tag} for coded index {codedIndex}");
+        }
+
+        return new MetadataToken(tables[tag], rid);
     }
 }

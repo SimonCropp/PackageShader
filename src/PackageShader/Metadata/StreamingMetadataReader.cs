@@ -122,6 +122,16 @@ sealed class StreamingMetadataReader : IDisposable
             rowCountPos += 4;
         }
 
+        // ECMA-335 II.22.2: Assembly table shall contain zero or one row
+        var assemblyRowCount = GetRowCount(TableIndex.Assembly);
+        if (assemblyRowCount > 1)
+            throw new InvalidDataException($"ECMA-335 violation: Assembly table must have 0 or 1 row, found {assemblyRowCount}");
+
+        // ECMA-335 II.22.30: Module table shall contain one and only one row
+        var moduleRowCount = GetRowCount(TableIndex.Module);
+        if (moduleRowCount != 1)
+            throw new InvalidDataException($"ECMA-335 violation: Module table must have exactly 1 row, found {moduleRowCount}");
+
         // Compute table row sizes and offsets
         tableDataOffset = tableHeapOffset + 24 + presentTableCount * 4;
         ComputeTableInfo();
@@ -144,22 +154,39 @@ sealed class StreamingMetadataReader : IDisposable
         }
     }
 
+    /// <summary>
+    /// Computes row size for each metadata table based on ECMA-335 II.22 specifications.
+    /// Row size depends on heap index sizes (2 or 4 bytes) and table row counts (for coded indices).
+    /// </summary>
     int ComputeRowSize(TableIndex table) =>
         table switch
         {
+            // ECMA-335 II.22.30: Module = Generation(2) + Name(str) + Mvid(guid) + EncId(guid) + EncBaseId(guid)
             TableIndex.Module => 2 + StringIndexSize + GuidIndexSize * 3,
+
+            // ECMA-335 II.22.38: TypeRef = ResolutionScope(coded) + TypeName(str) + TypeNamespace(str)
             TableIndex.TypeRef => GetCodedIndexSize(CodedIndex.ResolutionScope) + StringIndexSize * 2,
+
+            // ECMA-335 II.22.37: TypeDef = Flags(4) + TypeName(str) + TypeNamespace(str) + Extends(coded) + FieldList(tbl) + MethodList(tbl)
             TableIndex.TypeDef => 4 + StringIndexSize * 2 + GetCodedIndexSize(CodedIndex.TypeDefOrRef)
                                   + GetTableIndexSize(TableIndex.Field) + GetTableIndexSize(TableIndex.MethodDef),
             TableIndex.FieldPtr => GetTableIndexSize(TableIndex.Field),
+
+            // ECMA-335 II.22.15: Field = Flags(2) + Name(str) + Signature(blob)
             TableIndex.Field => 2 + StringIndexSize + BlobIndexSize,
             TableIndex.MethodPtr => GetTableIndexSize(TableIndex.MethodDef),
+
+            // ECMA-335 II.22.26: MethodDef = RVA(4) + ImplFlags(2) + Flags(2) + Name(str) + Signature(blob) + ParamList(tbl)
             TableIndex.MethodDef => 8 + StringIndexSize + BlobIndexSize + GetTableIndexSize(TableIndex.Param),
             TableIndex.ParamPtr => GetTableIndexSize(TableIndex.Param),
             TableIndex.Param => 4 + StringIndexSize,
             TableIndex.InterfaceImpl => GetTableIndexSize(TableIndex.TypeDef) + GetCodedIndexSize(CodedIndex.TypeDefOrRef),
+
+            // ECMA-335 II.22.25: MemberRef = Class(coded) + Name(str) + Signature(blob)
             TableIndex.MemberRef => GetCodedIndexSize(CodedIndex.MemberRefParent) + StringIndexSize + BlobIndexSize,
             TableIndex.Constant => 2 + GetCodedIndexSize(CodedIndex.HasConstant) + BlobIndexSize,
+
+            // ECMA-335 II.22.10: CustomAttribute = Parent(coded) + Type(coded) + Value(blob)
             TableIndex.CustomAttribute => GetCodedIndexSize(CodedIndex.HasCustomAttribute)
                                           + GetCodedIndexSize(CodedIndex.CustomAttributeType) + BlobIndexSize,
             TableIndex.FieldMarshal => GetCodedIndexSize(CodedIndex.HasFieldMarshal) + BlobIndexSize,
@@ -183,9 +210,12 @@ sealed class StreamingMetadataReader : IDisposable
             TableIndex.FieldRva => 4 + GetTableIndexSize(TableIndex.Field),
             TableIndex.EncLog => 8,
             TableIndex.EncMap => 4,
+            // ECMA-335 II.22.2: Assembly = HashAlgId(4) + Version(8) + Flags(4) + PublicKey(blob) + Name(str) + Culture(str)
             TableIndex.Assembly => 16 + BlobIndexSize + StringIndexSize * 2,
             TableIndex.AssemblyProcessor => 4,
             TableIndex.AssemblyOS => 12,
+
+            // ECMA-335 II.22.5: AssemblyRef = Version(8) + Flags(4) + PublicKeyOrToken(blob) + Name(str) + Culture(str) + HashValue(blob)
             TableIndex.AssemblyRef => 12 + BlobIndexSize * 2 + StringIndexSize * 2,
             TableIndex.AssemblyRefProcessor => 4 + GetTableIndexSize(TableIndex.AssemblyRef),
             TableIndex.AssemblyRefOS => 12 + GetTableIndexSize(TableIndex.AssemblyRef),
@@ -231,9 +261,12 @@ sealed class StreamingMetadataReader : IDisposable
 
     /// <summary>
     /// Reads raw bytes for a specific table row.
+    /// ECMA-335 II.22, II.24.2.6: RIDs are 1-based indices. RID 0 denotes null reference.
+    /// Valid RIDs are in range [1, rowCount].
     /// </summary>
     public byte[] ReadRow(TableIndex table, uint rid)
     {
+        // ECMA-335 II.22: RIDs are 1-based indices; 0 is null, valid range is [1, rowCount]
         if ((int) table >= 64 || rid == 0 || rid > tables[(int) table].RowCount)
             return Array.Empty<byte>();
 
