@@ -222,6 +222,16 @@ sealed class ModificationPlan(StreamingMetadataReader metadata)
     public IReadOnlyList<MemberRefRow> NewMemberRefs => newMemberRefs;
 
     /// <summary>
+    /// Gets the final string heap size after all modifications.
+    /// </summary>
+    public uint FinalStringHeapSize => nextStringIndex;
+
+    /// <summary>
+    /// Gets the final blob heap size after all modifications.
+    /// </summary>
+    public uint FinalBlobHeapSize => nextBlobIndex;
+
+    /// <summary>
     /// Gets modified assembly rows.
     /// </summary>
     public IReadOnlyDictionary<uint, AssemblyRow> ModifiedAssemblyRows => assemblyMods;
