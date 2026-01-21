@@ -296,6 +296,187 @@ public class ModificationTests
 
     #endregion
 
+    #region Heap Size Tracking Tests
+
+    [Fact]
+    public void ModificationPlan_FinalStringHeapSize_InitiallyEqualsSourceSize()
+    {
+        var assemblyPath = Path.Combine(binDirectory, "DummyAssembly.dll");
+
+        using var peFile = StreamingPEFile.Open(assemblyPath);
+        using var reader = new StreamingMetadataReader(peFile);
+        var plan = new ModificationPlan(reader);
+
+        Assert.Equal(reader.StringHeapSize, plan.FinalStringHeapSize);
+    }
+
+    [Fact]
+    public void ModificationPlan_FinalBlobHeapSize_InitiallyEqualsSourceSize()
+    {
+        var assemblyPath = Path.Combine(binDirectory, "DummyAssembly.dll");
+
+        using var peFile = StreamingPEFile.Open(assemblyPath);
+        using var reader = new StreamingMetadataReader(peFile);
+        var plan = new ModificationPlan(reader);
+
+        Assert.Equal(reader.BlobHeapSize, plan.FinalBlobHeapSize);
+    }
+
+    [Fact]
+    public void ModificationPlan_FinalStringHeapSize_GrowsWhenAddingStrings()
+    {
+        var assemblyPath = Path.Combine(binDirectory, "DummyAssembly.dll");
+
+        using var peFile = StreamingPEFile.Open(assemblyPath);
+        using var reader = new StreamingMetadataReader(peFile);
+        var plan = new ModificationPlan(reader);
+
+        var initialSize = plan.FinalStringHeapSize;
+        plan.GetOrAddString("TestString123");
+
+        // "TestString123" is 13 bytes + 1 null terminator = 14 bytes
+        Assert.Equal(initialSize + 14u, plan.FinalStringHeapSize);
+    }
+
+    [Fact]
+    public void ModificationPlan_FinalBlobHeapSize_GrowsWhenAddingBlobs()
+    {
+        var assemblyPath = Path.Combine(binDirectory, "DummyAssembly.dll");
+
+        using var peFile = StreamingPEFile.Open(assemblyPath);
+        using var reader = new StreamingMetadataReader(peFile);
+        var plan = new ModificationPlan(reader);
+
+        var initialSize = plan.FinalBlobHeapSize;
+        var blob = new byte[100];
+        plan.GetOrAddBlob(blob);
+
+        // 100 bytes + 1 byte length header (< 128) = 101 bytes
+        Assert.Equal(initialSize + 101u, plan.FinalBlobHeapSize);
+    }
+
+    [Fact]
+    public void ModificationPlan_FinalStringHeapSize_CalculatesCorrectlyForUTF8()
+    {
+        var assemblyPath = Path.Combine(binDirectory, "DummyAssembly.dll");
+
+        using var peFile = StreamingPEFile.Open(assemblyPath);
+        using var reader = new StreamingMetadataReader(peFile);
+        var plan = new ModificationPlan(reader);
+
+        var initialSize = plan.FinalStringHeapSize;
+
+        // Test with multi-byte UTF-8 characters
+        plan.GetOrAddString("Hello世界"); // "世界" is 6 bytes in UTF-8
+
+        // "Hello" = 5 bytes, "世界" = 6 bytes, null terminator = 1 byte
+        Assert.Equal(initialSize + 12u, plan.FinalStringHeapSize);
+    }
+
+    [Fact]
+    public void ModificationPlan_FinalBlobHeapSize_UsesCompressedLengthEncoding()
+    {
+        var assemblyPath = Path.Combine(binDirectory, "DummyAssembly.dll");
+
+        using var peFile = StreamingPEFile.Open(assemblyPath);
+        using var reader = new StreamingMetadataReader(peFile);
+        var plan = new ModificationPlan(reader);
+
+        var initialSize = plan.FinalBlobHeapSize;
+
+        // Test 1-byte length header (< 0x80)
+        var blob1 = new byte[50];
+        plan.GetOrAddBlob(blob1);
+        Assert.Equal(initialSize + 51u, plan.FinalBlobHeapSize); // 50 + 1 byte header
+
+        // Test 2-byte length header (>= 0x80, < 0x4000)
+        var sizeAfterBlob1 = plan.FinalBlobHeapSize;
+        var blob2 = new byte[200];
+        plan.GetOrAddBlob(blob2);
+        Assert.Equal(sizeAfterBlob1 + 202u, plan.FinalBlobHeapSize); // 200 + 2 byte header
+
+        // Test 4-byte length header (>= 0x4000)
+        var sizeAfterBlob2 = plan.FinalBlobHeapSize;
+        var blob3 = new byte[20000];
+        plan.GetOrAddBlob(blob3);
+        Assert.Equal(sizeAfterBlob2 + 20004u, plan.FinalBlobHeapSize); // 20000 + 4 byte header
+    }
+
+    [Fact]
+    public void ModificationPlan_FinalStringHeapSize_DeduplicatesStrings()
+    {
+        var assemblyPath = Path.Combine(binDirectory, "DummyAssembly.dll");
+
+        using var peFile = StreamingPEFile.Open(assemblyPath);
+        using var reader = new StreamingMetadataReader(peFile);
+        var plan = new ModificationPlan(reader);
+
+        var initialSize = plan.FinalStringHeapSize;
+
+        // Add same string twice
+        plan.GetOrAddString("DuplicateString");
+        var sizeAfterFirst = plan.FinalStringHeapSize;
+        plan.GetOrAddString("DuplicateString");
+        var sizeAfterSecond = plan.FinalStringHeapSize;
+
+        // Size should only grow once
+        Assert.Equal(initialSize + 16u, sizeAfterFirst); // 15 bytes + null
+        Assert.Equal(sizeAfterFirst, sizeAfterSecond);
+    }
+
+    [Fact]
+    public void ModificationPlan_FinalHeapSizes_LargeStringAddition()
+    {
+        var assemblyPath = Path.Combine(binDirectory, "DummyAssembly.dll");
+
+        using var peFile = StreamingPEFile.Open(assemblyPath);
+        using var reader = new StreamingMetadataReader(peFile);
+        var plan = new ModificationPlan(reader);
+
+        var initialSize = plan.FinalStringHeapSize;
+
+        // Add a very large string (10KB)
+        var largeString = new string('X', 10000);
+        plan.GetOrAddString(largeString);
+
+        Assert.Equal(initialSize + 10001u, plan.FinalStringHeapSize); // 10000 + null
+    }
+
+    [Fact]
+    public void ModificationPlan_SetAssemblyName_UpdatesFinalStringHeapSize()
+    {
+        var assemblyPath = Path.Combine(binDirectory, "DummyAssembly.dll");
+
+        using var peFile = StreamingPEFile.Open(assemblyPath);
+        using var reader = new StreamingMetadataReader(peFile);
+        var plan = new ModificationPlan(reader);
+
+        var initialSize = plan.FinalStringHeapSize;
+        plan.SetAssemblyName("MyNewAssemblyName");
+
+        // "MyNewAssemblyName" = 17 bytes + 1 null = 18 bytes
+        Assert.Equal(initialSize + 18u, plan.FinalStringHeapSize);
+    }
+
+    [Fact]
+    public void ModificationPlan_SetAssemblyPublicKey_UpdatesFinalBlobHeapSize()
+    {
+        var assemblyPath = Path.Combine(binDirectory, "DummyAssembly.dll");
+
+        using var peFile = StreamingPEFile.Open(assemblyPath);
+        using var reader = new StreamingMetadataReader(peFile);
+        var plan = new ModificationPlan(reader);
+
+        var initialSize = plan.FinalBlobHeapSize;
+        var publicKey = new byte[160]; // Typical RSA public key
+        plan.SetAssemblyPublicKey(publicKey);
+
+        // 160 bytes + 2 byte length header = 162 bytes
+        Assert.Equal(initialSize + 162u, plan.FinalBlobHeapSize);
+    }
+
+    #endregion
+
     #region ModificationStrategy Tests
 
     [Fact]
