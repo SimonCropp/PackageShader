@@ -3,6 +3,18 @@
 /// </summary>
 sealed class StreamingMetadataWriter(StreamingMetadataReader source, ModificationPlan plan)
 {
+    // ECMA-335 II.24.2.6: Index sizes determined by final heap sizes after modifications
+    // Index size can only grow, never shrink (use max of source and calculated size)
+    readonly int stringIndexSize = Math.Max(source.StringIndexSize, plan.FinalStringHeapSize >= 0x10000 ? 4 : 2);
+    readonly int blobIndexSize = Math.Max(source.BlobIndexSize, plan.FinalBlobHeapSize >= 0x10000 ? 4 : 2);
+    readonly int guidIndexSize = source.GuidIndexSize; // GUID heap is not modified
+
+    // CRITICAL: If index sizes changed, we CANNOT copy table data byte-for-byte.
+    // All table rows must be rewritten with new index sizes.
+    bool IndexSizesChanged =>
+        source.StringIndexSize != stringIndexSize ||
+        source.BlobIndexSize != blobIndexSize;
+
     /// <summary>
     /// Writes the complete metadata section to the output stream.
     /// </summary>
@@ -135,18 +147,19 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
         writer.Write((byte)0); // MinorVersion
 
         // ECMA-335 II.24.2.6: HeapSizes bit 0x01 = large string (>=2^16), 0x02 = large GUID, 0x04 = large blob
+        // Use final heap sizes after modifications to determine index sizes
         byte heapSizes = 0;
-        if (source.StringIndexSize == 4)
+        if (stringIndexSize == 4)
         {
             heapSizes |= 0x01; // #String heap >= 2^16 bytes
         }
 
-        if (source.GuidIndexSize == 4)
+        if (guidIndexSize == 4)
         {
             heapSizes |= 0x02; // #GUID heap >= 2^16 entries (not bytes)
         }
 
-        if (source.BlobIndexSize == 4)
+        if (blobIndexSize == 4)
         {
             heapSizes |= 0x04; // #Blob heap >= 2^16 bytes
         }
@@ -222,7 +235,7 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
                 for (uint rid = 1; rid <= rowCount; rid++)
                 {
                     var row = plan.GetAssemblyRow(rid);
-                    row.Write(writer, source.BlobIndexSize, source.StringIndexSize);
+                    row.Write(writer, blobIndexSize, stringIndexSize);
                 }
                 break;
 
@@ -230,7 +243,7 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
                 for (uint rid = 1; rid <= rowCount; rid++)
                 {
                     var row = plan.GetAssemblyRefRow(rid);
-                    row.Write(writer, source.BlobIndexSize, source.StringIndexSize);
+                    row.Write(writer, blobIndexSize, stringIndexSize);
                 }
                 break;
 
@@ -238,7 +251,7 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
                 for (uint rid = 1; rid <= rowCount; rid++)
                 {
                     var row = plan.GetTypeDefRow(rid);
-                    row.Write(writer, source.StringIndexSize,
+                    row.Write(writer, stringIndexSize,
                         source.GetCodedIndexSize(CodedIndex.TypeDefOrRef),
                         source.GetTableIndexSize(TableIndex.Field),
                         source.GetTableIndexSize(TableIndex.MethodDef));
@@ -252,14 +265,14 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
                     var row = source.ReadTypeRefRow(rid);
                     row.Write(writer,
                         source.GetCodedIndexSize(CodedIndex.ResolutionScope),
-                        source.StringIndexSize);
+                        stringIndexSize);
                 }
                 // New rows
                 foreach (var row in plan.NewTypeRefs)
                 {
                     row.Write(writer,
                         source.GetCodedIndexSize(CodedIndex.ResolutionScope),
-                        source.StringIndexSize);
+                        stringIndexSize);
                 }
                 break;
 
@@ -270,16 +283,16 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
                     var row = source.ReadMemberRefRow(rid);
                     row.Write(writer,
                         source.GetCodedIndexSize(CodedIndex.MemberRefParent),
-                        source.StringIndexSize,
-                        source.BlobIndexSize);
+                        stringIndexSize,
+                        blobIndexSize);
                 }
                 // New rows
                 foreach (var row in plan.NewMemberRefs)
                 {
                     row.Write(writer,
                         source.GetCodedIndexSize(CodedIndex.MemberRefParent),
-                        source.StringIndexSize,
-                        source.BlobIndexSize);
+                        stringIndexSize,
+                        blobIndexSize);
                 }
                 break;
 
@@ -288,7 +301,17 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
                 break;
 
             default:
-                // Copy unchanged table data
+                // ECMA-335 II.24.2.6: When heap index sizes change, table rows must be rewritten.
+                // We cannot copy table data byte-for-byte because row sizes have changed.
+                if (IndexSizesChanged)
+                {
+                    throw new NotSupportedException(
+                        $"Table {table} needs rewriting due to heap index size changes " +
+                        $"(String: {source.StringIndexSize} -> {stringIndexSize} bytes, " +
+                        $"Blob: {source.BlobIndexSize} -> {blobIndexSize} bytes). " +
+                        $"This table type is not yet implemented for index size changes.");
+                }
+                // Copy unchanged table data (only safe when index sizes haven't changed)
                 source.CopyTableData(table, writer.BaseStream);
                 break;
         }
@@ -317,7 +340,7 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
             row.Write(writer,
                 source.GetCodedIndexSize(CodedIndex.HasCustomAttribute),
                 source.GetCodedIndexSize(CodedIndex.CustomAttributeType),
-                source.BlobIndexSize);
+                blobIndexSize);
         }
     }
 
