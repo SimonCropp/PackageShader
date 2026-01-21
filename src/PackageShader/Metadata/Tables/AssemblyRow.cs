@@ -1,5 +1,6 @@
 /// <summary>
 /// Assembly table row (0x20).
+/// ECMA-335 II.22.2: The Assembly table shall contain zero or one row.
 /// </summary>
 struct AssemblyRow
 {
