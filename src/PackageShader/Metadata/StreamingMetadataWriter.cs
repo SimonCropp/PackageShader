@@ -134,28 +134,29 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
         writer.Write((byte)2); // MajorVersion
         writer.Write((byte)0); // MinorVersion
 
-        // HeapSizes
+        // ECMA-335 II.24.2.6: HeapSizes bit 0x01 = large string (>=2^16), 0x02 = large GUID, 0x04 = large blob
         byte heapSizes = 0;
         if (source.StringIndexSize == 4)
         {
-            heapSizes |= 0x01;
+            heapSizes |= 0x01; // #String heap >= 2^16 bytes
         }
 
         if (source.GuidIndexSize == 4)
         {
-            heapSizes |= 0x02;
+            heapSizes |= 0x02; // #GUID heap >= 2^16 entries (not bytes)
         }
 
         if (source.BlobIndexSize == 4)
         {
-            heapSizes |= 0x04;
+            heapSizes |= 0x04; // #Blob heap >= 2^16 bytes
         }
 
         writer.Write(heapSizes);
 
-        writer.Write((byte)1); // Reserved
+        writer.Write((byte)1); // Reserved, always 1
 
-        // Valid and Sorted bitmasks
+        // ECMA-335 II.24.2.6: Valid bitmask indicates present tables (bit N = table N present)
+        // ECMA-335 II.24.2.6: Sorted bitmask indicates which tables are sorted by their primary key
         var valid = source.Valid;
         var sorted = source.Sorted;
 
@@ -432,6 +433,10 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
         }
     }
 
+    /// <summary>
+    /// ECMA-335 II.24.2.2: Stream sizes shall be multiples of 4 bytes.
+    /// Pads the current position to the next 4-byte boundary.
+    /// </summary>
     static void AlignTo4(BinaryWriter writer)
     {
         var pos = writer.BaseStream.Position;

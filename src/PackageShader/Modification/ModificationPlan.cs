@@ -97,9 +97,12 @@ sealed class ModificationPlan(StreamingMetadataReader metadata)
     /// <summary>
     /// Adds a new type reference row.
     /// Returns the RID (1-based, counting from after existing rows).
+    /// ECMA-335 II.22.38: Caller must ensure no duplicate rows (same ResolutionScope, TypeName, TypeNamespace).
     /// </summary>
     public uint AddTypeRef(TypeRefRow row)
     {
+        // Note: This method does not check for duplicates. The caller is responsible for
+        // ensuring ECMA-335 II.22.38 compliance (no duplicate TypeRef rows).
         newTypeRefs.Add(row);
         hasNewRows = true;
         return (uint) (metadata.GetRowCount(TableIndex.TypeRef) + newTypeRefs.Count);
@@ -108,9 +111,11 @@ sealed class ModificationPlan(StreamingMetadataReader metadata)
     /// <summary>
     /// Adds a new member reference row.
     /// Returns the RID (1-based, counting from after existing rows).
+    /// ECMA-335 II.22.25: Duplicate rows (same Class, Name, Signature) generate [WARNING].
     /// </summary>
     public uint AddMemberRef(MemberRefRow row)
     {
+        // Note: ECMA-335 II.22.25 warns against duplicates but does not make it an error.
         newMemberRefs.Add(row);
         hasNewRows = true;
         return (uint) (metadata.GetRowCount(TableIndex.MemberRef) + newMemberRefs.Count);
