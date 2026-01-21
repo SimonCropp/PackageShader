@@ -1,5 +1,3 @@
-namespace PackageShader.Tests;
-
 /// <summary>
 /// Tests validating PackageShader's compliance with ECMA-335 specification.
 /// Each test corresponds to a specific ECMA-335 constraint with section references.
