@@ -98,7 +98,7 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
 
     void WriteMetadataRoot(BinaryWriter writer)
     {
-        // BSJB signature
+        // ECMA-335 II.24.2.1: Metadata signature is 0x424A5342 (ASCII "BSJB")
         writer.Write(0x424a5342u);
 
         // Major/Minor version
@@ -295,7 +295,7 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
 
     void WriteCustomAttributeTable(BinaryWriter writer, int existingCount)
     {
-        // CustomAttribute table must be sorted by Parent
+        // ECMA-335 II.22.10, II.24.2.6: CustomAttribute table must be sorted by Parent
         var allRows = new List<CustomAttributeRow>();
 
         // Read existing rows
@@ -307,8 +307,8 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
         // Add new rows
         allRows.AddRange(plan.NewCustomAttributes);
 
-        // Sort by Parent
-        allRows.Sort((a, b) => a.ParentIndex.CompareTo(b.ParentIndex));
+        // ECMA-335 II.24.2.6: Sort by Parent column (required for sorted tables)
+        allRows.Sort((_, __) => _.ParentIndex.CompareTo(__.ParentIndex));
 
         // Write sorted rows
         foreach (var row in allRows)
@@ -361,10 +361,11 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
     {
         var startPos = writer.BaseStream.Position;
 
+        // ECMA-335 II.24.2.4: Blob heap starts with empty blob (0x00) and uses compressed length encoding
         // Copy original blob heap
         source.CopyBlobHeap(writer.BaseStream);
 
-        // Append new blobs
+        // Append new blobs with compressed length prefix
         foreach (var (data, _) in plan.NewBlobs)
         {
             WriteCompressedLength(writer, data.Length);
@@ -380,6 +381,8 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
     {
         var startPos = writer.BaseStream.Position;
 
+        // ECMA-335 II.24.2.5: GUID heap is sequence of 128-bit GUIDs
+        // GUID indices are 1-based (not byte offsets), so index N refers to GUID at byte offset (N-1)*16
         // Just copy the original GUID heap (we don't add new GUIDs)
         source.CopyGuidHeap(writer.BaseStream);
 
@@ -388,6 +391,12 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
         return (uint)(writer.BaseStream.Position - startPos);
     }
 
+    /// <summary>
+    /// ECMA-335 II.24.2.4: Blob length compression encoding
+    /// - 1 byte: 0bbbbbbb (length &lt; 128)
+    /// - 2 bytes: 10bbbbbb xxxxxxxx (length &lt; 16384)
+    /// - 4 bytes: 110bbbbb xxxxxxxx yyyyyyyy zzzzzzzz (length &gt;= 16384)
+    /// </summary>
     static void WriteCompressedLength(BinaryWriter writer, int length)
     {
         if (length < 0x80)
