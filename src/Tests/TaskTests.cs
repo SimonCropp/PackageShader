@@ -578,6 +578,80 @@ public class TaskTests
         });
     }
 
+    [Fact]
+    public async Task BuildToolTransitiveDependenciesShouldNotTriggerValidation()
+    {
+        // This test reproduces the MarkdownSnippets issue:
+        // - A project shades System.Memory
+        // - System.IO.Pipelines also references System.Memory but is NOT shaded
+        // - System.IO.Pipelines is in CopyLocal (transitive from System.Text.Json)
+        // - But System.IO.Pipelines is NOT referenced by the root assembly
+        // - Therefore validation should skip it (it's a "stray" dependency)
+        using var tempDir = new TempDirectory();
+
+        // Create project targeting netstandard2.0 where System.Memory needs to be shaded
+        // Use Import directive to directly use local targets file (bypasses NuGet caching)
+        var projectContent = """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>netstandard2.0</TargetFramework>
+                <Version>1.0.0</Version>
+                <LangVersion>latest</LangVersion>
+                <Shader_Internalize>true</Shader_Internalize>
+                <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+              </PropertyGroup>
+              <ItemGroup>
+                <!-- System.Memory needs shading on netstandard2.0 to avoid version conflicts -->
+                <PackageReference Include="System.Memory" Version="4.6.3" Shade="true" />
+                <!-- System.Text.Json brings in System.IO.Pipelines which also refs System.Memory -->
+                <PackageReference Include="System.Text.Json" Version="10.0.2" />
+              </ItemGroup>
+              <Import Project="$MsBuildTargetsPath$" />
+            </Project>
+            """;
+
+        // Point to the actual targets file
+        var targetsPath = Path.Combine(ProjectFiles.ProjectDirectory.Path, "..", "PackageShader.MsBuild", "build", "PackageShader.MsBuild.targets");
+        projectContent = projectContent.Replace("$MsBuildTargetsPath$", targetsPath);
+
+        var projectPath = Path.Combine(tempDir, "TestProject.csproj");
+        await File.WriteAllTextAsync(projectPath, projectContent, TestContext.Current.CancellationToken);
+
+        var classContent =
+            """
+            namespace TestProject;
+            public class TestClass
+            {
+                // Uses System.Memory (via ReadOnlySpan) but NOT System.IO.Pipelines
+                public System.ReadOnlySpan<byte> GetSpan() => System.ReadOnlySpan<byte>.Empty;
+            }
+            """;
+        await File.WriteAllTextAsync(Path.Combine(tempDir, "TestClass.cs"), classContent, TestContext.Current.CancellationToken);
+
+        // Restore first
+        await Cli.Wrap("dotnet")
+            .WithArguments("restore")
+            .WithWorkingDirectory(tempDir)
+            .ExecuteAsync(TestContext.Current.CancellationToken);
+
+        // Build should succeed - System.IO.Pipelines should be skipped in validation
+        // because it's not referenced by the root assembly
+        var buildResult = await Cli.Wrap("dotnet")
+            .WithArguments(["build", "-c", "Release"])
+            .WithWorkingDirectory(tempDir)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
+
+        // The build should succeed without complaining about System.IO.Pipelines
+        Assert.True(buildResult.ExitCode == 0,
+            $"Build failed unexpectedly:\n{buildResult.StandardOutput}\n{buildResult.StandardError}");
+
+        // Verify that there's no validation ERROR about System.IO.Pipelines
+        // (it may appear in diagnostic output listing assemblies, but should not cause an error)
+        Assert.DoesNotContain("Invalid shading configuration", buildResult.StandardOutput);
+        Assert.DoesNotContain("Invalid shading configuration", buildResult.StandardError);
+    }
+
 #if !DEBUG
     [Fact]
     public async Task ShadedAssembliesCoLocatedWithCustomPackagePath()
