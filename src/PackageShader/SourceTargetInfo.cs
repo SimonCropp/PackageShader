@@ -6,5 +6,6 @@ public record SourceTargetInfo(
     string SourcePath,
     string TargetName,
     string TargetPath,
-    bool IsShaded);
+    bool IsShaded,
+    bool IsRootAssembly = false);
 // end-snippet

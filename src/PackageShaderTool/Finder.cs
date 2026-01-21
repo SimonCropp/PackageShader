@@ -54,7 +54,8 @@ public static class Finder
 
             if (!isShaded)
             {
-                yield return new(name, file, name, file, false);
+                // In CLI scenarios, all assemblies are treated as "root" - they can reference shaded deps
+                yield return new(name, file, name, file, IsShaded: false, IsRootAssembly: true);
             }
         }
     }

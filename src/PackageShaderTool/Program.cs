@@ -41,10 +41,10 @@ public static class Program
         var assemblyInfos = Finder.FindAssemblyInfos(assemblyNamesToShade, list, prefix, suffix)
             .Select(info =>
             {
-                // If assembly matches exclusion list, mark it as not-shaded
+                // If assembly matches exclusion list, mark it as not-shaded but allow it to reference shaded deps
                 if (assembliesToExclude.Contains(info.SourceName))
                 {
-                    return info with { TargetName = info.SourceName, TargetPath = info.SourcePath, IsShaded = false };
+                    return info with { TargetName = info.SourceName, TargetPath = info.SourcePath, IsShaded = false, IsRootAssembly = true };
                 }
                 return info;
             })

@@ -340,4 +340,53 @@ public class ShaderTests
     }
 
     public record AssemblyResult(string Name, List<string> References, List<string> InternalsVisibleTo, bool HasExternalSymbols, bool HasEmbeddedSymbols);
+
+    [Fact]
+    public void DetectsBrokenConfiguration_WhenUnshadedAssemblyReferencesShadedAssembly()
+    {
+        // This test reproduces the MarkdownSnippets issue:
+        // - AssemblyToProcess (unshaded) references AssemblyToInclude
+        // - AssemblyToInclude is being shaded
+        // - This creates a broken configuration with dangling references
+
+        using var directory = new TempDirectory();
+
+        // Copy both assemblies
+        var assemblyToProcess = Path.Combine(binDirectory, "AssemblyToProcess.dll");
+        var assemblyToInclude = Path.Combine(binDirectory, "AssemblyToInclude.dll");
+
+        File.Copy(assemblyToProcess, Path.Combine(directory, "AssemblyToProcess.dll"));
+        File.Copy(assemblyToInclude, Path.Combine(directory, "AssemblyToInclude.dll"));
+
+        var infos = new List<SourceTargetInfo>
+        {
+            // Shade AssemblyToInclude
+            new(
+                "AssemblyToInclude",
+                Path.Combine(directory, "AssemblyToInclude.dll"),
+                "Test_AssemblyToInclude",
+                Path.Combine(directory, "Test_AssemblyToInclude.dll"),
+                IsShaded: true
+            ),
+            // Don't shade AssemblyToProcess, but redirect its refs
+            new(
+                "AssemblyToProcess",
+                Path.Combine(directory, "AssemblyToProcess.dll"),
+                "AssemblyToProcess",
+                Path.Combine(directory, "AssemblyToProcess.dll"),
+                IsShaded: false
+            )
+        };
+
+        // This should throw an error about broken configuration
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+        {
+            Shader.Run(infos, internalize: false, key: null);
+        });
+
+        // Verify the error message is helpful
+        Assert.Contains("AssemblyToProcess", exception.Message);
+        Assert.Contains("AssemblyToInclude", exception.Message);
+        Assert.Contains("reference", exception.Message.ToLower());
+    }
 }
