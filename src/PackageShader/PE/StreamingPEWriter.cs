@@ -205,7 +205,19 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
             return;
         }
 
-        // Patch section header
+        // Calculate the VA shift for all sections after metadata
+        // Only needed when section raw data actually grows (rawSizeDiff != 0)
+        // If metadata fits within existing padding, no VA shift needed
+        uint vaShift = 0;
+        if (rawSizeDiff != 0)
+        {
+            var sectionAlignment = GetSectionAlignment();
+            var oldNextSectionVa = AlignUp((uint) (metadataSection.VirtualAddress + metadataSection.VirtualSize), sectionAlignment);
+            var newNextSectionVa = AlignUp((uint) (metadataSection.VirtualAddress + metadataSection.VirtualSize + sizeDiff), sectionAlignment);
+            vaShift = newNextSectionVa - oldNextSectionVa;
+        }
+
+        // Patch section headers
         var sectionOffset = source.SectionHeadersOffset;
         for (var i = 0; i < source.Sections.Length; i++)
         {
@@ -220,12 +232,64 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
                 output.Position = headerOffset + 16;
                 WriteUInt32(output, newRawSize);
             }
-            else if (section.PointerToRawData > metadataSection.PointerToRawData &&
-                     rawSizeDiff != 0)
+            else if (section.VirtualAddress > metadataSection.VirtualAddress)
             {
+                // Section is after metadata section - shift VirtualAddress by the calculated amount
+                if (vaShift > 0)
+                {
+                    output.Position = headerOffset + 12; // VirtualAddress offset
+                    WriteUInt32(output, (uint) (section.VirtualAddress + vaShift));
+                }
+
                 // Shift PointerToRawData for sections after metadata section
-                output.Position = headerOffset + 20;
-                WriteUInt32(output, (uint) (section.PointerToRawData + rawSizeDiff));
+                if (rawSizeDiff != 0)
+                {
+                    output.Position = headerOffset + 20;
+                    WriteUInt32(output, (uint) (section.PointerToRawData + rawSizeDiff));
+                }
+            }
+        }
+
+        // Update SizeOfImage in optional header (increases by VA shift)
+        if (vaShift > 0)
+        {
+            var sizeOfImageOffset = source.OptionalHeaderOffset + 56; // SizeOfImage at offset 56 in optional header
+            output.Position = sizeOfImageOffset;
+            var oldSizeOfImage = ReadUInt32(output);
+            output.Position = sizeOfImageOffset;
+            WriteUInt32(output, oldSizeOfImage + vaShift);
+
+            // Update data directory entries that point to shifted sections
+            // These directories point to sections AFTER the metadata section that have shifted
+            var pe64 = source.IsPE64;
+            var dataDirOffset = source.OptionalHeaderOffset + (pe64 ? 112 : 96);
+
+            // Get the old start address of the first section after metadata
+            var firstShiftedSectionVa = uint.MaxValue;
+            foreach (var section in source.Sections)
+            {
+                if (section.VirtualAddress > metadataSection.VirtualAddress &&
+                    section.VirtualAddress < firstShiftedSectionVa)
+                {
+                    firstShiftedSectionVa = section.VirtualAddress;
+                }
+            }
+
+            // Patch data directories that point to shifted sections
+            // Directory indices: 2=Resource, 5=BaseReloc
+            int[] directoriesToPatch = [2, 5];
+            foreach (var dirIndex in directoriesToPatch)
+            {
+                var dirEntryOffset = dataDirOffset + dirIndex * 8;
+                output.Position = dirEntryOffset;
+                var dirRva = ReadUInt32(output);
+
+                // Only patch if the RVA is in a section that shifted
+                if (dirRva >= firstShiftedSectionVa && dirRva > 0)
+                {
+                    output.Position = dirEntryOffset;
+                    WriteUInt32(output, dirRva + vaShift);
+                }
             }
         }
 
@@ -615,6 +679,13 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
     {
         Span<byte> buffer = stackalloc byte[4];
         source.ReadAt(source.OptionalHeaderOffset + 36, buffer);
+        return BinaryPrimitives.ReadUInt32LittleEndian(buffer);
+    }
+
+    uint GetSectionAlignment()
+    {
+        Span<byte> buffer = stackalloc byte[4];
+        source.ReadAt(source.OptionalHeaderOffset + 32, buffer);
         return BinaryPrimitives.ReadUInt32LittleEndian(buffer);
     }
 
