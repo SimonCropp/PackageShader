@@ -599,7 +599,7 @@ public class MetadataTests
         var metadata = output.ToArray();
 
         // Find the BSJB signature
-        var bsjbIndex = FindSignature(metadata, [0x42, 0x53, 0x4A, 0x42]);
+        var bsjbIndex = FindSignature(metadata, "BSJB"u8.ToArray());
         Assert.True(bsjbIndex >= 0, "BSJB signature not found");
 
         // Navigate to table heap header (skip metadata root, stream headers)

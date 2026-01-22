@@ -62,7 +62,7 @@ public class Ecma335ComplianceTests
         // Valid RIDs [1, rowCount] should work
         for (uint rid = 1; rid <= typeRefCount; rid++)
         {
-            var typeRefRow = reader.ReadTypeRefRow(rid);
+            reader.ReadTypeRefRow(rid);
             // TypeRefRow is a struct, just verify we can read it without exception
         }
 
@@ -186,7 +186,7 @@ public class Ecma335ComplianceTests
         // GUID index size is 2 or 4 bytes depending on HeapSizes flag (bit 0x02)
         // This is validated by System.Reflection.Metadata which PackageShader uses internally
         var guidIndexSize = reader.GuidIndexSize;
-        Assert.True(guidIndexSize == 2 || guidIndexSize == 4,
+        Assert.True(guidIndexSize is 2 or 4,
             "GUID index size should be 2 or 4 bytes");
     }
 
