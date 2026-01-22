@@ -146,8 +146,9 @@ public class MetadataTests
     [Fact]
     public void UndefinedVersionComponents_CastToUshort_Produces65535()
     {
-        // This test documents the bug: casting Version.Build when it's -1 (undefined)
-        // directly to ushort produces 65535 (0xFFFF), which can confuse some tools
+        // This test documents the .NET behavior: casting Version.Build when it's -1 (undefined)
+        // directly to ushort produces 65535 (0xFFFF), which can confuse some tools.
+        // NOTE: This is a documentation test only - it does not test our production code.
         var version = new Version(1, 0); // Build = -1, Revision = -1
 
         // Direct cast produces 65535 (the bug we're protecting against)
@@ -166,10 +167,87 @@ public class MetadataTests
     }
 
     [Fact]
+    public void ReadAssemblyRefRow_VersionMatchesRawMetadataBytes()
+    {
+        // This test verifies that ReadAssemblyRefRow correctly reads version components
+        // by comparing the parsed values against raw bytes from the metadata table.
+        // AssemblyRef row layout: MajorVersion(2) + MinorVersion(2) + BuildNumber(2) + RevisionNumber(2) + ...
+        var assemblyPath = Path.Combine(binDirectory, "DummyAssembly.dll");
+
+        using var peFile = StreamingPEFile.Open(assemblyPath);
+        using var reader = new StreamingMetadataReader(peFile);
+
+        var refCount = reader.GetRowCount(TableIndex.AssemblyRef);
+        Assert.True(refCount > 0, "Test assembly should have at least one AssemblyRef");
+
+        for (uint rid = 1; rid <= refCount; rid++)
+        {
+            // Read the row using the production code
+            var row = reader.ReadAssemblyRefRow(rid);
+
+            // Read the raw bytes directly from the table
+            var rawBytes = reader.ReadRow(TableIndex.AssemblyRef, rid);
+            Assert.True(rawBytes.Length >= 8, "AssemblyRef row should have at least 8 bytes for version fields");
+
+            // Parse version components directly from raw bytes (little-endian ushorts)
+            var rawMajor = BitConverter.ToUInt16(rawBytes, 0);
+            var rawMinor = BitConverter.ToUInt16(rawBytes, 2);
+            var rawBuild = BitConverter.ToUInt16(rawBytes, 4);
+            var rawRevision = BitConverter.ToUInt16(rawBytes, 6);
+
+            // The production code should return values matching the raw metadata
+            Assert.Equal(rawMajor, row.MajorVersion);
+            Assert.Equal(rawMinor, row.MinorVersion);
+            Assert.Equal(rawBuild, row.BuildNumber);
+            Assert.Equal(rawRevision, row.RevisionNumber);
+        }
+    }
+
+    [Fact]
+    public void FindAssemblyRef_VersionMatchesRawMetadataBytes()
+    {
+        // This test verifies that FindAssemblyRef correctly reads version components
+        // by comparing the parsed values against raw bytes from the metadata table.
+        var assemblyPath = Path.Combine(binDirectory, "DummyAssembly.dll");
+
+        using var peFile = StreamingPEFile.Open(assemblyPath);
+        using var reader = new StreamingMetadataReader(peFile);
+
+        var refCount = reader.GetRowCount(TableIndex.AssemblyRef);
+        Assert.True(refCount > 0, "Test assembly should have at least one AssemblyRef");
+
+        for (uint rid = 1; rid <= refCount; rid++)
+        {
+            var refInfo = reader.FindAssemblyRefByRid(rid);
+            Assert.NotNull(refInfo);
+
+            // Find the same ref by name to get the row from FindAssemblyRef
+            var foundByName = reader.FindAssemblyRef(refInfo.Value.name);
+            Assert.NotNull(foundByName);
+            var (foundRid, row) = foundByName.Value;
+
+            // Read the raw bytes directly from the table
+            var rawBytes = reader.ReadRow(TableIndex.AssemblyRef, foundRid);
+            Assert.True(rawBytes.Length >= 8, "AssemblyRef row should have at least 8 bytes for version fields");
+
+            // Parse version components directly from raw bytes (little-endian ushorts)
+            var rawMajor = BitConverter.ToUInt16(rawBytes, 0);
+            var rawMinor = BitConverter.ToUInt16(rawBytes, 2);
+            var rawBuild = BitConverter.ToUInt16(rawBytes, 4);
+            var rawRevision = BitConverter.ToUInt16(rawBytes, 6);
+
+            // The production code should return values matching the raw metadata
+            Assert.Equal(rawMajor, row.MajorVersion);
+            Assert.Equal(rawMinor, row.MinorVersion);
+            Assert.Equal(rawBuild, row.BuildNumber);
+            Assert.Equal(rawRevision, row.RevisionNumber);
+        }
+    }
+
+    [Fact]
     public void FindAssemblyRef_ReturnsConsistentVersionWithReadAssemblyRefRow()
     {
         // Verify FindAssemblyRef and ReadAssemblyRefRow return the same version info
-        // Both methods should use Math.Max(0, ...) to handle undefined components consistently
         var assemblyPath = Path.Combine(binDirectory, "DummyAssembly.dll");
 
         using var peFile = StreamingPEFile.Open(assemblyPath);

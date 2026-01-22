@@ -476,7 +476,7 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
         // CRITICAL: Patch MethodDef RVAs
         // MethodDef table contains RVA fields that point to IL code
         // When metadata grows, IL code shifts, so these RVAs must be updated
-        // This is the bug fix for "Bad IL format" errors in MarkdownSnippets
+        // This is the bug fix for "Bad IL format" errors
         PatchMethodDefRVAs(output, metadataSection, oldMetadataRvaEnd, sizeDiff);
 
         // Patch base relocation table entries that point to shifted addresses

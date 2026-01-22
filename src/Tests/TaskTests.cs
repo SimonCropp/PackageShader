@@ -581,7 +581,6 @@ public class TaskTests
     [Fact]
     public async Task BuildToolTransitiveDependenciesShouldNotTriggerValidation()
     {
-        // This test reproduces the MarkdownSnippets issue:
         // - A project shades System.Memory
         // - System.IO.Pipelines also references System.Memory but is NOT shaded
         // - System.IO.Pipelines is in CopyLocal (transitive from System.Text.Json)

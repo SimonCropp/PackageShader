@@ -344,7 +344,6 @@ public class ShaderTests
     [Fact]
     public void DetectsBrokenConfiguration_WhenUnshadedAssemblyReferencesShadedAssembly()
     {
-        // This test reproduces the MarkdownSnippets issue:
         // - AssemblyToProcess (unshaded) references AssemblyToInclude
         // - AssemblyToInclude is being shaded
         // - This creates a broken configuration with dangling references
