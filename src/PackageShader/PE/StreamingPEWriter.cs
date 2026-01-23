@@ -205,9 +205,10 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
             return;
         }
 
-        // Calculate the VA shift for all sections after metadata
-        // Only needed when section raw data actually grows (rawSizeDiff != 0)
-        // If metadata fits within existing padding, no VA shift needed
+        // Calculate the VA shift for all sections after metadata.
+        // Per ECMA-335 II.25.3, section VirtualAddress must be aligned to SectionAlignment.
+        // When metadata grows beyond the original section boundary, subsequent sections must
+        // shift to avoid overlap. Only needed when section raw data actually grows (rawSizeDiff != 0).
         uint vaShift = 0;
         if (rawSizeDiff != 0)
         {
@@ -217,7 +218,7 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
             vaShift = newNextSectionVa - oldNextSectionVa;
         }
 
-        // Patch section headers
+        // Patch section headers (40 bytes each per ECMA-335 II.25.3)
         var sectionOffset = source.SectionHeadersOffset;
         for (var i = 0; i < source.Sections.Length; i++)
         {
@@ -259,8 +260,10 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
             output.Position = sizeOfImageOffset;
             WriteUInt32(output, oldSizeOfImage + vaShift);
 
-            // Update data directory entries that point to shifted sections
-            // These directories point to sections AFTER the metadata section that have shifted
+            // Update data directory entries that point to shifted sections.
+            // Per ECMA-335 II.25.2.3.3, data directory entries contain RVAs that must point
+            // to valid locations within their respective sections. When section VirtualAddresses
+            // shift (per II.25.3), these RVAs must be updated accordingly.
             var pe64 = source.IsPE64;
             var dataDirOffset = source.OptionalHeaderOffset + (pe64 ? 112 : 96);
 
@@ -275,8 +278,8 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
                 }
             }
 
-            // Patch data directories that point to shifted sections
-            // Directory indices: 2=Resource, 5=BaseReloc
+            // Patch data directories that point to shifted sections.
+            // Directory indices per ECMA-335 II.25.2.3.3: 2=Resource Table, 5=Base Relocation Table
             int[] directoriesToPatch = [2, 5];
             foreach (var dirIndex in directoriesToPatch)
             {

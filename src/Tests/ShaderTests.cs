@@ -342,6 +342,480 @@ public class ShaderTests
     public record AssemblyResult(string Name, List<string> References, List<string> InternalsVisibleTo, bool HasExternalSymbols, bool HasEmbeddedSymbols);
 
     [Fact]
+    public async Task MarkdownSnippetsShading()
+    {
+        // This test uses actual MarkdownSnippets assemblies to verify shading works correctly
+        // The net10.0 shaded assembly was being produced with an invalid format (BadImageFormatException)
+        // MarkdownSnippets repo is at C:\Code\MarkdownSnippets (sibling to PackageShader repo)
+        var markdownSnippetsPath = @"C:\Code\MarkdownSnippets\src\MarkdownSnippets\bin\Release\net10.0";
+        var msBuildPath = @"C:\Code\MarkdownSnippets\src\MarkdownSnippets.MsBuild\bin\Release\net10.0";
+
+        var markdownSnippetsDll = Path.Combine(markdownSnippetsPath, "MarkdownSnippets.dll");
+        var msBuildDll = Path.Combine(msBuildPath, "MarkdownSnippets.MsBuild.dll");
+
+        Assert.True(File.Exists(markdownSnippetsDll), $"MarkdownSnippets.dll not found at: {markdownSnippetsDll}");
+        Assert.True(File.Exists(msBuildDll), $"MarkdownSnippets.MsBuild.dll not found at: {msBuildDll}");
+
+        using var directory = new TempDirectory();
+
+        // Copy the assemblies
+        File.Copy(markdownSnippetsDll, Path.Combine(directory, "MarkdownSnippets.dll"));
+        File.Copy(msBuildDll, Path.Combine(directory, "MarkdownSnippets.MsBuild.dll"));
+
+        var keyFile = @"C:\Code\MarkdownSnippets\src\key.snk";
+        var key = File.Exists(keyFile) ? StrongNameKey.FromFile(keyFile) : (StrongNameKey?)null;
+
+        var infos = new List<SourceTargetInfo>
+        {
+            // MarkdownSnippets.MsBuild is the root assembly (not shaded, but references MarkdownSnippets)
+            new(
+                "MarkdownSnippets.MsBuild",
+                Path.Combine(directory, "MarkdownSnippets.MsBuild.dll"),
+                "MarkdownSnippets.MsBuild",
+                Path.Combine(directory, "MarkdownSnippets.MsBuild.dll"),
+                IsShaded: false,
+                IsRootAssembly: true
+            ),
+            // MarkdownSnippets is shaded
+            new(
+                "MarkdownSnippets",
+                Path.Combine(directory, "MarkdownSnippets.dll"),
+                "MarkdownSnippets.MsBuild.MarkdownSnippets",
+                Path.Combine(directory, "MarkdownSnippets.MsBuild.MarkdownSnippets.dll"),
+                IsShaded: true
+            )
+        };
+
+        Shader.Run(infos, internalize: true, key: key);
+
+        // Verify shaded assembly is loadable - this was failing with BadImageFormatException
+        var shadedAssemblyPath = Path.Combine(directory, "MarkdownSnippets.MsBuild.MarkdownSnippets.dll");
+
+        // List all files in the temp directory for debugging
+        var files = Directory.GetFiles(directory, "*.dll");
+        Assert.True(File.Exists(shadedAssemblyPath),
+            $"Shaded assembly should exist. Files in directory: {string.Join(", ", files.Select(Path.GetFileName))}");
+
+        // Verify the shaded assembly has valid PE format by checking if we can read its assembly name
+        using (var fs = File.OpenRead(shadedAssemblyPath))
+        using (var peReader = new PEReader(fs))
+        {
+            var metadataReader = peReader.GetMetadataReader();
+            var asmName = MetadataHelper.FormatAssemblyName(metadataReader);
+            Assert.Contains("MarkdownSnippets.MsBuild.MarkdownSnippets", asmName);
+        }
+
+        // Compare with the assembly produced by MarkdownSnippets.MsBuild's own build
+        var existingShadedPath = Path.Combine(msBuildPath, "MarkdownSnippets.MsBuild.MarkdownSnippets.dll");
+        if (File.Exists(existingShadedPath))
+        {
+            // Read both assemblies and compare their PE characteristics
+            using var existingFs = File.OpenRead(existingShadedPath);
+            using var existingPeReader = new PEReader(existingFs);
+
+            using var newFs = File.OpenRead(shadedAssemblyPath);
+            using var newPeReader = new PEReader(newFs);
+
+            var existingHeaders = existingPeReader.PEHeaders;
+            var newHeaders = newPeReader.PEHeaders;
+
+            // Check if there's a machine type mismatch
+            var existingMachine = existingHeaders.CoffHeader.Machine;
+            var newMachine = newHeaders.CoffHeader.Machine;
+
+            // Check for CorFlags (determines managed code characteristics)
+            var existingCorFlags = existingHeaders.CorHeader?.Flags ?? 0;
+            var newCorFlags = newHeaders.CorHeader?.Flags ?? 0;
+
+            // Also check the source MarkdownSnippets.dll
+            var sourceMarkdownSnippets = Path.Combine(markdownSnippetsPath, "MarkdownSnippets.dll");
+            using var sourceFs = File.OpenRead(sourceMarkdownSnippets);
+            using var sourcePeReader = new PEReader(sourceFs);
+            var sourceHeaders = sourcePeReader.PEHeaders;
+
+            // Check 32BIT_REQUIRED flag (value 2 in CorFlags)
+            var source32BitRequired = (sourceHeaders.CorHeader?.Flags & CorFlags.Requires32Bit) != 0;
+            var existing32BitRequired = (existingCorFlags & CorFlags.Requires32Bit) != 0;
+            var new32BitRequired = (newCorFlags & CorFlags.Requires32Bit) != 0;
+
+            var comparison = $@"
+PE Comparison:
+  Source MarkdownSnippets.dll (original):
+    Machine: {sourceHeaders.CoffHeader.Machine}
+    CorFlags: {sourceHeaders.CorHeader?.Flags}
+    PE Magic: {sourceHeaders.PEHeader?.Magic}
+    32BIT_REQUIRED: {source32BitRequired}
+
+  Existing shaded assembly (from MarkdownSnippets.MsBuild build):
+    Machine: {existingMachine}
+    CorFlags: {existingCorFlags}
+    PE Magic: {existingHeaders.PEHeader?.Magic}
+    32BIT_REQUIRED: {existing32BitRequired}
+
+  New shaded assembly (from Shader.Run in test):
+    Machine: {newMachine}
+    CorFlags: {newCorFlags}
+    PE Magic: {newHeaders.PEHeader?.Magic}
+    32BIT_REQUIRED: {new32BitRequired}
+";
+            // Try to load the NEW shaded assembly from our test using MemoryStream to avoid file locks
+            var newBytes = File.ReadAllBytes(shadedAssemblyPath);
+            var newTestContext = new AssemblyLoadContext("NewTestLoadContext", isCollectible: true);
+            try
+            {
+                using var newStream = new MemoryStream(newBytes);
+                var newLoadedAsm = newTestContext.LoadFromStream(newStream);
+                var newTypes = newLoadedAsm.GetTypes();
+                // New assembly loads successfully - this proves Shader.Run works
+            }
+            catch (BadImageFormatException ex)
+            {
+                throw new($"NEW shaded assembly FAILED to load: {ex.Message}");
+            }
+            finally
+            {
+                newTestContext.Unload();
+            }
+
+            // Try to load the EXISTING shaded assembly (now expected to succeed after the fix)
+            var existingBytes = File.ReadAllBytes(existingShadedPath);
+            var existingTestContext = new AssemblyLoadContext("ExistingTestLoadContext", isCollectible: true);
+            try
+            {
+                using var existingStream = new MemoryStream(existingBytes);
+                var existingLoadedAsm = existingTestContext.LoadFromStream(existingStream);
+                var existingTypes = existingLoadedAsm.GetTypes();
+                // After the fix, both assemblies should load successfully
+            }
+            catch (BadImageFormatException ex)
+            {
+                throw new($"Existing shaded assembly still has Bad IL format - fix may not be complete: {ex.Message}. {comparison}");
+            }
+            finally
+            {
+                existingTestContext.Unload();
+            }
+        }
+
+        // Test passes - we've confirmed both assemblies load successfully
+        // This verifies the fix for the section VA overlap bug is working
+    }
+
+    [Fact]
+    public async Task MarkdownSnippetsShadingWithOriginalUnshaded()
+    {
+        // This test uses the ORIGINAL UNSHADED assemblies to exactly replicate MSBuild scenario
+        // The original files were captured by building MarkdownSnippets.MsBuild without PackageShader
+        var testDataDir = Path.Combine(ProjectFiles.SolutionDirectory.Path, "Tests", "TestData", "MarkdownSnippetsOriginal");
+        var originalMsBuildDll = Path.Combine(testDataDir, "MarkdownSnippets.MsBuild.dll");
+        var originalMarkdownSnippetsDll = Path.Combine(testDataDir, "MarkdownSnippets.dll");
+
+        Assert.True(File.Exists(originalMsBuildDll), $"Original MarkdownSnippets.MsBuild.dll not found at: {originalMsBuildDll}");
+        Assert.True(File.Exists(originalMarkdownSnippetsDll), $"Original MarkdownSnippets.dll not found at: {originalMarkdownSnippetsDll}");
+
+        using var directory = new TempDirectory();
+
+        // Copy the original unshaded assemblies
+        File.Copy(originalMsBuildDll, Path.Combine(directory, "MarkdownSnippets.MsBuild.dll"));
+        File.Copy(originalMarkdownSnippetsDll, Path.Combine(directory, "MarkdownSnippets.dll"));
+
+        var keyFile = @"C:\Code\MarkdownSnippets\src\key.snk";
+        var key = File.Exists(keyFile) ? StrongNameKey.FromFile(keyFile) : (StrongNameKey?)null;
+
+        // Setup exactly like MSBuild does:
+        // - MarkdownSnippets is shaded (IsShaded: true)
+        // - MarkdownSnippets.MsBuild is the root assembly (IsShaded: false, IsRootAssembly: true)
+        // - Source and target path for root assembly are the same (in-place modification)
+        var infos = new List<SourceTargetInfo>
+        {
+            // MarkdownSnippets is shaded
+            new(
+                "MarkdownSnippets",
+                Path.Combine(directory, "MarkdownSnippets.dll"),
+                "MarkdownSnippets.MsBuild.MarkdownSnippets",
+                Path.Combine(directory, "MarkdownSnippets.MsBuild.MarkdownSnippets.dll"),
+                IsShaded: true
+            ),
+            // MarkdownSnippets.MsBuild is the root assembly with SAME source and target path
+            new(
+                "MarkdownSnippets.MsBuild",
+                Path.Combine(directory, "MarkdownSnippets.MsBuild.dll"),
+                "MarkdownSnippets.MsBuild",
+                Path.Combine(directory, "MarkdownSnippets.MsBuild.dll"),
+                IsShaded: false,
+                IsRootAssembly: true
+            )
+        };
+
+        Shader.Run(infos, internalize: true, key: key);
+
+        // Verify the shaded assembly is loadable
+        var shadedPath = Path.Combine(directory, "MarkdownSnippets.MsBuild.MarkdownSnippets.dll");
+        Assert.True(File.Exists(shadedPath), "Shaded assembly should exist");
+
+        var shadedBytes = File.ReadAllBytes(shadedPath);
+        var testContext = new AssemblyLoadContext("TestLoadContext", isCollectible: true);
+        try
+        {
+            using var stream = new MemoryStream(shadedBytes);
+            var loadedAsm = testContext.LoadFromStream(stream);
+            var types = loadedAsm.GetTypes();
+            // Assembly loads successfully
+        }
+        catch (BadImageFormatException ex)
+        {
+            throw new($"Shaded assembly is corrupt: {ex.Message}");
+        }
+        finally
+        {
+            testContext.Unload();
+        }
+
+        // Also verify the root assembly was updated correctly
+        var rootPath = Path.Combine(directory, "MarkdownSnippets.MsBuild.dll");
+        var rootBytes = File.ReadAllBytes(rootPath);
+        var rootContext = new AssemblyLoadContext("RootTestContext", isCollectible: true);
+        try
+        {
+            using var stream = new MemoryStream(rootBytes);
+            var loadedAsm = rootContext.LoadFromStream(stream);
+
+            // Verify references were updated
+            var refs = loadedAsm.GetReferencedAssemblies();
+            var hasShaded = refs.Any(r => r.Name == "MarkdownSnippets.MsBuild.MarkdownSnippets");
+            var hasOriginal = refs.Any(r => r.Name == "MarkdownSnippets");
+            Assert.True(hasShaded, "Root assembly should reference the shaded name");
+            Assert.False(hasOriginal, "Root assembly should not reference the original name");
+        }
+        finally
+        {
+            rootContext.Unload();
+        }
+
+        // Now compare with the MSBuild output if it exists
+        var msBuildCorruptPath = @"C:\Code\MarkdownSnippets\src\MarkdownSnippets.MsBuild\obj\Release\net10.0\MarkdownSnippets.MsBuild.MarkdownSnippets.dll";
+        if (File.Exists(msBuildCorruptPath))
+        {
+            // Read both files and compare PE structure
+            var testBytes = File.ReadAllBytes(shadedPath);
+            var msBuildBytes = File.ReadAllBytes(msBuildCorruptPath);
+
+            using var testStream = new MemoryStream(testBytes);
+            using var msBuildStream = new MemoryStream(msBuildBytes);
+
+            using var testPE = new PEReader(testStream);
+            using var msBuildPE = new PEReader(msBuildStream);
+
+            var comparison = new StringBuilder();
+            comparison.AppendLine("PE Comparison (Test vs MSBuild):");
+            comparison.AppendLine($"  File size: {testBytes.Length} vs {msBuildBytes.Length}");
+            comparison.AppendLine($"  Has metadata: {testPE.HasMetadata} vs {msBuildPE.HasMetadata}");
+
+            var testHeaders = testPE.PEHeaders;
+            var msBuildHeaders = msBuildPE.PEHeaders;
+
+            comparison.AppendLine($"  Machine: {testHeaders.CoffHeader.Machine} vs {msBuildHeaders.CoffHeader.Machine}");
+            comparison.AppendLine($"  Characteristics: {testHeaders.CoffHeader.Characteristics} vs {msBuildHeaders.CoffHeader.Characteristics}");
+            comparison.AppendLine($"  PE Magic: {testHeaders.PEHeader?.Magic} vs {msBuildHeaders.PEHeader?.Magic}");
+            comparison.AppendLine($"  CorFlags: {testHeaders.CorHeader?.Flags} vs {msBuildHeaders.CorHeader?.Flags}");
+            comparison.AppendLine($"  Section count: {testHeaders.SectionHeaders.Length} vs {msBuildHeaders.SectionHeaders.Length}");
+
+            // If metadata is valid but Assembly.LoadFrom fails, the IL might be corrupt
+            // This suggests the RVA patching or IL body relocation might be wrong
+
+            // Let's compare the method RVAs between the two files
+            var testMd2 = testPE.GetMetadataReader();
+            var msBuildMd2 = msBuildPE.GetMetadataReader();
+
+            comparison.AppendLine($"  Test metadata: OK, assembly name: {testMd2.GetString(testMd2.GetAssemblyDefinition().Name)}");
+            comparison.AppendLine($"  MSBuild metadata: OK, assembly name: {msBuildMd2.GetString(msBuildMd2.GetAssemblyDefinition().Name)}");
+
+            comparison.AppendLine("\nMethod comparison:");
+            var testMethodCount = testMd2.MethodDefinitions.Count;
+            var msBuildMethodCount = msBuildMd2.MethodDefinitions.Count;
+            comparison.AppendLine($"  Method count: {testMethodCount} vs {msBuildMethodCount}");
+
+            // Compare first few method RVAs
+            var compareCount = Math.Min(5, Math.Min(testMethodCount, msBuildMethodCount));
+            var testMethodHandles = testMd2.MethodDefinitions.ToArray();
+            var msBuildMethodHandles = msBuildMd2.MethodDefinitions.ToArray();
+
+            for (var i = 0; i < compareCount; i++)
+            {
+                var testMethod = testMd2.GetMethodDefinition(testMethodHandles[i]);
+                var msBuildMethod = msBuildMd2.GetMethodDefinition(msBuildMethodHandles[i]);
+                var testName = testMd2.GetString(testMethod.Name);
+                var msBuildName = msBuildMd2.GetString(msBuildMethod.Name);
+                comparison.AppendLine($"  Method {i}: '{testName}' RVA={testMethod.RelativeVirtualAddress} vs '{msBuildName}' RVA={msBuildMethod.RelativeVirtualAddress}");
+            }
+
+            // Test if we can read method bodies from the PE
+            comparison.AppendLine("\nMethod body validation:");
+            try
+            {
+                for (var i = 0; i < Math.Min(3, testMethodCount); i++)
+                {
+                    var method = testMd2.GetMethodDefinition(testMethodHandles[i]);
+                    if (method.RelativeVirtualAddress != 0)
+                    {
+                        var body = testPE.GetMethodBody(method.RelativeVirtualAddress);
+                        var ilBytes = body.GetILBytes();
+                        comparison.AppendLine($"  Test method {i}: IL size = {ilBytes?.Length ?? 0}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                comparison.AppendLine($"  Test method body read FAILED: {ex.Message}");
+            }
+
+            try
+            {
+                for (var i = 0; i < Math.Min(3, msBuildMethodCount); i++)
+                {
+                    var method = msBuildMd2.GetMethodDefinition(msBuildMethodHandles[i]);
+                    if (method.RelativeVirtualAddress != 0)
+                    {
+                        var body = msBuildPE.GetMethodBody(method.RelativeVirtualAddress);
+                        var ilBytes = body.GetILBytes();
+                        comparison.AppendLine($"  MSBuild method {i}: IL size = {ilBytes?.Length ?? 0}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                comparison.AppendLine($"  MSBuild method body read FAILED: {ex.Message}");
+            }
+
+            // Compare sections
+            comparison.AppendLine("\nSection comparison:");
+            for (var s = 0; s < testHeaders.SectionHeaders.Length; s++)
+            {
+                var testSection = testHeaders.SectionHeaders[s];
+                var msBuildSection = msBuildHeaders.SectionHeaders[s];
+                var testSectionName = testSection.Name;
+                var msBuildSectionName = msBuildSection.Name;
+                comparison.AppendLine($"  Section {s}: '{testSectionName}' vs '{msBuildSectionName}'");
+                comparison.AppendLine($"    VirtualAddress: {testSection.VirtualAddress} vs {msBuildSection.VirtualAddress}");
+                comparison.AppendLine($"    VirtualSize: {testSection.VirtualSize} vs {msBuildSection.VirtualSize}");
+                comparison.AppendLine($"    SizeOfRawData: {testSection.SizeOfRawData} vs {msBuildSection.SizeOfRawData}");
+                comparison.AppendLine($"    PointerToRawData: {testSection.PointerToRawData} vs {msBuildSection.PointerToRawData}");
+            }
+
+            // Check strong name directory
+            comparison.AppendLine("\nCLR Header:");
+            var testCor = testHeaders.CorHeader;
+            var msBuildCor = msBuildHeaders.CorHeader;
+            if (testCor != null && msBuildCor != null)
+            {
+                comparison.AppendLine($"  EntryPointToken: {testCor.EntryPointTokenOrRelativeVirtualAddress} vs {msBuildCor.EntryPointTokenOrRelativeVirtualAddress}");
+                comparison.AppendLine($"  StrongNameSignature RVA: {testCor.StrongNameSignatureDirectory.RelativeVirtualAddress} vs {msBuildCor.StrongNameSignatureDirectory.RelativeVirtualAddress}");
+                comparison.AppendLine($"  StrongNameSignature Size: {testCor.StrongNameSignatureDirectory.Size} vs {msBuildCor.StrongNameSignatureDirectory.Size}");
+                comparison.AppendLine($"  MetadataDirectory RVA: {testCor.MetadataDirectory.RelativeVirtualAddress} vs {msBuildCor.MetadataDirectory.RelativeVirtualAddress}");
+                comparison.AppendLine($"  MetadataDirectory Size: {testCor.MetadataDirectory.Size} vs {msBuildCor.MetadataDirectory.Size}");
+                comparison.AppendLine($"  Resources RVA: {testCor.ResourcesDirectory.RelativeVirtualAddress} vs {msBuildCor.ResourcesDirectory.RelativeVirtualAddress}");
+                comparison.AppendLine($"  Resources Size: {testCor.ResourcesDirectory.Size} vs {msBuildCor.ResourcesDirectory.Size}");
+            }
+
+            // Check metadata tables
+            comparison.AppendLine("\nMetadata tables:");
+            comparison.AppendLine($"  AssemblyRef count: {testMd2.AssemblyReferences.Count} vs {msBuildMd2.AssemblyReferences.Count}");
+            comparison.AppendLine($"  TypeRef count: {testMd2.TypeReferences.Count} vs {msBuildMd2.TypeReferences.Count}");
+            comparison.AppendLine($"  MemberRef count: {testMd2.MemberReferences.Count} vs {msBuildMd2.MemberReferences.Count}");
+            comparison.AppendLine($"  TypeDef count: {testMd2.TypeDefinitions.Count} vs {msBuildMd2.TypeDefinitions.Count}");
+            comparison.AppendLine($"  CustomAttribute count: {testMd2.CustomAttributes.Count} vs {msBuildMd2.CustomAttributes.Count}");
+
+            // Debug comparison for manual inspection
+            // The MSBuild output was created before the VA fix, so section addresses don't match
+            // This is expected - the fix should make new builds produce valid output
+        }
+    }
+
+    [Fact]
+    public async Task MarkdownSnippetsShadingWithNetStandard20()
+    {
+        // This test uses the RELEASE NETSTANDARD2.0 build of PackageShader to reproduce the MSBuild issue
+        // The MSBuild task uses the Release netstandard2.0 PackageShader.dll from NuGet
+        var netStandard20Path = @"C:\Code\PackageShader\src\PackageShader\bin\Release\netstandard2.0\PackageShader.dll";
+
+        Assert.True(File.Exists(netStandard20Path), $"netstandard2.0 build not found at: {netStandard20Path}");
+
+        var markdownSnippetsPath = @"C:\Code\MarkdownSnippets\src\MarkdownSnippets\bin\Release\net10.0";
+        var markdownSnippetsDll = Path.Combine(markdownSnippetsPath, "MarkdownSnippets.dll");
+        Assert.True(File.Exists(markdownSnippetsDll), $"MarkdownSnippets.dll not found");
+
+        using var directory = new TempDirectory();
+
+        // Copy the source assembly
+        File.Copy(markdownSnippetsDll, Path.Combine(directory, "MarkdownSnippets.dll"));
+
+        // Load netstandard2.0 PackageShader using AssemblyLoadContext
+        var loadContext = new AssemblyLoadContext("NetStandard20PackageShader", isCollectible: true);
+        try
+        {
+            var netStdAsm = loadContext.LoadFromAssemblyPath(netStandard20Path);
+
+            // Get Shader type and Run method
+            var shaderType = netStdAsm.GetType("PackageShader.Shader");
+            Assert.NotNull(shaderType);
+
+            var runMethod = shaderType!.GetMethod("Run", BindingFlags.Public | BindingFlags.Static);
+            Assert.NotNull(runMethod);
+
+            // Get SourceTargetInfo type
+            var sourceTargetInfoType = netStdAsm.GetType("PackageShader.SourceTargetInfo");
+            Assert.NotNull(sourceTargetInfoType);
+
+            // Create list of SourceTargetInfo
+            var listType = typeof(List<>).MakeGenericType(sourceTargetInfoType!);
+            var infos = Activator.CreateInstance(listType);
+            var addMethod = listType.GetMethod("Add");
+
+            // Create SourceTargetInfo for the shaded assembly
+            // Record constructor: (SourceName, SourcePath, TargetName, TargetPath, IsShaded, IsRootAssembly)
+            var info = Activator.CreateInstance(sourceTargetInfoType,
+                "MarkdownSnippets",                                    // SourceName
+                Path.Combine(directory, "MarkdownSnippets.dll"),      // SourcePath
+                "Test.MarkdownSnippets",                              // TargetName
+                Path.Combine(directory, "Test.MarkdownSnippets.dll"), // TargetPath
+                true,                                                  // IsShaded
+                false);                                                // IsRootAssembly
+            addMethod!.Invoke(infos, [info]);
+
+            // Call Shader.Run using reflection
+            runMethod!.Invoke(null, [infos, true, null]);
+
+            // Verify the shaded assembly was created
+            var shadedPath = Path.Combine(directory, "Test.MarkdownSnippets.dll");
+            Assert.True(File.Exists(shadedPath), "Shaded assembly should exist");
+
+            // Try to load the shaded assembly
+            var shadedBytes = File.ReadAllBytes(shadedPath);
+            var testContext = new AssemblyLoadContext("TestLoadContext", isCollectible: true);
+            try
+            {
+                using var stream = new MemoryStream(shadedBytes);
+                var loadedAsm = testContext.LoadFromStream(stream);
+                var types = loadedAsm.GetTypes();
+                // If we get here, the netstandard2.0 build works correctly
+            }
+            catch (BadImageFormatException ex)
+            {
+                // This would indicate the netstandard2.0 build has the same bug
+                throw new($"NETSTANDARD2.0 PackageShader.dll produces corrupt assemblies: {ex.Message}");
+            }
+            finally
+            {
+                testContext.Unload();
+            }
+        }
+        finally
+        {
+            loadContext.Unload();
+        }
+    }
+
+    [Fact]
     public void DetectsBrokenConfiguration_WhenUnshadedAssemblyReferencesShadedAssembly()
     {
         // This test reproduces the MarkdownSnippets issue:
@@ -388,5 +862,97 @@ public class ShaderTests
         Assert.Contains("AssemblyToProcess", exception.Message);
         Assert.Contains("AssemblyToInclude", exception.Message);
         Assert.Contains("reference", exception.Message.ToLower());
+    }
+
+    /// <summary>
+    /// Tests that when metadata grows significantly (causing section VAs to shift),
+    /// the data directory RVAs (Resource, BaseReloc) are correctly updated.
+    /// Per ECMA-335 II.25.2.3.3 and II.25.3, data directory RVAs must point to
+    /// valid locations within their respective sections.
+    /// </summary>
+    [Fact]
+    public void DataDirectoryRvasUpdatedWhenSectionsShift()
+    {
+        using var directory = new TempDirectory();
+
+        // Copy AssemblyWithResources which has .rsrc section
+        var sourceAssembly = Path.Combine(binDirectory, "AssemblyWithResources.dll");
+        Assert.True(File.Exists(sourceAssembly), "AssemblyWithResources.dll not found");
+        File.Copy(sourceAssembly, Path.Combine(directory, "AssemblyWithResources.dll"));
+
+        // Get original section info
+        using var originalFs = File.OpenRead(sourceAssembly);
+        using var originalPe = new PEReader(originalFs);
+        var originalResourceRva = originalPe.PEHeaders.PEHeader!.ResourceTableDirectory.RelativeVirtualAddress;
+        var originalRelocRva = originalPe.PEHeaders.PEHeader.BaseRelocationTableDirectory.RelativeVirtualAddress;
+        var originalRsrcSection = originalPe.PEHeaders.SectionHeaders.FirstOrDefault(s => s.Name == ".rsrc");
+        var originalRelocSection = originalPe.PEHeaders.SectionHeaders.FirstOrDefault(s => s.Name == ".reloc");
+
+        var infos = new List<SourceTargetInfo>
+        {
+            new(
+                "AssemblyWithResources",
+                Path.Combine(directory, "AssemblyWithResources.dll"),
+                "Shaded.AssemblyWithResources",
+                Path.Combine(directory, "Shaded.AssemblyWithResources.dll"),
+                IsShaded: true
+            )
+        };
+
+        // Use StreamingAssemblyModifier to add many IVT attributes (forces metadata growth)
+        var shadedPath = Path.Combine(directory, "Shaded.AssemblyWithResources.dll");
+        using (var modifier = StreamingAssemblyModifier.Open(sourceAssembly))
+        {
+            // Add many InternalsVisibleTo attributes to force significant metadata growth
+            for (var i = 0; i < 50; i++)
+            {
+                modifier.AddInternalsVisibleTo($"FriendAssembly{i}");
+            }
+            modifier.SetAssemblyName("Shaded.AssemblyWithResources");
+            modifier.Save(shadedPath);
+        }
+
+        // Verify the shaded assembly has correct data directory RVAs
+        using var shadedFs = File.OpenRead(shadedPath);
+        using var shadedPe = new PEReader(shadedFs);
+
+        var shadedResourceRva = shadedPe.PEHeaders.PEHeader!.ResourceTableDirectory.RelativeVirtualAddress;
+        var shadedRelocRva = shadedPe.PEHeaders.PEHeader.BaseRelocationTableDirectory.RelativeVirtualAddress;
+        var shadedRsrcSection = shadedPe.PEHeaders.SectionHeaders.FirstOrDefault(s => s.Name == ".rsrc");
+        var shadedRelocSection = shadedPe.PEHeaders.SectionHeaders.FirstOrDefault(s => s.Name == ".reloc");
+
+        // Verify Resource RVA is within .rsrc section (if present)
+        if (shadedRsrcSection.Name == ".rsrc" && shadedResourceRva > 0)
+        {
+            Assert.True(
+                shadedResourceRva >= shadedRsrcSection.VirtualAddress &&
+                shadedResourceRva < shadedRsrcSection.VirtualAddress + shadedRsrcSection.VirtualSize,
+                $"Resource RVA {shadedResourceRva} should be within .rsrc section " +
+                $"({shadedRsrcSection.VirtualAddress}-{shadedRsrcSection.VirtualAddress + shadedRsrcSection.VirtualSize})");
+        }
+
+        // Verify BaseReloc RVA is within .reloc section (if present)
+        if (shadedRelocSection.Name == ".reloc" && shadedRelocRva > 0)
+        {
+            Assert.True(
+                shadedRelocRva >= shadedRelocSection.VirtualAddress &&
+                shadedRelocRva < shadedRelocSection.VirtualAddress + shadedRelocSection.VirtualSize,
+                $"BaseReloc RVA {shadedRelocRva} should be within .reloc section " +
+                $"({shadedRelocSection.VirtualAddress}-{shadedRelocSection.VirtualAddress + shadedRelocSection.VirtualSize})");
+        }
+
+        // Verify the assembly can be loaded (the ultimate test)
+        var loadContext = new AssemblyLoadContext("DataDirTest", isCollectible: true);
+        try
+        {
+            var bytes = File.ReadAllBytes(shadedPath);
+            using var ms = new MemoryStream(bytes);
+            var asm = loadContext.LoadFromStream(ms);
+            Assert.Contains("Shaded.AssemblyWithResources", asm.FullName);
+        }
+        finally
+        {
+            loadContext.Unload();
+        }
     }
 }
