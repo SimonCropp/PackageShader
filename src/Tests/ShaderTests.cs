@@ -481,4 +481,72 @@ public class ShaderTests
             loadContext.Unload();
         }
     }
+
+    /// <summary>
+    /// Tests that when metadata grows, FieldRVA entries are correctly patched.
+    /// FieldRVA table contains RVAs pointing to static field initialization data.
+    /// This is critical for assemblies using ReadOnlySpan backed by static data,
+    /// like System.Collections.Frozen's FrozenHashTable.Primes.
+    /// </summary>
+    [Fact]
+    public void FieldRVAsPatchedWhenMetadataGrows()
+    {
+        using var directory = new TempDirectory();
+
+        // Copy AssemblyWithStaticFields which has FieldRVA entries
+        var sourceAssembly = Path.Combine(binDirectory, "AssemblyWithStaticFields.dll");
+        Assert.True(File.Exists(sourceAssembly), "AssemblyWithStaticFields.dll not found");
+        File.Copy(sourceAssembly, Path.Combine(directory, "AssemblyWithStaticFields.dll"));
+
+        // Get original FieldRVA count using StreamingMetadataReader
+        using var originalPeFile = StreamingPEFile.Open(sourceAssembly);
+        using var originalReader = new StreamingMetadataReader(originalPeFile);
+        var originalFieldRvaCount = originalReader.GetRowCount(TableIndex.FieldRva);
+        Assert.True(originalFieldRvaCount > 0, "Test assembly should have FieldRVA entries");
+
+        // Shade with significant metadata growth (adding many IVT attributes)
+        var shadedPath = Path.Combine(directory, "Shaded.AssemblyWithStaticFields.dll");
+        using (var modifier = StreamingAssemblyModifier.Open(sourceAssembly))
+        {
+            // Add many InternalsVisibleTo attributes to force metadata growth
+            for (var i = 0; i < 50; i++)
+            {
+                modifier.AddInternalsVisibleTo($"FriendAssembly{i}");
+            }
+            modifier.SetAssemblyName("Shaded.AssemblyWithStaticFields");
+            modifier.Save(shadedPath);
+        }
+
+        // Verify the assembly can be loaded and static data is accessible
+        var loadContext = new AssemblyLoadContext("FieldRVATest", isCollectible: true);
+        try
+        {
+            var bytes = File.ReadAllBytes(shadedPath);
+            using var ms = new MemoryStream(bytes);
+            var asm = loadContext.LoadFromStream(ms);
+            Assert.Contains("Shaded.AssemblyWithStaticFields", asm.FullName);
+
+            // Get the type and invoke methods that access static field data
+            var type = asm.GetType("AssemblyWithStaticFields.ClassWithStaticFields");
+            Assert.NotNull(type);
+
+            // Test GetPrime - accesses ReadOnlySpan<int> backed by FieldRVA data
+            var getPrimeMethod = type.GetMethod("GetPrime");
+            Assert.NotNull(getPrimeMethod);
+            var prime0 = (int)getPrimeMethod.Invoke(null, [0])!;
+            Assert.Equal(3, prime0); // First prime in the array
+            var prime5 = (int)getPrimeMethod.Invoke(null, [5])!;
+            Assert.Equal(29, prime5); // 6th prime in the array
+
+            // Test SumInts - accesses ReadOnlySpan<int> backed by FieldRVA data
+            var sumIntsMethod = type.GetMethod("SumInts");
+            Assert.NotNull(sumIntsMethod);
+            var sum = (int)sumIntsMethod.Invoke(null, null)!;
+            Assert.Equal(1500, sum); // 100 + 200 + 300 + 400 + 500
+        }
+        finally
+        {
+            loadContext.Unload();
+        }
+    }
 }

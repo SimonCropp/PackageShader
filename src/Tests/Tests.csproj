@@ -26,6 +26,7 @@
     <ProjectReference Include="..\AssemblyWithResources\AssemblyWithResources.csproj" />
     <ProjectReference Include="..\AssemblyWithStrongName\AssemblyWithStrongName.csproj" />
     <ProjectReference Include="..\DummyAssembly\DummyAssembly.csproj" />
+    <ProjectReference Include="..\AssemblyWithStaticFields\AssemblyWithStaticFields.csproj" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
     <PackageReference Include="MarkdownSnippets.MsBuild" PrivateAssets="all" />
     <PackageReference Include="Microsoft.ILVerification" />
