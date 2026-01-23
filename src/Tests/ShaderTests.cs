@@ -389,4 +389,96 @@ public class ShaderTests
         Assert.Contains("AssemblyToInclude", exception.Message);
         Assert.Contains("reference", exception.Message.ToLower());
     }
+
+    /// <summary>
+    /// Tests that when metadata grows significantly (causing section VAs to shift),
+    /// the data directory RVAs (Resource, BaseReloc) are correctly updated.
+    /// Per ECMA-335 II.25.2.3.3 and II.25.3, data directory RVAs must point to
+    /// valid locations within their respective sections.
+    /// </summary>
+    [Fact]
+    public void DataDirectoryRvasUpdatedWhenSectionsShift()
+    {
+        using var directory = new TempDirectory();
+
+        // Copy AssemblyWithResources which has .rsrc section
+        var sourceAssembly = Path.Combine(binDirectory, "AssemblyWithResources.dll");
+        Assert.True(File.Exists(sourceAssembly), "AssemblyWithResources.dll not found");
+        File.Copy(sourceAssembly, Path.Combine(directory, "AssemblyWithResources.dll"));
+
+        // Get original section info
+        using var originalFs = File.OpenRead(sourceAssembly);
+        using var originalPe = new PEReader(originalFs);
+        var originalResourceRva = originalPe.PEHeaders.PEHeader!.ResourceTableDirectory.RelativeVirtualAddress;
+        var originalRelocRva = originalPe.PEHeaders.PEHeader.BaseRelocationTableDirectory.RelativeVirtualAddress;
+        var originalRsrcSection = originalPe.PEHeaders.SectionHeaders.FirstOrDefault(s => s.Name == ".rsrc");
+        var originalRelocSection = originalPe.PEHeaders.SectionHeaders.FirstOrDefault(s => s.Name == ".reloc");
+
+        var infos = new List<SourceTargetInfo>
+        {
+            new(
+                "AssemblyWithResources",
+                Path.Combine(directory, "AssemblyWithResources.dll"),
+                "Shaded.AssemblyWithResources",
+                Path.Combine(directory, "Shaded.AssemblyWithResources.dll"),
+                IsShaded: true
+            )
+        };
+
+        // Use StreamingAssemblyModifier to add many IVT attributes (forces metadata growth)
+        var shadedPath = Path.Combine(directory, "Shaded.AssemblyWithResources.dll");
+        using (var modifier = StreamingAssemblyModifier.Open(sourceAssembly))
+        {
+            // Add many InternalsVisibleTo attributes to force significant metadata growth
+            for (var i = 0; i < 50; i++)
+            {
+                modifier.AddInternalsVisibleTo($"FriendAssembly{i}");
+            }
+            modifier.SetAssemblyName("Shaded.AssemblyWithResources");
+            modifier.Save(shadedPath);
+        }
+
+        // Verify the shaded assembly has correct data directory RVAs
+        using var shadedFs = File.OpenRead(shadedPath);
+        using var shadedPe = new PEReader(shadedFs);
+
+        var shadedResourceRva = shadedPe.PEHeaders.PEHeader!.ResourceTableDirectory.RelativeVirtualAddress;
+        var shadedRelocRva = shadedPe.PEHeaders.PEHeader.BaseRelocationTableDirectory.RelativeVirtualAddress;
+        var shadedRsrcSection = shadedPe.PEHeaders.SectionHeaders.FirstOrDefault(s => s.Name == ".rsrc");
+        var shadedRelocSection = shadedPe.PEHeaders.SectionHeaders.FirstOrDefault(s => s.Name == ".reloc");
+
+        // Verify Resource RVA is within .rsrc section (if present)
+        if (shadedRsrcSection.Name == ".rsrc" && shadedResourceRva > 0)
+        {
+            Assert.True(
+                shadedResourceRva >= shadedRsrcSection.VirtualAddress &&
+                shadedResourceRva < shadedRsrcSection.VirtualAddress + shadedRsrcSection.VirtualSize,
+                $"Resource RVA {shadedResourceRva} should be within .rsrc section " +
+                $"({shadedRsrcSection.VirtualAddress}-{shadedRsrcSection.VirtualAddress + shadedRsrcSection.VirtualSize})");
+        }
+
+        // Verify BaseReloc RVA is within .reloc section (if present)
+        if (shadedRelocSection.Name == ".reloc" && shadedRelocRva > 0)
+        {
+            Assert.True(
+                shadedRelocRva >= shadedRelocSection.VirtualAddress &&
+                shadedRelocRva < shadedRelocSection.VirtualAddress + shadedRelocSection.VirtualSize,
+                $"BaseReloc RVA {shadedRelocRva} should be within .reloc section " +
+                $"({shadedRelocSection.VirtualAddress}-{shadedRelocSection.VirtualAddress + shadedRelocSection.VirtualSize})");
+        }
+
+        // Verify the assembly can be loaded (the ultimate test)
+        var loadContext = new AssemblyLoadContext("DataDirTest", isCollectible: true);
+        try
+        {
+            var bytes = File.ReadAllBytes(shadedPath);
+            using var ms = new MemoryStream(bytes);
+            var asm = loadContext.LoadFromStream(ms);
+            Assert.Contains("Shaded.AssemblyWithResources", asm.FullName);
+        }
+        finally
+        {
+            loadContext.Unload();
+        }
+    }
 }
