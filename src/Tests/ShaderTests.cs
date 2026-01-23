@@ -483,8 +483,67 @@ public class ShaderTests
     }
 
     /// <summary>
+    /// Tests that when metadata grows, MethodDef RVAs are correctly patched.
+    /// ECMA-335 II.22.26: MethodDef table contains RVAs pointing to IL code.
+    /// This verifies that methods can be invoked after shading with metadata growth.
+    /// </summary>
+    [Fact]
+    public void MethodDefRVAsPatchedWhenMetadataGrows()
+    {
+        using var directory = new TempDirectory();
+
+        // Copy DummyAssembly which has methods with IL code
+        var sourceAssembly = Path.Combine(binDirectory, "DummyAssembly.dll");
+        Assert.True(File.Exists(sourceAssembly), "DummyAssembly.dll not found");
+        File.Copy(sourceAssembly, Path.Combine(directory, "DummyAssembly.dll"));
+
+        // Shade with significant metadata growth (adding many IVT attributes)
+        var shadedPath = Path.Combine(directory, "Shaded.DummyAssembly.dll");
+        using (var modifier = StreamingAssemblyModifier.Open(sourceAssembly))
+        {
+            // Add many InternalsVisibleTo attributes to force metadata growth
+            for (var i = 0; i < 50; i++)
+            {
+                modifier.AddInternalsVisibleTo($"FriendAssembly{i}");
+            }
+            modifier.SetAssemblyName("Shaded.DummyAssembly");
+            modifier.Save(shadedPath);
+        }
+
+        // Verify the assembly can be loaded and methods can be invoked
+        var loadContext = new AssemblyLoadContext("MethodDefRVATest", isCollectible: true);
+        try
+        {
+            var bytes = File.ReadAllBytes(shadedPath);
+            using var ms = new MemoryStream(bytes);
+            var asm = loadContext.LoadFromStream(ms);
+            Assert.Contains("Shaded.DummyAssembly", asm.FullName);
+
+            // Get the type and create an instance
+            var type = asm.GetType("DummyAssembly.Class1");
+            Assert.NotNull(type);
+
+            var instance = Activator.CreateInstance(type);
+            Assert.NotNull(instance);
+
+            // Invoke the Method - this will fail if MethodDef RVAs are incorrect
+            var method = type.GetMethod("Method");
+            Assert.NotNull(method);
+
+            // Method takes an int parameter and modifies internal state
+            method.Invoke(instance, [42]);
+
+            // If we get here without BadImageFormatException, the IL code is valid
+        }
+        finally
+        {
+            loadContext.Unload();
+        }
+    }
+
+    /// <summary>
     /// Tests that when metadata grows, FieldRVA entries are correctly patched.
-    /// FieldRVA table contains RVAs pointing to static field initialization data.
+    /// ECMA-335 II.22.18: FieldRVA table contains RVAs pointing to static field initialization data.
     /// This is critical for assemblies using ReadOnlySpan backed by static data,
     /// like System.Collections.Frozen's FrozenHashTable.Primes.
     /// </summary>
