@@ -5,7 +5,7 @@
 [![NuGet Status](https://img.shields.io/nuget/v/PackageShaderTool.svg?label=PackageShaderTool)](https://www.nuget.org/packages/PackageShaderTool/)
 [![NuGet Status](https://img.shields.io/nuget/v/PackageShader.MsBuild.svg?label=PackageShader.MsBuild)](https://www.nuget.org/packages/PackageShader.MsBuild/)
 
-Avoid dependency conflicts in assemblies change changing the name of references. Designed as an alternative to [Costura](https://github.com/Fody/Costura), [ILMerge](https://github.com/dotnet/ILMerge), and [ILRepack](https://github.com/gluck/il-repack).
+Avoid dependency conflicts in assemblies changing the name of references. Designed as an alternative to [Costura](https://github.com/Fody/Costura), [ILMerge](https://github.com/dotnet/ILMerge), and [ILRepack](https://github.com/gluck/il-repack).
 
 This project is a fork of [Alias](https://github.com/getsentry/dotnet-assembly-alias). Credit goes to [Sentry](https://sentry.io/) for producing the original Alias project. See their blog post [Alias: An approach to .NET assembly conflict resolution](https://blog.sentry.io/alias-an-approach-to-net-assembly-conflict-resolution/) for background on the approach.
 
