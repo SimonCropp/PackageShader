@@ -905,6 +905,7 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
 
     /// <summary>
     /// Patches FieldRVA entries when static field data has shifted due to metadata growth.
+    /// ECMA-335 II.22.18: FieldRVA table contains RVA(4) + Field index, pointing to static field data.
     /// This is critical for assemblies using static data like ReadOnlySpan initializers.
     /// </summary>
     void PatchFieldRVAs(
@@ -913,7 +914,7 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
         uint oldMetadataRvaEnd,
         int sizeDiff)
     {
-        // Get the number of FieldRVA rows from old metadata
+        // ECMA-335 II.22.18: FieldRVA table (0x1D) - each row extends a Field row with an RVA
         var fieldRvaCount = metadata.GetRowCount(TableIndex.FieldRva);
         if (fieldRvaCount == 0)
         {
@@ -925,11 +926,9 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
         var newMetadataFileOffset = metadataSection.PointerToRawData + metadataOffsetInSection;
 
         // Calculate where FieldRVA table is in the NEW metadata
-        // FieldRVA is table index 29 (0x1D)
+        // ECMA-335 II.22.18: FieldRVA is table index 0x1D (29)
         // Tables that come BEFORE FieldRVA and might have added rows:
-        // - TypeRef (table 1)
-        // - MemberRef (table 10)
-        // - CustomAttribute (table 12)
+        // - TypeRef (0x01), MemberRef (0x0A), CustomAttribute (0x0C)
         // Need to account for all these table shifts
 
         // Calculate the shift caused by added rows in tables before FieldRVA

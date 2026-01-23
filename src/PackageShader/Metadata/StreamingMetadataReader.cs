@@ -207,6 +207,7 @@ sealed class StreamingMetadataReader : IDisposable
             TableIndex.TypeSpec => BlobIndexSize,
             TableIndex.ImplMap => 2 + GetCodedIndexSize(CodedIndex.MemberForwarded)
                                     + StringIndexSize + GetTableIndexSize(TableIndex.ModuleRef),
+            // ECMA-335 II.22.18: FieldRVA = RVA(4) + Field(tbl)
             TableIndex.FieldRva => 4 + GetTableIndexSize(TableIndex.Field),
             TableIndex.EncLog => 8,
             TableIndex.EncMap => 4,
