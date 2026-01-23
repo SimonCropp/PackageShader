@@ -44,7 +44,13 @@ public static class Program
                 // If assembly matches exclusion list, mark it as not-shaded but allow it to reference shaded deps
                 if (assembliesToExclude.Contains(info.SourceName))
                 {
-                    return info with { TargetName = info.SourceName, TargetPath = info.SourcePath, IsShaded = false, IsRootAssembly = true };
+                    return info with
+                    {
+                        TargetName = info.SourceName,
+                        TargetPath = info.SourcePath,
+                        IsShaded = false,
+                        IsRootAssembly = true
+                    };
                 }
                 return info;
             })
