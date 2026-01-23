@@ -546,6 +546,12 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
         // This is the bug fix for "Bad IL format" errors in MarkdownSnippets
         PatchMethodDefRVAs(output, metadataSection, oldMetadataRvaEnd, sizeDiff);
 
+        // CRITICAL: Patch FieldRVA entries
+        // ECMA-335 II.22.18: FieldRVA table contains RVAs pointing to static field initialization data
+        // When metadata grows, this data shifts, so these RVAs must be updated
+        // This is the bug fix for FrozenSet failures (e.g., IndexOutOfRangeException in CalcNumBuckets)
+        PatchFieldRVAs(output, metadataSection, oldMetadataRvaEnd, sizeDiff);
+
         // Patch base relocation table entries that point to shifted addresses
         // The .reloc section contains fixup entries for addresses that need adjusting when the image is loaded
         // If those entries point to shifted data, we need to update the offsets
@@ -891,6 +897,111 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
             {
                 // Patch the RVA by adding the size difference
                 var newRva = methodRva + sizeDiff;
+                output.Position = rowOffset;
+                WriteUInt32(output, (uint) newRva);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Patches FieldRVA entries when static field data has shifted due to metadata growth.
+    /// This is critical for assemblies using static data like ReadOnlySpan initializers.
+    /// </summary>
+    void PatchFieldRVAs(
+        Stream output,
+        SectionInfo metadataSection,
+        uint oldMetadataRvaEnd,
+        int sizeDiff)
+    {
+        // Get the number of FieldRVA rows from old metadata
+        var fieldRvaCount = metadata.GetRowCount(TableIndex.FieldRva);
+        if (fieldRvaCount == 0)
+        {
+            return; // No FieldRVA entries to patch
+        }
+
+        // Calculate where the NEW metadata starts in the output file
+        var metadataOffsetInSection = source.MetadataRva - metadataSection.VirtualAddress;
+        var newMetadataFileOffset = metadataSection.PointerToRawData + metadataOffsetInSection;
+
+        // Calculate where FieldRVA table is in the NEW metadata
+        // FieldRVA is table index 29 (0x1D)
+        // Tables that come BEFORE FieldRVA and might have added rows:
+        // - TypeRef (table 1)
+        // - MemberRef (table 10)
+        // - CustomAttribute (table 12)
+        // Need to account for all these table shifts
+
+        // Calculate the shift caused by added rows in tables before FieldRVA
+        var tableShift = 0;
+
+        // TypeRef (table 1) additions
+        if (plan.NewTypeRefs.Count > 0)
+        {
+            var typeRefRowSize = metadata.GetCodedIndexSize(CodedIndex.ResolutionScope) +
+                                metadata.StringIndexSize +
+                                metadata.StringIndexSize;
+            tableShift += plan.NewTypeRefs.Count * typeRefRowSize;
+        }
+
+        // MemberRef (table 10) additions
+        if (plan.NewMemberRefs.Count > 0)
+        {
+            var memberRefRowSize = metadata.GetCodedIndexSize(CodedIndex.MemberRefParent) +
+                                   metadata.StringIndexSize +
+                                   metadata.BlobIndexSize;
+            tableShift += plan.NewMemberRefs.Count * memberRefRowSize;
+        }
+
+        // CustomAttribute (table 12) additions
+        if (plan.NewCustomAttributes.Count > 0)
+        {
+            var customAttrRowSize = metadata.GetCodedIndexSize(CodedIndex.HasCustomAttribute) +
+                                    metadata.GetCodedIndexSize(CodedIndex.CustomAttributeType) +
+                                    metadata.BlobIndexSize;
+            tableShift += plan.NewCustomAttributes.Count * customAttrRowSize;
+        }
+
+        // Get the offset of the FieldRVA table within the OLD metadata blob
+        var firstFieldRvaRowFileOffset = metadata.GetRowOffset(TableIndex.FieldRva, 1);
+        var fieldRvaTableOffsetInMetadata = firstFieldRvaRowFileOffset - source.MetadataFileOffset;
+
+        // Apply the shift to account for added rows in tables before FieldRVA
+        fieldRvaTableOffsetInMetadata += tableShift;
+
+        // Calculate the absolute file offset of the FieldRVA table in the NEW metadata in output
+        var fieldRvaTableFileOffset = newMetadataFileOffset + fieldRvaTableOffsetInMetadata;
+
+        // Get row size (RVA(4) + Field index)
+        var rowSize = metadata.GetRowSize(TableIndex.FieldRva);
+
+        // Patch each FieldRVA entry
+        for (uint rid = 1; rid <= fieldRvaCount; rid++)
+        {
+            var rowOffset = fieldRvaTableFileOffset + (rid - 1) * rowSize;
+
+            // Read the RVA (first 4 bytes of the row)
+            output.Position = rowOffset;
+            var fieldRva = ReadUInt32(output);
+
+            // Skip if RVA is 0 (shouldn't happen for valid FieldRVA entries, but be safe)
+            if (fieldRva == 0)
+            {
+                continue;
+            }
+
+            // Check if this RVA points to data that was shifted
+            var metadataSectionRvaStart = metadataSection.VirtualAddress;
+            var metadataSectionRvaEnd = metadataSection.VirtualAddress + metadataSection.VirtualSize;
+
+            var dataInMetadataSection = fieldRva >= metadataSectionRvaStart &&
+                                        fieldRva < metadataSectionRvaEnd;
+
+            // Only patch if data is in metadata section AND after where metadata ended before growth
+            if (dataInMetadataSection && fieldRva >= oldMetadataRvaEnd)
+            {
+                // Patch the RVA by adding the size difference
+                var newRva = fieldRva + sizeDiff;
                 output.Position = rowOffset;
                 WriteUInt32(output, (uint) newRva);
             }
