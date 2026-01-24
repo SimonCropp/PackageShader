@@ -19,6 +19,7 @@
   <Project Path="AssemblyWithNoSymbols/AssemblyWithNoSymbols.csproj" />
   <Project Path="AssemblyWithPdb/AssemblyWithPdb.csproj" />
   <Project Path="AssemblyWithResources/AssemblyWithResources.csproj" />
+  <Project Path="AssemblyWithStaticFields/AssemblyWithStaticFields.csproj" />
   <Project Path="AssemblyWithStrongName/AssemblyWithStrongName.csproj" />
   <Project Path="DummyAssembly/DummyAssembly.csproj" />
   <Project Path="PackageShader.MsBuild/PackageShader.MsBuild.csproj" />
