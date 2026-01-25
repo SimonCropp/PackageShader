@@ -608,8 +608,8 @@ public class TaskTests
               </PropertyGroup>
               <ItemGroup>
                 <PackageReference Include="PackageShader.MsBuild" Version="{packageVersion}" PrivateAssets="all" />
-                <!-- Shade Argon - WITHOUT PrivateAssets to test validation -->
-                <PackageReference Include="Argon" Version="0.28.0" Shade="true" />
+                <!-- Shade Argon - PrivateAssets="All" is REQUIRED to exclude from nuspec dependencies -->
+                <PackageReference Include="Argon" Version="0.28.0" Shade="true" PrivateAssets="All" />
               </ItemGroup>
             </Project>
             """;
@@ -703,6 +703,101 @@ public class TaskTests
             LibEntries = libEntries.OrderBy(_ => _).ToList(),
             NuspecHasArgonDependency = nuspecContent.Contains("Argon")
         });
+    }
+
+    [Fact]
+    public async Task PackFailsWithValidationError_WhenShadedPackageMissingPrivateAssets()
+    {
+        // This test verifies that the _ValidateShadedPackageReferences target
+        // produces a clear error when a shaded PackageReference is missing PrivateAssets="All"
+        using var tempDir = new TempDirectory();
+        var projectDir = (string)tempDir;
+
+        // Get the actual built version from the PackageShader.MsBuild assembly
+        var packageVersion = typeof(ShadeTask).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!
+            .InformationalVersion;
+
+        // Create a project with shaded PackageReference WITHOUT PrivateAssets="All"
+        var projectContent =
+            $"""
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net8.0</TargetFramework>
+                <PackageId>TestValidation</PackageId>
+                <Version>1.0.0</Version>
+                <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+              </PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="PackageShader.MsBuild" Version="{packageVersion}" PrivateAssets="all" />
+                <!-- Intentionally missing PrivateAssets="All" to trigger validation error -->
+                <PackageReference Include="Argon" Version="0.28.0" Shade="true" />
+              </ItemGroup>
+            </Project>
+            """;
+
+        var projectPath = Path.Combine(projectDir, "TestValidation.csproj");
+        await File.WriteAllTextAsync(projectPath, projectContent, TestContext.Current.CancellationToken);
+
+        // Create a minimal class file
+        var classContent =
+            """
+            namespace TestValidation
+            {
+                public class MyClass
+                {
+                    public string GetJson() => Argon.JObject.Parse("{}").ToString();
+                }
+            }
+            """;
+        await File.WriteAllTextAsync(Path.Combine(projectDir, "MyClass.cs"), classContent, TestContext.Current.CancellationToken);
+
+        // Create NuGet.config pointing to local PackageShader package
+        var packageShaderBinPath = Path.Combine(ProjectFiles.SolutionDirectory.Path, "..", "nugets");
+        var localPackagesFolder = Path.Combine(projectDir, "packages");
+        var nugetConfig =
+            $"""
+             <?xml version="1.0" encoding="utf-8"?>
+             <configuration>
+               <config>
+                 <add key="globalPackagesFolder" value="{localPackagesFolder}" />
+               </config>
+               <packageSources>
+                 <clear />
+                 <add key="local" value="{packageShaderBinPath}" />
+                 <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+               </packageSources>
+             </configuration>
+             """;
+        await File.WriteAllTextAsync(Path.Combine(projectDir, "NuGet.config"), nugetConfig, TestContext.Current.CancellationToken);
+
+        // Restore
+        var restoreResult = await Cli.Wrap("dotnet")
+            .WithArguments(["restore"])
+            .WithWorkingDirectory(projectDir)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
+
+        if (restoreResult.ExitCode != 0)
+        {
+            throw new($"Restore failed:\n{restoreResult.StandardOutput}\n{restoreResult.StandardError}");
+        }
+
+        // Pack should fail with validation error
+        var packResult = await Cli.Wrap("dotnet")
+            .WithArguments(["pack", "-c", "Release", "-nodeReuse:false"])
+            .WithWorkingDirectory(projectDir)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
+
+        // Verify pack failed
+        Assert.NotEqual(0, packResult.ExitCode);
+
+        // Verify the error message mentions the missing PrivateAssets
+        var output = packResult.StandardOutput + packResult.StandardError;
+        Assert.Contains("PackageShader:", output);
+        Assert.Contains("missing 'PrivateAssets=\"All\"'", output);
+        Assert.Contains("Argon", output);
     }
 #endif
 
