@@ -411,19 +411,25 @@ public class ShaderTests
         using var originalPe = new PEReader(originalFs);
         var originalResourceRva = originalPe.PEHeaders.PEHeader!.ResourceTableDirectory.RelativeVirtualAddress;
         var originalRelocRva = originalPe.PEHeaders.PEHeader.BaseRelocationTableDirectory.RelativeVirtualAddress;
-        var originalRsrcSection = originalPe.PEHeaders.SectionHeaders.FirstOrDefault(s => s.Name == ".rsrc");
-        var originalRelocSection = originalPe.PEHeaders.SectionHeaders.FirstOrDefault(s => s.Name == ".reloc");
+        var originalRsrcSection = originalPe.PEHeaders.SectionHeaders.FirstOrDefault(_ => _.Name == ".rsrc");
+        var originalRelocSection = originalPe.PEHeaders.SectionHeaders.FirstOrDefault(_ => _.Name == ".reloc");
 
-        var infos = new List<SourceTargetInfo>
+        // Verify original assembly has valid RVAs (baseline)
+        if (originalRsrcSection.Name == ".rsrc" && originalResourceRva > 0)
         {
-            new(
-                "AssemblyWithResources",
-                Path.Combine(directory, "AssemblyWithResources.dll"),
-                "Shaded.AssemblyWithResources",
-                Path.Combine(directory, "Shaded.AssemblyWithResources.dll"),
-                IsShaded: true
-            )
-        };
+            Assert.True(
+                originalResourceRva >= originalRsrcSection.VirtualAddress &&
+                originalResourceRva < originalRsrcSection.VirtualAddress + originalRsrcSection.VirtualSize,
+                $"Original Resource RVA {originalResourceRva} should be within .rsrc section");
+        }
+
+        if (originalRelocSection.Name == ".reloc" && originalRelocRva > 0)
+        {
+            Assert.True(
+                originalRelocRva >= originalRelocSection.VirtualAddress &&
+                originalRelocRva < originalRelocSection.VirtualAddress + originalRelocSection.VirtualSize,
+                $"Original BaseReloc RVA {originalRelocRva} should be within .reloc section");
+        }
 
         // Use StreamingAssemblyModifier to add many IVT attributes (forces metadata growth)
         var shadedPath = Path.Combine(directory, "Shaded.AssemblyWithResources.dll");
@@ -444,8 +450,8 @@ public class ShaderTests
 
         var shadedResourceRva = shadedPe.PEHeaders.PEHeader!.ResourceTableDirectory.RelativeVirtualAddress;
         var shadedRelocRva = shadedPe.PEHeaders.PEHeader.BaseRelocationTableDirectory.RelativeVirtualAddress;
-        var shadedRsrcSection = shadedPe.PEHeaders.SectionHeaders.FirstOrDefault(s => s.Name == ".rsrc");
-        var shadedRelocSection = shadedPe.PEHeaders.SectionHeaders.FirstOrDefault(s => s.Name == ".reloc");
+        var shadedRsrcSection = shadedPe.PEHeaders.SectionHeaders.FirstOrDefault(_ => _.Name == ".rsrc");
+        var shadedRelocSection = shadedPe.PEHeaders.SectionHeaders.FirstOrDefault(_ => _.Name == ".reloc");
 
         // Verify Resource RVA is within .rsrc section (if present)
         if (shadedRsrcSection.Name == ".rsrc" && shadedResourceRva > 0)
@@ -455,6 +461,14 @@ public class ShaderTests
                 shadedResourceRva < shadedRsrcSection.VirtualAddress + shadedRsrcSection.VirtualSize,
                 $"Resource RVA {shadedResourceRva} should be within .rsrc section " +
                 $"({shadedRsrcSection.VirtualAddress}-{shadedRsrcSection.VirtualAddress + shadedRsrcSection.VirtualSize})");
+
+            // Verify RVA was updated if section shifted
+            if (originalRsrcSection.Name == ".rsrc" &&
+                shadedRsrcSection.VirtualAddress != originalRsrcSection.VirtualAddress)
+            {
+                var sectionShift = shadedRsrcSection.VirtualAddress - originalRsrcSection.VirtualAddress;
+                Assert.Equal(originalResourceRva + sectionShift, shadedResourceRva);
+            }
         }
 
         // Verify BaseReloc RVA is within .reloc section (if present)
@@ -465,6 +479,14 @@ public class ShaderTests
                 shadedRelocRva < shadedRelocSection.VirtualAddress + shadedRelocSection.VirtualSize,
                 $"BaseReloc RVA {shadedRelocRva} should be within .reloc section " +
                 $"({shadedRelocSection.VirtualAddress}-{shadedRelocSection.VirtualAddress + shadedRelocSection.VirtualSize})");
+
+            // Verify RVA was updated if section shifted
+            if (originalRelocSection.Name == ".reloc" &&
+                shadedRelocSection.VirtualAddress != originalRelocSection.VirtualAddress)
+            {
+                var sectionShift = shadedRelocSection.VirtualAddress - originalRelocSection.VirtualAddress;
+                Assert.Equal(originalRelocRva + sectionShift, shadedRelocRva);
+            }
         }
 
         // Verify the assembly can be loaded (the ultimate test)

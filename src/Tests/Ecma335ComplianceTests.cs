@@ -62,6 +62,7 @@ public class Ecma335ComplianceTests
         // Valid RIDs [1, rowCount] should work
         for (uint rid = 1; rid <= typeRefCount; rid++)
         {
+            // ReSharper disable once UnusedVariable
             var typeRefRow = reader.ReadTypeRefRow(rid);
             // TypeRefRow is a struct, just verify we can read it without exception
         }
@@ -455,9 +456,7 @@ public class Ecma335ComplianceTests
             var customAttrBit = 1L << (int)TableIndex.CustomAttribute;
             var isSorted = (reader.Sorted & customAttrBit) != 0;
 
-            // The sorted bit should reflect whether the table is actually sorted
-            // System.Reflection.Metadata sets this appropriately
-            Assert.True(true); // This is informational - we validate actual sorting elsewhere
+            Assert.True(isSorted);
         }
     }
 

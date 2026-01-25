@@ -5,12 +5,12 @@
 sealed class StreamingAssemblyModifier : IDisposable
 {
     // Constructor signature: HASTHIS (0x20) | ParamCount(1) | ReturnType:VOID(0x01) | Param:STRING(0x0E)
-    static readonly byte[] IvtCtorSignature = [0x20, 0x01, 0x01, 0x0E];
-    static readonly byte[] PublicKeyPrefix = ", PublicKey="u8.ToArray();
-    static readonly string[] RuntimeAssemblyNames = ["System.Runtime", "mscorlib", "netstandard", "System.Private.CoreLib"];
+    static readonly byte[] ivtCtorSignature = [0x20, 0x01, 0x01, 0x0E];
+    static readonly byte[] publicKeyPrefix = ", PublicKey="u8.ToArray();
+    static readonly string[] runtimeAssemblyNames = ["System.Runtime", "mscorlib", "netstandard", "System.Private.CoreLib"];
 
     // Assembly row is always RID 1, encoded as HasCustomAttribute
-    static readonly uint AssemblyParentEncoded = CodedIndexHelper.EncodeToken(
+    static readonly uint assemblyParentEncoded = CodedIndexHelper.EncodeToken(
         CodedIndex.HasCustomAttribute,
         new(TableIndex.Assembly, 1));
 
@@ -77,7 +77,7 @@ sealed class StreamingAssemblyModifier : IDisposable
         plan.AddCustomAttribute(
             new()
             {
-                ParentIndex = AssemblyParentEncoded,
+                ParentIndex = assemblyParentEncoded,
                 TypeIndex = typeEncoded,
                 ValueIndex = valueBlobIndex
             });
@@ -96,7 +96,7 @@ sealed class StreamingAssemblyModifier : IDisposable
             var nameByteCount = Encoding.UTF8.GetByteCount(assemblyName);
             builder.WriteCompressedInteger(nameByteCount + 12 + publicKey.Length * 2);
             builder.WriteUTF8(assemblyName);
-            builder.WriteBytes(PublicKeyPrefix);
+            builder.WriteBytes(publicKeyPrefix);
             foreach (var b in publicKey)
             {
                 builder.WriteByte((byte) (b >> 4 < 10 ? '0' + (b >> 4) : 'A' + (b >> 4) - 10));
@@ -133,7 +133,7 @@ sealed class StreamingAssemblyModifier : IDisposable
         }
 
         // Find resolution scope (System.Runtime or mscorlib)
-        var scopeRid = RuntimeAssemblyNames
+        var scopeRid = runtimeAssemblyNames
                            .Select(name => metadata.FindAssemblyRef(name))
                            .FirstOrDefault(r => r.HasValue)?.rid
                        ?? throw new InvalidOperationException("Could not find runtime assembly reference for InternalsVisibleToAttribute");
@@ -158,7 +158,7 @@ sealed class StreamingAssemblyModifier : IDisposable
             {
                 ClassIndex = CodedIndexHelper.EncodeToken(CodedIndex.MemberRefParent, new(TableIndex.TypeRef, typeRefRid)),
                 NameIndex = plan.GetOrAddString(".ctor"),
-                SignatureIndex = plan.GetOrAddBlob(IvtCtorSignature)
+                SignatureIndex = plan.GetOrAddBlob(ivtCtorSignature)
             });
 
     /// <summary>

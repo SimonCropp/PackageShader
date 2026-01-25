@@ -213,7 +213,7 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
         if (rawSizeDiff != 0)
         {
             var sectionAlignment = GetSectionAlignment();
-            var oldNextSectionVa = AlignUp((uint) (metadataSection.VirtualAddress + metadataSection.VirtualSize), sectionAlignment);
+            var oldNextSectionVa = AlignUp(metadataSection.VirtualAddress + metadataSection.VirtualSize, sectionAlignment);
             var newNextSectionVa = AlignUp((uint) (metadataSection.VirtualAddress + metadataSection.VirtualSize + sizeDiff), sectionAlignment);
             vaShift = newNextSectionVa - oldNextSectionVa;
         }
@@ -239,7 +239,7 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
                 if (vaShift > 0)
                 {
                     output.Position = headerOffset + 12; // VirtualAddress offset
-                    WriteUInt32(output, (uint) (section.VirtualAddress + vaShift));
+                    WriteUInt32(output, section.VirtualAddress + vaShift);
                 }
 
                 // Shift PointerToRawData for sections after metadata section

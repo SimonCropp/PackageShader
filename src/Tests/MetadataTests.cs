@@ -464,7 +464,7 @@ public class MetadataTests
         var metadata = output.ToArray();
 
         // Find the BSJB signature
-        var bsjbIndex = FindSignature(metadata, [0x42, 0x53, 0x4A, 0x42]);
+        var bsjbIndex = FindSignature(metadata, "BSJB"u8.ToArray());
         Assert.True(bsjbIndex >= 0, "BSJB signature not found");
 
         // Navigate to table heap header (skip metadata root, stream headers)
@@ -506,7 +506,7 @@ public class MetadataTests
         for (var i = 0; i < stringsNeeded; i++)
         {
             // Each string must be unique (strings are deduplicated)
-            plan.GetOrAddString($"TestString_{i:D10}_{new string('X', 70)}");
+            plan.GetOrAddString($"TestString_{i:D10}_{new('X', 70)}");
         }
 
         // Verify final size is > 65536
