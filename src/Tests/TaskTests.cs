@@ -54,7 +54,7 @@ public class TaskTests
         var result = task.Execute();
 
         Assert.False(result);
-        Assert.Contains(buildEngine.Errors, e => e.Contains("AssemblyOriginatorKeyFile not defined"));
+        Assert.Contains(buildEngine.Errors, _ => _.Contains("AssemblyOriginatorKeyFile not defined"));
     }
 
     [Fact]
@@ -92,8 +92,8 @@ public class TaskTests
         SetupTestAssemblies(tempDir);
 
         var assemblyPaths = GetTestAssemblyPaths(tempDir);
-        var assemblyWithPdbPath = assemblyPaths.First(p => p.Contains("AssemblyWithPdb"));
-        var referenceCopyLocalPaths = assemblyPaths.Select(p => new MockTaskItem(p)).ToArray();
+        var assemblyWithPdbPath = assemblyPaths.First(_ => _.Contains("AssemblyWithPdb"));
+        var referenceCopyLocalPaths = assemblyPaths.Select(_ => new MockTaskItem(_)).ToArray();
 
         var task = new ShadeTask
         {
@@ -109,7 +109,7 @@ public class TaskTests
         var result = task.Execute();
 
         Assert.True(result);
-        var outputFiles = task.CopyLocalPathsToAdd.Select(i => Path.GetFileName(i.ItemSpec)).ToList();
+        var outputFiles = task.CopyLocalPathsToAdd.Select(_ => Path.GetFileName(_.ItemSpec)).ToList();
         // Only AssemblyWithPdb should be shaded with prefix
         Assert.Contains("AssemblyToProcess.AssemblyWithPdb.dll", outputFiles);
         // AssemblyWithNoSymbols should NOT be shaded (not in AssembliesToShade)
@@ -129,10 +129,10 @@ public class TaskTests
         File.Copy(originalAssembly, customAssembly);
 
         var assemblyPaths = GetTestAssemblyPaths(tempDir);
-        var assemblyWithPdbPath = assemblyPaths.First(p => p.Contains("AssemblyWithPdb"));
+        var assemblyWithPdbPath = assemblyPaths.First(_ => _.Contains("AssemblyWithPdb"));
         // Exclude the original AssemblyToProcess.dll since MyCustomApp is a copy of it
         var referenceCopyLocalPaths = assemblyPaths
-            .Where(p => !p.Contains("AssemblyToProcess.dll"))
+            .Where(_ => !_.Contains("AssemblyToProcess.dll"))
             .Select(p => new MockTaskItem(p))
             .ToArray();
 
@@ -149,7 +149,7 @@ public class TaskTests
 
         task.Execute();
 
-        var outputFiles = task.CopyLocalPathsToAdd.Select(i => Path.GetFileName(i.ItemSpec)).ToList();
+        var outputFiles = task.CopyLocalPathsToAdd.Select(_ => Path.GetFileName(_.ItemSpec)).ToList();
         // Prefix should be derived from "MyCustomApp"
         Assert.Contains("MyCustomApp.AssemblyWithPdb.dll", outputFiles);
     }
@@ -161,7 +161,7 @@ public class TaskTests
         SetupTestAssemblies(tempDir);
 
         var assemblyPaths = GetTestAssemblyPaths(tempDir);
-        var referenceCopyLocalPaths = assemblyPaths.Select(p => new MockTaskItem(p)).ToArray();
+        var referenceCopyLocalPaths = assemblyPaths.Select(_ => new MockTaskItem(_)).ToArray();
 
         var task = new ShadeTask
         {
@@ -178,8 +178,8 @@ public class TaskTests
 
         Assert.True(result);
         // All assemblies should be in output without prefix (none shaded)
-        var outputFiles = task.CopyLocalPathsToAdd.Select(i => Path.GetFileName(i.ItemSpec)).ToList();
-        Assert.DoesNotContain(outputFiles, f => f.StartsWith("AssemblyToProcess.Assembly"));
+        var outputFiles = task.CopyLocalPathsToAdd.Select(_ => Path.GetFileName(_.ItemSpec)).ToList();
+        Assert.DoesNotContain(outputFiles, _ => _.StartsWith("AssemblyToProcess.Assembly"));
     }
 
     [Fact]
@@ -206,8 +206,8 @@ public class TaskTests
 
         Assert.True(result);
         // All assemblies should be in output without prefix (none shaded)
-        var outputFiles = task.CopyLocalPathsToAdd.Select(i => Path.GetFileName(i.ItemSpec)).ToList();
-        Assert.DoesNotContain(outputFiles, f => f.StartsWith("AssemblyToProcess.Assembly"));
+        var outputFiles = task.CopyLocalPathsToAdd.Select(_ => Path.GetFileName(_.ItemSpec)).ToList();
+        Assert.DoesNotContain(outputFiles, _ => _.StartsWith("AssemblyToProcess.Assembly"));
     }
 
     [Fact]
@@ -220,7 +220,7 @@ public class TaskTests
 
         task.Execute();
 
-        Assert.Contains(buildEngine.Messages, m => m.Contains("Finished PackageShader") && m.Contains("ms"));
+        Assert.Contains(buildEngine.Messages, _ => _.Contains("Finished PackageShader") && _.Contains("ms"));
     }
 
     [Fact]
@@ -256,7 +256,7 @@ public class TaskTests
         SetupTestAssemblies(tempDir);
 
         var assemblyPaths = GetTestAssemblyPaths(tempDir);
-        var referenceCopyLocalPaths = assemblyPaths.Select(p => new MockTaskItem(p)).ToArray();
+        var referenceCopyLocalPaths = assemblyPaths.Select(_ => new MockTaskItem(_)).ToArray();
 
         // By default, shade all assemblies except the main one
         var assembliesToShade = assemblyPaths
@@ -369,8 +369,7 @@ public class TaskTests
     [Fact]
     public async Task IncludesShadedAssembliesInPackageWhenIncludeBuildOutputIsFalse_ReleaseOnly()
     {
-        using var tempDirectory = new TempDirectory();
-        var projectDir = (string)tempDirectory;
+        using var projectDir = new TempDirectory();
 
         // Get the actual built version from the PackageShader.MsBuild assembly
         var packageVersion = typeof(ShadeTask).Assembly
@@ -477,8 +476,8 @@ public class TaskTests
         Assert.Null(originalEntry);
 
         // Get all entries for verification output
-        var entries = archive.Entries.Select(e => e.FullName).ToList();
-        var libEntries = entries.Where(e => e.StartsWith("lib/")).OrderBy(e => e).ToList();
+        var entries = archive.Entries.Select(_ => _.FullName).ToList();
+        var libEntries = entries.Where(_ => _.StartsWith("lib/")).OrderBy(_ => _).ToList();
 
         await Verify(new
         {
@@ -494,6 +493,7 @@ public class TaskTests
         using var tempDir = new TempDirectory();
 
         // Create a minimal library project with a shaded PackageReference
+        // Note: PrivateAssets="All" is required to exclude shaded deps from nuspec
         var projectContent = """
                              <Project Sdk="Microsoft.NET.Sdk">
                                <PropertyGroup>
@@ -557,10 +557,10 @@ public class TaskTests
         await using var archive = await ZipFile.OpenReadAsync(nupkgPath, TestContext.Current.CancellationToken);
         var entries = archive.Entries.Select(_ => _.FullName).ToList();
 
-        var libEntries = entries.Where(e => e.StartsWith("lib/")).ToList();
+        var libEntries = entries.Where(_ => _.StartsWith("lib/")).ToList();
 
         // Read nuspec from package to verify no dependency on Argon
-        var nuspecEntry = archive.Entries.FirstOrDefault(e => e.Name.EndsWith(".nuspec"));
+        var nuspecEntry = archive.Entries.FirstOrDefault(_ => _.Name.EndsWith(".nuspec"));
         Assert.NotNull(nuspecEntry);
 
         await using var nuspecStream = await nuspecEntry.OpenAsync(TestContext.Current.CancellationToken);
@@ -577,6 +577,141 @@ public class TaskTests
             NuspecHasArgonDependency = nuspecContent.Contains("Argon")
         });
     }
+
+#if RELEASE
+    [Fact]
+    public async Task NuGetPackExcludesShadedDependencies_MultiTargeting()
+    {
+        // This test reproduces the MarkdownSnippets.MsBuild scenario:
+        // - Multi-targeted project (netstandard2.0;net8.0)
+        // - Shaded dependencies with Condition for specific frameworks
+        // - Uses the actual PackageShader.MsBuild NuGet package
+        using var projectDir = new TempDirectory();
+
+        // Get the actual built version from the PackageShader.MsBuild assembly
+        var packageVersion = typeof(ShadeTask).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!
+            .InformationalVersion;
+
+        // Create a multi-targeted library project with shaded PackageReferences
+        // that only apply to netstandard2.0 (like MarkdownSnippets.MsBuild)
+        var projectContent =
+            $"""
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
+                <PackageId>TestLibMultiTarget</PackageId>
+                <Version>1.0.0</Version>
+                <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+              </PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="PackageShader.MsBuild" Version="{packageVersion}" PrivateAssets="all" />
+                <!-- Shade Argon - PrivateAssets="All" is REQUIRED to exclude from nuspec dependencies -->
+                <PackageReference Include="Argon" Version="0.28.0" Shade="true" />
+              </ItemGroup>
+            </Project>
+            """;
+
+        var projectPath = Path.Combine(projectDir, "TestLib.csproj");
+        await File.WriteAllTextAsync(projectPath, projectContent, TestContext.Current.CancellationToken);
+
+        // Create a minimal class file that uses Argon
+        var classContent =
+            """
+            namespace TestLib
+            {
+                public class MyClass
+                {
+                    public string GetJson() => Argon.JObject.Parse("{}").ToString();
+                }
+            }
+            """;
+        await File.WriteAllTextAsync(Path.Combine(projectDir, "MyClass.cs"), classContent, TestContext.Current.CancellationToken);
+
+        // Create NuGet.config pointing to local PackageShader package
+        // Use a local packages folder to avoid global cache issues when testing local package changes
+        var packageShaderBinPath = Path.Combine(ProjectFiles.SolutionDirectory.Path, "..", "nugets");
+        var localPackagesFolder = Path.Combine(projectDir, "packages");
+        var nugetConfig =
+            $"""
+             <?xml version="1.0" encoding="utf-8"?>
+             <configuration>
+               <config>
+                 <add key="globalPackagesFolder" value="{localPackagesFolder}" />
+               </config>
+               <packageSources>
+                 <clear />
+                 <add key="local" value="{packageShaderBinPath}" />
+                 <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+               </packageSources>
+             </configuration>
+             """;
+        await File.WriteAllTextAsync(Path.Combine(projectDir, "NuGet.config"), nugetConfig, TestContext.Current.CancellationToken);
+
+        // Restore
+        var restoreResult = await Cli.Wrap("dotnet")
+            .WithArguments(["restore"])
+            .WithWorkingDirectory(projectDir)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
+
+        if (restoreResult.ExitCode != 0)
+        {
+            throw new($"Restore failed:\n{restoreResult.StandardOutput}\n{restoreResult.StandardError}");
+        }
+
+        // Build and Pack together (disable node reuse to avoid file locking during cleanup)
+        var packResult = await Cli.Wrap("dotnet")
+            .WithArguments(["pack", "-c", "Release", "-o", ".", "-nodeReuse:false"])
+            .WithWorkingDirectory(projectDir)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
+
+        // Debug: check for NupkgPatcher messages
+        var hasNupkgPatcherOutput = packResult.StandardOutput.Contains("NupkgPatcher") ||
+                                    packResult.StandardError.Contains("NupkgPatcher");
+        if (!hasNupkgPatcherOutput)
+        {
+            TestContext.Current.TestOutputHelper?.WriteLine("WARNING: No NupkgPatcher output found!");
+            TestContext.Current.TestOutputHelper?.WriteLine($"Pack stdout:\n{packResult.StandardOutput}");
+        }
+
+        if (packResult.ExitCode != 0)
+        {
+            throw new($"Pack failed:\n{packResult.StandardOutput}\n{packResult.StandardError}");
+        }
+
+        // Allow build processes to fully release file handles before continuing
+        await Task.Delay(1000, TestContext.Current.CancellationToken);
+
+        // Inspect the nupkg
+        var nupkgPath = Path.Combine(projectDir, "TestLibMultiTarget.1.0.0.nupkg");
+        Assert.True(File.Exists(nupkgPath), $"NuGet package should exist at {nupkgPath}");
+
+        await using var archive = await ZipFile.OpenReadAsync(nupkgPath, TestContext.Current.CancellationToken);
+        var entries = archive.Entries.Select(_ => _.FullName).ToList();
+
+        var libEntries = entries.Where(_ => _.StartsWith("lib/")).ToList();
+
+        // Read nuspec from package to verify no dependency on System.Memory
+        var nuspecEntry = archive.Entries.FirstOrDefault(_ => _.Name.EndsWith(".nuspec"));
+        Assert.NotNull(nuspecEntry);
+
+        await using var nuspecStream = await nuspecEntry.OpenAsync(TestContext.Current.CancellationToken);
+        using var reader = new StreamReader(nuspecStream);
+        var nuspecContent = await reader.ReadToEndAsync(TestContext.Current.CancellationToken);
+
+        // Verify Argon is NOT listed as a dependency in any target framework group
+        // This is the key assertion - before the fix, Argon would appear as a dependency
+        Assert.DoesNotContain("Argon", nuspecContent);
+
+        await Verify(new
+        {
+            LibEntries = libEntries.OrderBy(_ => _).ToList(),
+            NuspecHasArgonDependency = nuspecContent.Contains("Argon")
+        });
+    }
+#endif
 
     [Fact]
     public async Task BuildToolTransitiveDependenciesShouldNotTriggerValidation()
@@ -656,8 +791,7 @@ public class TaskTests
     [Fact]
     public async Task ShadedAssembliesCoLocatedWithCustomPackagePath()
     {
-        using var tempDirectory = new TempDirectory();
-        var projectDir = (string)tempDirectory;
+        using var projectDir = new TempDirectory();
 
         // Get the actual built version from the PackageShader.MsBuild assembly
         var packageVersion = typeof(ShadeTask).Assembly
@@ -762,9 +896,9 @@ public class TaskTests
         await using var archive = await ZipFile.OpenReadAsync(nupkgPath, TestContext.Current.CancellationToken);
 
         // Get all entries for verification
-        var entries = archive.Entries.Select(e => e.FullName).ToList();
-        var taskEntries = entries.Where(e => e.StartsWith("task/")).OrderBy(e => e).ToList();
-        var libEntries = entries.Where(e => e.StartsWith("lib/")).OrderBy(e => e).ToList();
+        var entries = archive.Entries.Select(_ => _.FullName).ToList();
+        var taskEntries = entries.Where(_ => _.StartsWith("task/")).OrderBy(_ => _).ToList();
+        var libEntries = entries.Where(_ => _.StartsWith("lib/")).OrderBy(_ => _).ToList();
 
         // Verify shaded assembly exists in task/ folder (co-located with primary DLL)
         var shadedEntryInTask = archive.GetEntry("task/net8.0/TestProject.Argon.dll");

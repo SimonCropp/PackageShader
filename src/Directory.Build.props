@@ -1,6 +1,6 @@
 <Project>
   <PropertyGroup>
-    <Version>0.1.11</Version>
+    <Version>0.1.12</Version>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <NoWarn>CS1591</NoWarn>

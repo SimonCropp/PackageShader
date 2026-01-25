@@ -15,6 +15,10 @@
     TaskName="PackageShader.DepsJsonPatcherTask"
     AssemblyFile="$(ShaderAssembly)" />
 
+  <UsingTask
+    TaskName="PackageShader.NupkgPatcherTask"
+    AssemblyFile="$(ShaderAssembly)" />
+
   <!-- Target 1: Collect PackageReference and ProjectReference items with Shade="true" -->
   <Target Name="_CollectShadedReferences"
           BeforeTargets="ShadeTarget"
@@ -43,18 +47,6 @@
       <!-- Match ProjectReference by MSBuildSourceProjectFile metadata -->
       <_AssembliesToShade Include="@(ReferenceCopyLocalPaths)"
         Condition="'%(ReferenceCopyLocalPaths.MSBuildSourceProjectFile)' != '' And $(_ShadedProjectFilesJoined.Contains(';%(ReferenceCopyLocalPaths.MSBuildSourceProjectFile);'))" />
-    </ItemGroup>
-  </Target>
-
-  <!-- Target 3: Mark shaded packages as PrivateAssets=all for NuGet pack -->
-  <Target Name="_ExcludeShadedFromNuGetDeps"
-          BeforeTargets="_GetPackageFiles;_WalkEachTargetPerFramework;GenerateNuspec"
-          AfterTargets="CollectPackageReferences"
-          Condition="'@(PackageReference)' != ''">
-    <ItemGroup>
-      <PackageReference Condition="'%(PackageReference.Shade)' == 'true'">
-        <PrivateAssets>all</PrivateAssets>
-      </PackageReference>
     </ItemGroup>
   </Target>
 
@@ -159,5 +151,30 @@
     <PackageShader.DepsJsonPatcherTask
       DepsJsonPath="$(_DepsJsonPath)"
       ShadedNameMappings="@(_ShadedNameMappings)" />
+  </Target>
+
+  <!-- Target 6: Patch nupkg to remove shaded dependencies -->
+  <!-- NuGet reads dependencies from project.assets.json (created at restore time), not live PackageReference items.
+       So we patch the nupkg after it's created to remove shaded package dependencies. -->
+  <Target Name="_PatchNupkgRemoveShadedDependencies"
+          AfterTargets="Pack">
+    <!-- Collect shaded package names -->
+    <ItemGroup>
+      <_ShadedPackageNamesForNupkg Include="@(PackageReference->'%(Identity)')"
+                                    Condition="'%(PackageReference.Shade)' == 'true'" />
+    </ItemGroup>
+
+    <!-- Construct the nupkg path (ensure trailing slash on PackageOutputPath) -->
+    <PropertyGroup>
+      <_PackageOutputPathWithSlash Condition="!$(PackageOutputPath.EndsWith('\')) And !$(PackageOutputPath.EndsWith('/'))">$(PackageOutputPath)\</_PackageOutputPathWithSlash>
+      <_PackageOutputPathWithSlash Condition="$(PackageOutputPath.EndsWith('\')) Or $(PackageOutputPath.EndsWith('/'))">$(PackageOutputPath)</_PackageOutputPathWithSlash>
+      <_NupkgFilePath>$(_PackageOutputPathWithSlash)$(PackageId).$(PackageVersion).nupkg</_NupkgFilePath>
+    </PropertyGroup>
+
+    <!-- Patch the nupkg to remove shaded dependencies -->
+    <PackageShader.NupkgPatcherTask
+      Condition="'@(_ShadedPackageNamesForNupkg)' != '' And Exists('$(_NupkgFilePath)')"
+      NupkgPath="$(_NupkgFilePath)"
+      ShadedPackageNames="@(_ShadedPackageNamesForNupkg)" />
   </Target>
 </Project>
