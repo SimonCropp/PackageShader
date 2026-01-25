@@ -580,6 +580,121 @@ public class TaskTests
 
 #if RELEASE
     [Fact]
+    public async Task NuGetPackExcludesShadedDependencies_MultiTargeting_ConditionalShade()
+    {
+        // This test reproduces the MarkdownSnippets.MsBuild bug:
+        // - Multi-targeted project (netstandard2.0;net10.0)
+        // - Shaded dependencies with Condition for specific frameworks
+        // - During pack, $(TargetFramework) is not set at the outer level
+        // - So conditional PackageReferences are NOT collected by _PatchNupkgRemoveShadedDependencies
+        // - Result: shaded dependencies still appear in nuspec
+        using var projectDir = new TempDirectory();
+
+        // Get the actual built version from the PackageShader.MsBuild assembly
+        var packageVersion = typeof(ShadeTask).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!
+            .InformationalVersion;
+
+        // Create a multi-targeted library project with CONDITIONAL shaded PackageReferences
+        // that only apply to netstandard2.0 (exactly like MarkdownSnippets.MsBuild)
+        var projectContent =
+            $"""
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFrameworks>netstandard2.0;net10.0</TargetFrameworks>
+                <PackageId>TestLibConditionalShade</PackageId>
+                <Version>1.0.0</Version>
+                <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+              </PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="PackageShader.MsBuild" Version="{packageVersion}" PrivateAssets="all" />
+                <!-- CONDITIONAL Shade - only for netstandard2.0 (this is the bug scenario) -->
+                <PackageReference Include="System.Memory" Version="4.6.3" Shade="true" Condition="'$(TargetFramework)' == 'netstandard2.0'" />
+              </ItemGroup>
+            </Project>
+            """;
+
+        var projectPath = Path.Combine(projectDir, "TestLib.csproj");
+        await File.WriteAllTextAsync(projectPath, projectContent, TestContext.Current.CancellationToken);
+
+        // Create a minimal class file that uses System.Memory
+        var classContent =
+            """
+            namespace TestLib
+            {
+                public class MyClass
+                {
+                    public System.ReadOnlySpan<byte> GetSpan() => System.ReadOnlySpan<byte>.Empty;
+                }
+            }
+            """;
+        await File.WriteAllTextAsync(Path.Combine(projectDir, "MyClass.cs"), classContent, TestContext.Current.CancellationToken);
+
+        // Create NuGet.config pointing to local PackageShader package
+        var packageShaderBinPath = Path.Combine(ProjectFiles.SolutionDirectory.Path, "..", "nugets");
+        var localPackagesFolder = Path.Combine(projectDir, "packages");
+        var nugetConfig =
+            $"""
+             <?xml version="1.0" encoding="utf-8"?>
+             <configuration>
+               <config>
+                 <add key="globalPackagesFolder" value="{localPackagesFolder}" />
+               </config>
+               <packageSources>
+                 <clear />
+                 <add key="local" value="{packageShaderBinPath}" />
+                 <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+               </packageSources>
+             </configuration>
+             """;
+        await File.WriteAllTextAsync(Path.Combine(projectDir, "NuGet.config"), nugetConfig, TestContext.Current.CancellationToken);
+
+        // Restore
+        var restoreResult = await Cli.Wrap("dotnet")
+            .WithArguments(["restore"])
+            .WithWorkingDirectory(projectDir)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
+
+        if (restoreResult.ExitCode != 0)
+        {
+            throw new($"Restore failed:\n{restoreResult.StandardOutput}\n{restoreResult.StandardError}");
+        }
+
+        // Build and Pack
+        var packResult = await Cli.Wrap("dotnet")
+            .WithArguments(["pack", "-c", "Release", "-o", ".", "-nodeReuse:false"])
+            .WithWorkingDirectory(projectDir)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
+
+        if (packResult.ExitCode != 0)
+        {
+            throw new($"Pack failed:\n{packResult.StandardOutput}\n{packResult.StandardError}");
+        }
+
+        await Task.Delay(1000, TestContext.Current.CancellationToken);
+
+        // Inspect the nupkg
+        var nupkgPath = Path.Combine(projectDir, "TestLibConditionalShade.1.0.0.nupkg");
+        Assert.True(File.Exists(nupkgPath), $"NuGet package should exist at {nupkgPath}");
+
+        await using var archive = await ZipFile.OpenReadAsync(nupkgPath, TestContext.Current.CancellationToken);
+
+        // Read nuspec from package
+        var nuspecEntry = archive.Entries.FirstOrDefault(_ => _.Name.EndsWith(".nuspec"));
+        Assert.NotNull(nuspecEntry);
+
+        await using var nuspecStream = await nuspecEntry.OpenAsync(TestContext.Current.CancellationToken);
+        using var reader = new StreamReader(nuspecStream);
+        var nuspecContent = await reader.ReadToEndAsync(TestContext.Current.CancellationToken);
+
+        // KEY ASSERTION: System.Memory should NOT be a dependency because it was shaded
+        // BUG: System.Memory WILL appear because the conditional PackageReference is not collected
+        Assert.DoesNotContain("System.Memory", nuspecContent);
+    }
+
+    [Fact]
     public async Task NuGetPackExcludesShadedDependencies_MultiTargeting()
     {
         // This test reproduces the MarkdownSnippets.MsBuild scenario:
