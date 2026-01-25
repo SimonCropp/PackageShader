@@ -369,8 +369,7 @@ public class TaskTests
     [Fact]
     public async Task IncludesShadedAssembliesInPackageWhenIncludeBuildOutputIsFalse_ReleaseOnly()
     {
-        using var tempDirectory = new TempDirectory();
-        var projectDir = (string)tempDirectory;
+        using var projectDir = new TempDirectory();
 
         // Get the actual built version from the PackageShader.MsBuild assembly
         var packageVersion = typeof(ShadeTask).Assembly
@@ -579,7 +578,7 @@ public class TaskTests
         });
     }
 
-#if !DEBUG
+#if RELEASE
     [Fact]
     public async Task NuGetPackExcludesShadedDependencies_MultiTargeting()
     {
@@ -587,8 +586,7 @@ public class TaskTests
         // - Multi-targeted project (netstandard2.0;net8.0)
         // - Shaded dependencies with Condition for specific frameworks
         // - Uses the actual PackageShader.MsBuild NuGet package
-        using var tempDir = new TempDirectory();
-        var projectDir = (string)tempDir;
+        using var projectDir = new TempDirectory();
 
         // Get the actual built version from the PackageShader.MsBuild assembly
         var packageVersion = typeof(ShadeTask).Assembly
@@ -793,8 +791,7 @@ public class TaskTests
     [Fact]
     public async Task ShadedAssembliesCoLocatedWithCustomPackagePath()
     {
-        using var tempDirectory = new TempDirectory();
-        var projectDir = (string)tempDirectory;
+        using var projectDir = new TempDirectory();
 
         // Get the actual built version from the PackageShader.MsBuild assembly
         var packageVersion = typeof(ShadeTask).Assembly
