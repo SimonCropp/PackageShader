@@ -7,6 +7,25 @@
     <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_IncludeShadedInPackage</TargetsForTfmSpecificContentInPackage>
   </PropertyGroup>
 
+  <!--
+    NOTE: Setting PrivateAssets via .targets Update doesn't work because NuGet reads
+    PackageReference metadata at restore time (lock file), not at pack time.
+    Users must set PrivateAssets="All" directly on shaded PackageReferences.
+    The target below validates this and provides a helpful error message.
+  -->
+
+  <!-- Validate that shaded PackageReferences have PrivateAssets="All" to prevent unwanted dependencies in the nuspec -->
+  <Target Name="_ValidateShadedPackageReferences"
+          BeforeTargets="GenerateNuspec"
+          Condition="'@(PackageReference)' != ''">
+    <ItemGroup>
+      <_ShadedWithoutPrivateAssets Include="@(PackageReference)"
+        Condition="'%(PackageReference.Shade)' == 'true' AND '%(PackageReference.PrivateAssets)' != 'All' AND '%(PackageReference.PrivateAssets)' != 'all'" />
+    </ItemGroup>
+    <Error Condition="'@(_ShadedWithoutPrivateAssets)' != ''"
+           Text="PackageShader: The following shaded PackageReferences are missing 'PrivateAssets=&quot;All&quot;' which will cause them to appear as dependencies in the NuGet package. Add PrivateAssets=&quot;All&quot; to: @(_ShadedWithoutPrivateAssets, ', ')" />
+  </Target>
+
   <UsingTask
     TaskName="PackageShader.ShadeTask"
     AssemblyFile="$(ShaderAssembly)" />
@@ -43,18 +62,6 @@
       <!-- Match ProjectReference by MSBuildSourceProjectFile metadata -->
       <_AssembliesToShade Include="@(ReferenceCopyLocalPaths)"
         Condition="'%(ReferenceCopyLocalPaths.MSBuildSourceProjectFile)' != '' And $(_ShadedProjectFilesJoined.Contains(';%(ReferenceCopyLocalPaths.MSBuildSourceProjectFile);'))" />
-    </ItemGroup>
-  </Target>
-
-  <!-- Target 3: Mark shaded packages as PrivateAssets=all for NuGet pack -->
-  <Target Name="_ExcludeShadedFromNuGetDeps"
-          BeforeTargets="_GetPackageFiles;_WalkEachTargetPerFramework;GenerateNuspec"
-          AfterTargets="CollectPackageReferences"
-          Condition="'@(PackageReference)' != ''">
-    <ItemGroup>
-      <PackageReference Condition="'%(PackageReference.Shade)' == 'true'">
-        <PrivateAssets>all</PrivateAssets>
-      </PackageReference>
     </ItemGroup>
   </Target>
 
