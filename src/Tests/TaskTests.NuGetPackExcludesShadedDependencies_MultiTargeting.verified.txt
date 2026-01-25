@@ -1,0 +1,8 @@
+{
+  LibEntries: [
+    lib/net8.0/TestLib.dll,
+    lib/netstandard2.0/TestLib.dll,
+    lib/netstandard2.0/TestLib.System.Memory.dll
+  ],
+  NuspecHasSystemMemoryDependency: false
+}

@@ -579,6 +579,98 @@ public class TaskTests
     }
 
     [Fact]
+    public async Task NuGetPackExcludesShadedDependencies_MultiTargeting()
+    {
+        using var tempDir = new TempDirectory();
+
+        // Create a multi-targeted library project with shaded PackageReferences
+        // that only apply to netstandard2.0 (like MarkdownSnippets.MsBuild)
+        var projectContent = """
+                             <Project Sdk="Microsoft.NET.Sdk">
+                               <PropertyGroup>
+                                 <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
+                                 <PackageId>TestLibMultiTarget</PackageId>
+                                 <Version>1.0.0</Version>
+                                 <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+                               </PropertyGroup>
+                               <ItemGroup>
+                                 <!-- Shade System.Memory only for netstandard2.0, like MarkdownSnippets.MsBuild -->
+                                 <PackageReference Include="System.Memory" Version="4.6.3" Shade="true" Condition="'$(TargetFramework)' == 'netstandard2.0'" />
+                               </ItemGroup>
+                               <Import Project="$MsBuildTargetsPath$" />
+                             </Project>
+                             """;
+
+        // Point to the actual targets file
+        var targetsPath = Path.Combine(ProjectFiles.ProjectDirectory.Path, "..", "PackageShader.MsBuild", "build", "PackageShader.MsBuild.targets");
+        projectContent = projectContent.Replace("$MsBuildTargetsPath$", targetsPath);
+
+        var projectPath = Path.Combine(tempDir, "TestLib.csproj");
+        await File.WriteAllTextAsync(projectPath, projectContent, TestContext.Current.CancellationToken);
+
+        // Create a minimal class file that uses System.Memory
+        var classContent = """
+                           namespace TestLib
+                           {
+                               public class MyClass
+                               {
+                                   public System.ReadOnlySpan<byte> GetSpan() => System.ReadOnlySpan<byte>.Empty;
+                               }
+                           }
+                           """;
+        await File.WriteAllTextAsync(Path.Combine(tempDir, "MyClass.cs"), classContent, TestContext.Current.CancellationToken);
+
+        // Restore first
+        await Cli.Wrap("dotnet")
+            .WithArguments("restore")
+            .WithWorkingDirectory(tempDir)
+            .ExecuteAsync(TestContext.Current.CancellationToken);
+
+        // Build and Pack together
+        var packResult = await Cli.Wrap("dotnet")
+            .WithArguments("pack -c Release -o .")
+            .WithWorkingDirectory(tempDir)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
+
+        if (packResult.ExitCode != 0)
+        {
+            throw new($"Pack failed:\n{packResult.StandardOutput}\n{packResult.StandardError}");
+        }
+
+        // Inspect the nupkg
+        var nupkgPath = Path.Combine(tempDir, "TestLibMultiTarget.1.0.0.nupkg");
+        Assert.True(File.Exists(nupkgPath), $"NuGet package should exist at {nupkgPath}");
+
+        await using var archive = await ZipFile.OpenReadAsync(nupkgPath, TestContext.Current.CancellationToken);
+        var entries = archive.Entries.Select(_ => _.FullName).ToList();
+
+        var libEntries = entries.Where(e => e.StartsWith("lib/")).ToList();
+
+        // Read nuspec from package to verify no dependency on System.Memory
+        var nuspecEntry = archive.Entries.FirstOrDefault(e => e.Name.EndsWith(".nuspec"));
+        Assert.NotNull(nuspecEntry);
+
+        await using var nuspecStream = await nuspecEntry.OpenAsync(TestContext.Current.CancellationToken);
+        using var reader = new StreamReader(nuspecStream);
+        var nuspecContent = await reader.ReadToEndAsync(TestContext.Current.CancellationToken);
+
+        // Verify System.Memory is NOT listed as a dependency in any target framework group
+        // This is the key assertion - before the fix, System.Memory would appear in netstandard2.0 group
+        Assert.DoesNotContain("System.Memory", nuspecContent);
+
+        // Also verify the transitive dependencies are not there
+        Assert.DoesNotContain("System.Buffers", nuspecContent);
+        Assert.DoesNotContain("System.Runtime.CompilerServices.Unsafe", nuspecContent);
+
+        await Verify(new
+        {
+            LibEntries = libEntries.OrderBy(_ => _).ToList(),
+            NuspecHasSystemMemoryDependency = nuspecContent.Contains("System.Memory")
+        });
+    }
+
+    [Fact]
     public async Task BuildToolTransitiveDependenciesShouldNotTriggerValidation()
     {
         // This test reproduces the MarkdownSnippets issue:
