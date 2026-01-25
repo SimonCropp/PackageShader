@@ -608,8 +608,8 @@ public class TaskTests
               </PropertyGroup>
               <ItemGroup>
                 <PackageReference Include="PackageShader.MsBuild" Version="{packageVersion}" PrivateAssets="all" />
-                <!-- Shade Argon - must include PrivateAssets="All" to exclude from nuspec dependencies -->
-                <PackageReference Include="Argon" Version="0.28.0" Shade="true" PrivateAssets="All" />
+                <!-- Shade Argon - WITHOUT PrivateAssets to test validation -->
+                <PackageReference Include="Argon" Version="0.28.0" Shade="true" />
               </ItemGroup>
             </Project>
             """;
