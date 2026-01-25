@@ -98,6 +98,19 @@
       Lines="@(_ShadedDllsToAdd)"
       Overwrite="true"
       WriteOnlyWhenDifferent="true" />
+
+    <!-- Write shaded package names to a file for use during pack (for nupkg patching) -->
+    <!-- This is needed because conditional PackageReferences (e.g. Condition="'$(TargetFramework)' == 'netstandard2.0'")
+         are not visible at the outer build level during Pack in multi-targeted projects -->
+    <PropertyGroup Condition="'@(_ShadedPackageNames)' != ''">
+      <_ShadedPackageNamesListFile>$(IntermediateOutputPath)PackageShader.ShadedPackageNames.txt</_ShadedPackageNamesListFile>
+    </PropertyGroup>
+    <WriteLinesToFile
+      Condition="'@(_ShadedPackageNames)' != ''"
+      File="$(_ShadedPackageNamesListFile)"
+      Lines="@(_ShadedPackageNames)"
+      Overwrite="true"
+      WriteOnlyWhenDifferent="true" />
   </Target>
 
   <!-- Target 4: Include shaded assemblies in NuGet package -->
@@ -155,14 +168,35 @@
 
   <!-- Target 6: Patch nupkg to remove shaded dependencies -->
   <!-- NuGet reads dependencies from project.assets.json (created at restore time), not live PackageReference items.
-       So we patch the nupkg after it's created to remove shaded package dependencies. -->
+       So we patch the nupkg after it's created to remove shaded package dependencies.
+
+       For multi-targeted projects, conditional PackageReferences (e.g. Condition="'$(TargetFramework)' == 'netstandard2.0'")
+       are not visible at the outer build level. So we read shaded package names from files written during inner builds. -->
   <Target Name="_PatchNupkgRemoveShadedDependencies"
           AfterTargets="Pack">
-    <!-- Collect shaded package names -->
-    <ItemGroup>
+
+    <!-- For single-targeted projects, collect shaded package names directly -->
+    <ItemGroup Condition="'$(TargetFramework)' != ''">
       <_ShadedPackageNamesForNupkg Include="@(PackageReference->'%(Identity)')"
                                     Condition="'%(PackageReference.Shade)' == 'true'" />
     </ItemGroup>
+
+    <!-- For multi-targeted projects, read shaded package names from files written during inner builds -->
+    <ItemGroup Condition="'$(TargetFrameworks)' != ''">
+      <_TargetFrameworkList Include="$(TargetFrameworks)" />
+    </ItemGroup>
+
+    <!-- Find all ShadedPackageNames.txt files from each TFM's intermediate directory -->
+    <ItemGroup Condition="'$(TargetFrameworks)' != ''">
+      <_ShadedPackageNamesFiles Include="$(BaseIntermediateOutputPath)$(Configuration)\*\PackageShader.ShadedPackageNames.txt" />
+    </ItemGroup>
+
+    <!-- Read shaded package names from all TFM files -->
+    <ReadLinesFromFile
+      Condition="'@(_ShadedPackageNamesFiles)' != ''"
+      File="%(_ShadedPackageNamesFiles.Identity)">
+      <Output TaskParameter="Lines" ItemName="_ShadedPackageNamesForNupkg" />
+    </ReadLinesFromFile>
 
     <!-- Construct the nupkg path (ensure trailing slash on PackageOutputPath) -->
     <PropertyGroup>
