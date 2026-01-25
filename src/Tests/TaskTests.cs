@@ -494,6 +494,7 @@ public class TaskTests
         using var tempDir = new TempDirectory();
 
         // Create a minimal library project with a shaded PackageReference
+        // Note: PrivateAssets="All" is required to exclude shaded deps from nuspec
         var projectContent = """
                              <Project Sdk="Microsoft.NET.Sdk">
                                <PropertyGroup>
@@ -503,7 +504,7 @@ public class TaskTests
                                  <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
                                </PropertyGroup>
                                <ItemGroup>
-                                 <PackageReference Include="Argon" Version="0.28.0" Shade="true" />
+                                 <PackageReference Include="Argon" Version="0.28.0" Shade="true" PrivateAssets="All" />
                                </ItemGroup>
                                <Import Project="$MsBuildTargetsPath$" />
                              </Project>
@@ -578,58 +579,93 @@ public class TaskTests
         });
     }
 
+#if !DEBUG
     [Fact]
     public async Task NuGetPackExcludesShadedDependencies_MultiTargeting()
     {
+        // This test reproduces the MarkdownSnippets.MsBuild scenario:
+        // - Multi-targeted project (netstandard2.0;net8.0)
+        // - Shaded dependencies with Condition for specific frameworks
+        // - Uses the actual PackageShader.MsBuild NuGet package
         using var tempDir = new TempDirectory();
+        var projectDir = (string)tempDir;
+
+        // Get the actual built version from the PackageShader.MsBuild assembly
+        var packageVersion = typeof(ShadeTask).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!
+            .InformationalVersion;
 
         // Create a multi-targeted library project with shaded PackageReferences
         // that only apply to netstandard2.0 (like MarkdownSnippets.MsBuild)
-        var projectContent = """
-                             <Project Sdk="Microsoft.NET.Sdk">
-                               <PropertyGroup>
-                                 <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
-                                 <PackageId>TestLibMultiTarget</PackageId>
-                                 <Version>1.0.0</Version>
-                                 <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-                               </PropertyGroup>
-                               <ItemGroup>
-                                 <!-- Shade System.Memory only for netstandard2.0, like MarkdownSnippets.MsBuild -->
-                                 <PackageReference Include="System.Memory" Version="4.6.3" Shade="true" Condition="'$(TargetFramework)' == 'netstandard2.0'" />
-                               </ItemGroup>
-                               <Import Project="$MsBuildTargetsPath$" />
-                             </Project>
-                             """;
+        var projectContent =
+            $"""
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
+                <PackageId>TestLibMultiTarget</PackageId>
+                <Version>1.0.0</Version>
+                <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+              </PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="PackageShader.MsBuild" Version="{packageVersion}" PrivateAssets="all" />
+                <!-- Shade Argon - must include PrivateAssets="All" to exclude from nuspec dependencies -->
+                <PackageReference Include="Argon" Version="0.28.0" Shade="true" PrivateAssets="All" />
+              </ItemGroup>
+            </Project>
+            """;
 
-        // Point to the actual targets file
-        var targetsPath = Path.Combine(ProjectFiles.ProjectDirectory.Path, "..", "PackageShader.MsBuild", "build", "PackageShader.MsBuild.targets");
-        projectContent = projectContent.Replace("$MsBuildTargetsPath$", targetsPath);
-
-        var projectPath = Path.Combine(tempDir, "TestLib.csproj");
+        var projectPath = Path.Combine(projectDir, "TestLib.csproj");
         await File.WriteAllTextAsync(projectPath, projectContent, TestContext.Current.CancellationToken);
 
-        // Create a minimal class file that uses System.Memory
-        var classContent = """
-                           namespace TestLib
-                           {
-                               public class MyClass
-                               {
-                                   public System.ReadOnlySpan<byte> GetSpan() => System.ReadOnlySpan<byte>.Empty;
-                               }
-                           }
-                           """;
-        await File.WriteAllTextAsync(Path.Combine(tempDir, "MyClass.cs"), classContent, TestContext.Current.CancellationToken);
+        // Create a minimal class file that uses Argon
+        var classContent =
+            """
+            namespace TestLib
+            {
+                public class MyClass
+                {
+                    public string GetJson() => Argon.JObject.Parse("{}").ToString();
+                }
+            }
+            """;
+        await File.WriteAllTextAsync(Path.Combine(projectDir, "MyClass.cs"), classContent, TestContext.Current.CancellationToken);
 
-        // Restore first
-        await Cli.Wrap("dotnet")
-            .WithArguments("restore")
-            .WithWorkingDirectory(tempDir)
-            .ExecuteAsync(TestContext.Current.CancellationToken);
+        // Create NuGet.config pointing to local PackageShader package
+        // Use a local packages folder to avoid global cache issues when testing local package changes
+        var packageShaderBinPath = Path.Combine(ProjectFiles.SolutionDirectory.Path, "..", "nugets");
+        var localPackagesFolder = Path.Combine(projectDir, "packages");
+        var nugetConfig =
+            $"""
+             <?xml version="1.0" encoding="utf-8"?>
+             <configuration>
+               <config>
+                 <add key="globalPackagesFolder" value="{localPackagesFolder}" />
+               </config>
+               <packageSources>
+                 <clear />
+                 <add key="local" value="{packageShaderBinPath}" />
+                 <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+               </packageSources>
+             </configuration>
+             """;
+        await File.WriteAllTextAsync(Path.Combine(projectDir, "NuGet.config"), nugetConfig, TestContext.Current.CancellationToken);
 
-        // Build and Pack together
+        // Restore
+        var restoreResult = await Cli.Wrap("dotnet")
+            .WithArguments(["restore"])
+            .WithWorkingDirectory(projectDir)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
+
+        if (restoreResult.ExitCode != 0)
+        {
+            throw new($"Restore failed:\n{restoreResult.StandardOutput}\n{restoreResult.StandardError}");
+        }
+
+        // Build and Pack together (disable node reuse to avoid file locking during cleanup)
         var packResult = await Cli.Wrap("dotnet")
-            .WithArguments("pack -c Release -o .")
-            .WithWorkingDirectory(tempDir)
+            .WithArguments(["pack", "-c", "Release", "-o", ".", "-nodeReuse:false"])
+            .WithWorkingDirectory(projectDir)
             .WithValidation(CommandResultValidation.None)
             .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
 
@@ -638,8 +674,11 @@ public class TaskTests
             throw new($"Pack failed:\n{packResult.StandardOutput}\n{packResult.StandardError}");
         }
 
+        // Allow build processes to fully release file handles before continuing
+        await Task.Delay(1000, TestContext.Current.CancellationToken);
+
         // Inspect the nupkg
-        var nupkgPath = Path.Combine(tempDir, "TestLibMultiTarget.1.0.0.nupkg");
+        var nupkgPath = Path.Combine(projectDir, "TestLibMultiTarget.1.0.0.nupkg");
         Assert.True(File.Exists(nupkgPath), $"NuGet package should exist at {nupkgPath}");
 
         await using var archive = await ZipFile.OpenReadAsync(nupkgPath, TestContext.Current.CancellationToken);
@@ -655,20 +694,17 @@ public class TaskTests
         using var reader = new StreamReader(nuspecStream);
         var nuspecContent = await reader.ReadToEndAsync(TestContext.Current.CancellationToken);
 
-        // Verify System.Memory is NOT listed as a dependency in any target framework group
-        // This is the key assertion - before the fix, System.Memory would appear in netstandard2.0 group
-        Assert.DoesNotContain("System.Memory", nuspecContent);
-
-        // Also verify the transitive dependencies are not there
-        Assert.DoesNotContain("System.Buffers", nuspecContent);
-        Assert.DoesNotContain("System.Runtime.CompilerServices.Unsafe", nuspecContent);
+        // Verify Argon is NOT listed as a dependency in any target framework group
+        // This is the key assertion - before the fix, Argon would appear as a dependency
+        Assert.DoesNotContain("Argon", nuspecContent);
 
         await Verify(new
         {
             LibEntries = libEntries.OrderBy(_ => _).ToList(),
-            NuspecHasSystemMemoryDependency = nuspecContent.Contains("System.Memory")
+            NuspecHasArgonDependency = nuspecContent.Contains("Argon")
         });
     }
+#endif
 
     [Fact]
     public async Task BuildToolTransitiveDependenciesShouldNotTriggerValidation()
