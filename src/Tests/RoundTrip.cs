@@ -474,8 +474,8 @@ public partial class RoundTrip
         // Find the LOWEST installed version for deterministic builds
         var versions = Directory.GetDirectories(nugetPackagesDir)
             .Select(Path.GetFileName)
-            .Where(v => v != null)
-            .OrderBy(v => Version.TryParse(v, out var parsed) ? parsed : new(0, 0))
+            .Where(_ => _ != null)
+            .OrderBy(_ => Version.TryParse(_, out var parsed) ? parsed : new(0, 0))
             .ToList();
 
         foreach (var version in versions)
@@ -573,7 +573,7 @@ public partial class RoundTrip
             MethodCount = reader.MethodDefinitions.Count,
             AssemblyRefCount = reader.AssemblyReferences.Count,
             HasDebugInfo = peReader.ReadDebugDirectory().Any(),
-            HasEmbeddedPdb = peReader.ReadDebugDirectory().Any(d => d.Type == DebugDirectoryEntryType.EmbeddedPortablePdb),
+            HasEmbeddedPdb = peReader.ReadDebugDirectory().Any(_ => _.Type == DebugDirectoryEntryType.EmbeddedPortablePdb),
             StringHeapSize = reader.GetHeapSize(HeapIndex.String),
             BlobHeapSize = reader.GetHeapSize(HeapIndex.Blob),
             GuidHeapSize = reader.GetHeapSize(HeapIndex.Guid),
@@ -686,7 +686,7 @@ public partial class RoundTrip
         // ILVerify check
         var inputIlVerifyErrors = GetILVerifyErrors(inputPath).ToHashSet();
         var outputIlVerifyErrors = GetILVerifyErrors(outputPath);
-        var newIlVerifyErrors = outputIlVerifyErrors.Where(e => !inputIlVerifyErrors.Contains(e)).ToList();
+        var newIlVerifyErrors = outputIlVerifyErrors.Where(_ => !inputIlVerifyErrors.Contains(_)).ToList();
 
         if (newIlVerifyErrors.Count > 0)
         {
@@ -699,7 +699,7 @@ public partial class RoundTrip
         {
             var inputPeVerifyErrors = GetPeVerifyErrors(inputPath).ToHashSet();
             var outputPeVerifyErrors = GetPeVerifyErrors(outputPath);
-            var newPeVerifyErrors = outputPeVerifyErrors.Where(e => !inputPeVerifyErrors.Contains(e)).ToList();
+            var newPeVerifyErrors = outputPeVerifyErrors.Where(_ => !inputPeVerifyErrors.Contains(_)).ToList();
 
             if (newPeVerifyErrors.Count > 0)
             {
@@ -728,7 +728,7 @@ public partial class RoundTrip
             }
 
             path = Directory.EnumerateFiles(windowsSdkDirectory, "peverify.exe", SearchOption.AllDirectories)
-                .Where(x => !x.Contains("x64", StringComparison.OrdinalIgnoreCase))
+                .Where(_ => !_.Contains("x64", StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(x =>
                 {
                     var info = FileVersionInfo.GetVersionInfo(x);

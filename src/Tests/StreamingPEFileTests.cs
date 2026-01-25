@@ -63,7 +63,7 @@ public class StreamingPEFileTests
         Assert.True(peFile.StreamHeaders.Length > 0);
 
         // Should have at least #~ (or #-) and #Strings
-        var streamNames = peFile.StreamHeaders.Select(h => h.Name).ToList();
+        var streamNames = peFile.StreamHeaders.Select(_ => _.Name).ToList();
         Assert.True(streamNames.Contains("#~") || streamNames.Contains("#-"));
         Assert.Contains("#Strings", streamNames);
     }

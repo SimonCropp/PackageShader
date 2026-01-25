@@ -54,7 +54,7 @@ public class TaskTests
         var result = task.Execute();
 
         Assert.False(result);
-        Assert.Contains(buildEngine.Errors, e => e.Contains("AssemblyOriginatorKeyFile not defined"));
+        Assert.Contains(buildEngine.Errors, _ => _.Contains("AssemblyOriginatorKeyFile not defined"));
     }
 
     [Fact]
@@ -92,8 +92,8 @@ public class TaskTests
         SetupTestAssemblies(tempDir);
 
         var assemblyPaths = GetTestAssemblyPaths(tempDir);
-        var assemblyWithPdbPath = assemblyPaths.First(p => p.Contains("AssemblyWithPdb"));
-        var referenceCopyLocalPaths = assemblyPaths.Select(p => new MockTaskItem(p)).ToArray();
+        var assemblyWithPdbPath = assemblyPaths.First(_ => _.Contains("AssemblyWithPdb"));
+        var referenceCopyLocalPaths = assemblyPaths.Select(_ => new MockTaskItem(_)).ToArray();
 
         var task = new ShadeTask
         {
@@ -109,7 +109,7 @@ public class TaskTests
         var result = task.Execute();
 
         Assert.True(result);
-        var outputFiles = task.CopyLocalPathsToAdd.Select(i => Path.GetFileName(i.ItemSpec)).ToList();
+        var outputFiles = task.CopyLocalPathsToAdd.Select(_ => Path.GetFileName(_.ItemSpec)).ToList();
         // Only AssemblyWithPdb should be shaded with prefix
         Assert.Contains("AssemblyToProcess.AssemblyWithPdb.dll", outputFiles);
         // AssemblyWithNoSymbols should NOT be shaded (not in AssembliesToShade)
@@ -129,10 +129,10 @@ public class TaskTests
         File.Copy(originalAssembly, customAssembly);
 
         var assemblyPaths = GetTestAssemblyPaths(tempDir);
-        var assemblyWithPdbPath = assemblyPaths.First(p => p.Contains("AssemblyWithPdb"));
+        var assemblyWithPdbPath = assemblyPaths.First(_ => _.Contains("AssemblyWithPdb"));
         // Exclude the original AssemblyToProcess.dll since MyCustomApp is a copy of it
         var referenceCopyLocalPaths = assemblyPaths
-            .Where(p => !p.Contains("AssemblyToProcess.dll"))
+            .Where(_ => !_.Contains("AssemblyToProcess.dll"))
             .Select(p => new MockTaskItem(p))
             .ToArray();
 
@@ -149,7 +149,7 @@ public class TaskTests
 
         task.Execute();
 
-        var outputFiles = task.CopyLocalPathsToAdd.Select(i => Path.GetFileName(i.ItemSpec)).ToList();
+        var outputFiles = task.CopyLocalPathsToAdd.Select(_ => Path.GetFileName(_.ItemSpec)).ToList();
         // Prefix should be derived from "MyCustomApp"
         Assert.Contains("MyCustomApp.AssemblyWithPdb.dll", outputFiles);
     }
@@ -161,7 +161,7 @@ public class TaskTests
         SetupTestAssemblies(tempDir);
 
         var assemblyPaths = GetTestAssemblyPaths(tempDir);
-        var referenceCopyLocalPaths = assemblyPaths.Select(p => new MockTaskItem(p)).ToArray();
+        var referenceCopyLocalPaths = assemblyPaths.Select(_ => new MockTaskItem(_)).ToArray();
 
         var task = new ShadeTask
         {
@@ -178,8 +178,8 @@ public class TaskTests
 
         Assert.True(result);
         // All assemblies should be in output without prefix (none shaded)
-        var outputFiles = task.CopyLocalPathsToAdd.Select(i => Path.GetFileName(i.ItemSpec)).ToList();
-        Assert.DoesNotContain(outputFiles, f => f.StartsWith("AssemblyToProcess.Assembly"));
+        var outputFiles = task.CopyLocalPathsToAdd.Select(_ => Path.GetFileName(_.ItemSpec)).ToList();
+        Assert.DoesNotContain(outputFiles, _ => _.StartsWith("AssemblyToProcess.Assembly"));
     }
 
     [Fact]
@@ -206,8 +206,8 @@ public class TaskTests
 
         Assert.True(result);
         // All assemblies should be in output without prefix (none shaded)
-        var outputFiles = task.CopyLocalPathsToAdd.Select(i => Path.GetFileName(i.ItemSpec)).ToList();
-        Assert.DoesNotContain(outputFiles, f => f.StartsWith("AssemblyToProcess.Assembly"));
+        var outputFiles = task.CopyLocalPathsToAdd.Select(_ => Path.GetFileName(_.ItemSpec)).ToList();
+        Assert.DoesNotContain(outputFiles, _ => _.StartsWith("AssemblyToProcess.Assembly"));
     }
 
     [Fact]
@@ -220,7 +220,7 @@ public class TaskTests
 
         task.Execute();
 
-        Assert.Contains(buildEngine.Messages, m => m.Contains("Finished PackageShader") && m.Contains("ms"));
+        Assert.Contains(buildEngine.Messages, _ => _.Contains("Finished PackageShader") && _.Contains("ms"));
     }
 
     [Fact]
@@ -256,7 +256,7 @@ public class TaskTests
         SetupTestAssemblies(tempDir);
 
         var assemblyPaths = GetTestAssemblyPaths(tempDir);
-        var referenceCopyLocalPaths = assemblyPaths.Select(p => new MockTaskItem(p)).ToArray();
+        var referenceCopyLocalPaths = assemblyPaths.Select(_ => new MockTaskItem(_)).ToArray();
 
         // By default, shade all assemblies except the main one
         var assembliesToShade = assemblyPaths
@@ -476,8 +476,8 @@ public class TaskTests
         Assert.Null(originalEntry);
 
         // Get all entries for verification output
-        var entries = archive.Entries.Select(e => e.FullName).ToList();
-        var libEntries = entries.Where(e => e.StartsWith("lib/")).OrderBy(e => e).ToList();
+        var entries = archive.Entries.Select(_ => _.FullName).ToList();
+        var libEntries = entries.Where(_ => _.StartsWith("lib/")).OrderBy(_ => _).ToList();
 
         await Verify(new
         {
@@ -557,10 +557,10 @@ public class TaskTests
         await using var archive = await ZipFile.OpenReadAsync(nupkgPath, TestContext.Current.CancellationToken);
         var entries = archive.Entries.Select(_ => _.FullName).ToList();
 
-        var libEntries = entries.Where(e => e.StartsWith("lib/")).ToList();
+        var libEntries = entries.Where(_ => _.StartsWith("lib/")).ToList();
 
         // Read nuspec from package to verify no dependency on Argon
-        var nuspecEntry = archive.Entries.FirstOrDefault(e => e.Name.EndsWith(".nuspec"));
+        var nuspecEntry = archive.Entries.FirstOrDefault(_ => _.Name.EndsWith(".nuspec"));
         Assert.NotNull(nuspecEntry);
 
         await using var nuspecStream = await nuspecEntry.OpenAsync(TestContext.Current.CancellationToken);
@@ -691,10 +691,10 @@ public class TaskTests
         await using var archive = await ZipFile.OpenReadAsync(nupkgPath, TestContext.Current.CancellationToken);
         var entries = archive.Entries.Select(_ => _.FullName).ToList();
 
-        var libEntries = entries.Where(e => e.StartsWith("lib/")).ToList();
+        var libEntries = entries.Where(_ => _.StartsWith("lib/")).ToList();
 
         // Read nuspec from package to verify no dependency on System.Memory
-        var nuspecEntry = archive.Entries.FirstOrDefault(e => e.Name.EndsWith(".nuspec"));
+        var nuspecEntry = archive.Entries.FirstOrDefault(_ => _.Name.EndsWith(".nuspec"));
         Assert.NotNull(nuspecEntry);
 
         await using var nuspecStream = await nuspecEntry.OpenAsync(TestContext.Current.CancellationToken);
@@ -896,9 +896,9 @@ public class TaskTests
         await using var archive = await ZipFile.OpenReadAsync(nupkgPath, TestContext.Current.CancellationToken);
 
         // Get all entries for verification
-        var entries = archive.Entries.Select(e => e.FullName).ToList();
-        var taskEntries = entries.Where(e => e.StartsWith("task/")).OrderBy(e => e).ToList();
-        var libEntries = entries.Where(e => e.StartsWith("lib/")).OrderBy(e => e).ToList();
+        var entries = archive.Entries.Select(_ => _.FullName).ToList();
+        var taskEntries = entries.Where(_ => _.StartsWith("task/")).OrderBy(_ => _).ToList();
+        var libEntries = entries.Where(_ => _.StartsWith("lib/")).OrderBy(_ => _).ToList();
 
         // Verify shaded assembly exists in task/ folder (co-located with primary DLL)
         var shadedEntryInTask = archive.GetEntry("task/net8.0/TestProject.Argon.dll");
