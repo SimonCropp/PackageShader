@@ -431,17 +431,6 @@ public class ShaderTests
                 $"Original BaseReloc RVA {originalRelocRva} should be within .reloc section");
         }
 
-        var infos = new List<SourceTargetInfo>
-        {
-            new(
-                "AssemblyWithResources",
-                Path.Combine(directory, "AssemblyWithResources.dll"),
-                "Shaded.AssemblyWithResources",
-                Path.Combine(directory, "Shaded.AssemblyWithResources.dll"),
-                IsShaded: true
-            )
-        };
-
         // Use StreamingAssemblyModifier to add many IVT attributes (forces metadata growth)
         var shadedPath = Path.Combine(directory, "Shaded.AssemblyWithResources.dll");
         using (var modifier = StreamingAssemblyModifier.Open(sourceAssembly))
