@@ -7,7 +7,7 @@
 
 Avoid dependency conflicts in assemblies changing the name of references. Designed as an alternative to [Costura](https://github.com/Fody/Costura), [ILMerge](https://github.com/dotnet/ILMerge), and [ILRepack](https://github.com/gluck/il-repack).
 
-This project is a fork of [Alias](https://github.com/getsentry/dotnet-assembly-alias). Credit goes to [Sentry](https://sentry.io/) for producing the original Alias project. See their blog post [Alias: An approach to .NET assembly conflict resolution](https://blog.sentry.io/alias-an-approach-to-net-assembly-conflict-resolution/) for background on the approach.
+This project is inspired by [Alias](https://github.com/getsentry/dotnet-assembly-alias). Credit goes to [Sentry](https://sentry.io/) for producing the original Alias project. See their blog post [Alias: An approach to .NET assembly conflict resolution](https://blog.sentry.io/alias-an-approach-to-net-assembly-conflict-resolution/) for background on the approach.
 
 **See [Milestones](../../milestones?state=closed) for release notes.**
 
@@ -18,8 +18,19 @@ In .NET plugin/extension based applications, all assemblies are loaded into a si
 
 This is particularly common in:
 
- * **Unity extensions** - Unity Package Manager packages bundle System DLLs
- * **MSBuild tasks** - Tasks run in a shared AppDomain
+
+### The .net build pipeline.
+
+The following all run in a shared AppDomain launched by either msbuild or the IDE
+
+ * **C# source generators**
+ * **C# Analyzers**
+ * **MSBuild tasks**
+
+
+### Extension scenarios
+
+ * **Unity extensions** - Unity Package Manager packages bundle System DLLs which can result in conflicts
  * **SharePoint/Office extensions** - Plugins share the host's assembly context
  * **Visual Studio extensions** - Extensions share the VS process
 
@@ -42,7 +53,7 @@ The result is a group of files that will not conflict with any assemblies loaded
 |------|----------|------------|
 | [Costura](https://github.com/Fody/Costura) | Embeds dependencies as resources | Doesn't rename assemblies, conflicts persist |
 | [ILMerge](https://github.com/dotnet/ILMerge) | Merges IL into single assembly | Unmaintained, known bugs in .NET Core |
-| [ILRepack](https://github.com/gluck/il-repack) | Merges IL into single assembly | Not suitable for plugin deployment scenarios |
+| [ILRepack](https://github.com/gluck/il-repack) | Merges IL into single assembly | |
 | **PackageShader** | Renames and patches references | Produces multiple files (by design) |
 
 
