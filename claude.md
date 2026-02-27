@@ -10,6 +10,11 @@ PackageShader is a .NET assembly shading/aliasing tool that resolves dependency 
 
 Follow `.editorconfig` for formatting and code style conventions. Respect `.gitattributes` for line endings and file handling.
 
+**Line endings**: All source files must use LF (`\n`), not CRLF. The `Write` tool on Windows produces CRLF files. After writing any new file, immediately fix its line endings:
+```bash
+sed -i 's/\r//' path/to/file.cs
+```
+
 **Lambda/Delegate Parameters**: For single-parameter delegates, always use `_` as the parameter name instead of a descriptive name:
 - ✅ Good: `.OrderBy(_ => _.Property)` or `.Select(_ => _.Transform())`
 - ❌ Bad: `.OrderBy(x => x.Property)` or `.Select(item => item.Transform())`
