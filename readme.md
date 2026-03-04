@@ -353,6 +353,119 @@ Example for MSBuild task package:
 ```
 
 
+### Building an MSBuild Task Package
+
+When authoring an MSBuild task as a NuGet package, all task dependencies are loaded into the host MSBuild process (or IDE). This makes version conflicts almost inevitable since the host already has its own versions of common libraries loaded. PackageShader solves this by renaming your task's dependencies so they don't collide with the host's assemblies.
+
+Here's how to structure an MSBuild task package that uses PackageShader, based on [MarkdownSnippets](https://github.com/SimonCropp/MarkdownSnippets):
+
+
+#### Project File
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Target both netstandard2.0 (for .NET Framework MSBuild)
+         and net10.0 (for .NET Core MSBuild / dotnet build) -->
+    <TargetFrameworks>netstandard2.0;net10.0</TargetFrameworks>
+
+    <!-- Mark as build-time only dependency -->
+    <DevelopmentDependency>true</DevelopmentDependency>
+
+    <!-- Prevent the default lib/ output; we use task/ instead -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+
+    <!-- Ensure all transitive dependencies are copied to output -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+
+    <!-- PackageShader: don't internalize since MSBuild needs
+         to load the task's public types -->
+    <Shader_Internalize>false</Shader_Internalize>
+
+    <!-- Optional: strong name signing -->
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>..\key.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Place the task DLL in a task/ subfolder in the NuGet package -->
+    <TfmSpecificPackageFile Include=".\bin\$(Configuration)\$(TargetFramework)\MyTask.dll">
+      <Pack>true</Pack>
+      <PackagePath>task\$(TargetFramework)</PackagePath>
+    </TfmSpecificPackageFile>
+
+    <!-- Include the .targets file so consuming projects
+         automatically run the task -->
+    <Content Include="MyTask.targets">
+      <Pack>true</Pack>
+      <PackagePath>build</PackagePath>
+    </Content>
+
+    <!-- PackageShader.MsBuild does the shading at build time -->
+    <PackageReference Include="PackageShader.MsBuild" PrivateAssets="all" />
+
+    <!-- MSBuild SDK reference (not shaded, provided by the host) -->
+    <PackageReference Include="Microsoft.Build.Tasks.Core" PrivateAssets="All" />
+
+    <!-- Shade your own library and its transitive dependencies -->
+    <ProjectReference Include="..\MyLibrary\MyLibrary.csproj"
+                      Shade="true" PrivateAssets="All" />
+
+    <!-- Shade system packages that may conflict with the host,
+         only for frameworks where they aren't built-in -->
+    <PackageReference Include="System.Collections.Immutable"
+                      Shade="true"
+                      Condition="'$(TargetFramework)' != 'net10.0'" />
+    <PackageReference Include="System.Memory"
+                      Shade="true"
+                      Condition="'$(TargetFramework)' == 'netstandard2.0'" />
+  </ItemGroup>
+</Project>
+```
+
+
+#### Targets File
+
+The `.targets` file is included in the NuGet package and tells MSBuild how to load and run the task:
+
+```xml
+<Project ToolsVersion="4.0"
+         xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <!-- Select the correct TFM based on the MSBuild runtime -->
+    <MyTaskAssembly
+        Condition="$(MSBuildRuntimeType) == 'Core'">
+      $(MSBuildThisFileDirectory)..\task\net10.0\MyTask.dll
+    </MyTaskAssembly>
+    <MyTaskAssembly
+        Condition="$(MSBuildRuntimeType) != 'Core'">
+      $(MSBuildThisFileDirectory)..\task\netstandard2.0\MyTask.dll
+    </MyTaskAssembly>
+  </PropertyGroup>
+
+  <UsingTask TaskName="MyNamespace.MyTask"
+             AssemblyFile="$(MyTaskAssembly)" />
+
+  <Target Name="MyTaskTarget"
+          AfterTargets="AfterCompile"
+          Condition="$(DesignTimeBuild) != true">
+    <MyNamespace.MyTask ProjectDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+</Project>
+```
+
+
+#### Key Points
+
+ * **Dual-target `netstandard2.0` and a modern TFM** - The `netstandard2.0` build runs in .NET Framework MSBuild (Visual Studio), while the modern TFM runs in `dotnet build`. The `.targets` file selects the right one at runtime via `MSBuildRuntimeType`.
+ * **Set `IncludeBuildOutput` to false** - Standard `lib/` output is not needed. Instead use `TfmSpecificPackageFile` to place the task DLL in a `task/` folder. Shaded assemblies are automatically co-located.
+ * **Set `CopyLocalLockFileAssemblies` to true** - Ensures all transitive dependencies are available in the output directory for PackageShader to process.
+ * **Set `DevelopmentDependency` to true** - Prevents the package from appearing as a runtime dependency in consuming projects.
+ * **Conditionally shade system packages** - Packages like `System.Memory` and `System.Buffers` are only needed (and should only be shaded) for `netstandard2.0`. Modern TFMs include them in the framework.
+ * **Don't shade `Microsoft.Build.*`** - These are provided by the MSBuild host process and must not be shaded.
+ * **Consider `Shader_Internalize`** - Set to `false` for MSBuild tasks since the host must be able to load the task type by name. Use `true` if the task class itself doesn't expose shaded types in its public API and you want maximum isolation.
+
+
 ## Icon
 
 [Shade](https://thenounproject.com/icon/shade-7850642/) designed by [Kim Naces](https://thenounproject.com/creator/kim2262/) from [The Noun Project](https://thenounproject.com).
