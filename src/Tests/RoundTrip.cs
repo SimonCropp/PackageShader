@@ -86,7 +86,7 @@ public partial class RoundTrip
 
     public static IEnumerable<object[]> GetAssemblyScenarios()
     {
-        var frameworks = new[] {"net8.0", "net9.0", "net10.0", "net48", "netstandard2.0", "netstandard2.1"};
+        var frameworks = new[] {"net8.0", "net9.0", "net10.0", "net11.0", "net48", "netstandard2.0", "netstandard2.1"};
         var strongNameOptions = new[] {true, false};
         var symbolTypes = new[] {Symbol.Embedded, Symbol.External, Symbol.None};
         var compilationMethods = new[] {Compilation.DotNetBuild, Compilation.Roslyn};
@@ -373,6 +373,7 @@ public partial class RoundTrip
             "net8.0" => FindReferenceAssemblies("Microsoft.NETCore.App.Ref", "net8.0"),
             "net9.0" => FindReferenceAssemblies("Microsoft.NETCore.App.Ref", "net9.0"),
             "net10.0" => FindReferenceAssemblies("Microsoft.NETCore.App.Ref", "net10.0"),
+            "net11.0" => FindReferenceAssemblies("Microsoft.NETCore.App.Ref", "net11.0"),
             _ => throw new NotSupportedException($"Target framework {targetFramework} not supported")
         };
 
