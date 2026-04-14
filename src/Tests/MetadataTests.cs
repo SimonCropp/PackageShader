@@ -499,9 +499,12 @@ public class MetadataTests
             return;
         }
 
-        var bytesNeeded = 65536 - currentSize + 5000; // Add 5000 extra bytes to be sure
-        var stringSize = 90; // Each string is 90 chars + null = 91 bytes
-        var stringsNeeded = (int)(bytesNeeded / stringSize) + 100; // Add extra to be absolutely sure
+        // Add 5000 extra bytes to be sure
+        var bytesNeeded = 65536 - currentSize + 5000;
+        // Each string is 90 chars + null = 91 bytes
+        var stringSize = 90;
+        // Add extra to be absolutely sure
+        var stringsNeeded = (int)(bytesNeeded / stringSize) + 100;
 
         for (var i = 0; i < stringsNeeded; i++)
         {
@@ -551,8 +554,10 @@ public class MetadataTests
             return;
         }
 
-        var bytesNeeded = 65536 - currentSize + 1000; // Add 1000 extra bytes to be sure
-        var blobSize = 1000; // Each blob is ~1000 bytes + 2-byte header
+        // Add 1000 extra bytes to be sure
+        var bytesNeeded = 65536 - currentSize + 1000;
+        // Each blob is ~1000 bytes + 2-byte header
+        var blobSize = 1000;
         var blobsNeeded = (int)(bytesNeeded / blobSize) + 10;
 
         for (var i = 0; i < blobsNeeded; i++)
@@ -593,7 +598,8 @@ public class MetadataTests
 
         // Locate the #~ stream by reading the metadata root + stream headers
         var versionLength = BitConverter.ToInt32(bytes, 12);
-        var streamCountOffset = 16 + versionLength + 4; // version + flags(2) + streamCount(2)
+        // version + flags(2) + streamCount(2)
+        var streamCountOffset = 16 + versionLength + 4;
         var streamCount = BitConverter.ToUInt16(bytes, streamCountOffset - 2);
 
         var pos = streamCountOffset;
@@ -601,14 +607,16 @@ public class MetadataTests
         for (var i = 0; i < streamCount; i++)
         {
             var offset = BitConverter.ToUInt32(bytes, pos);
-            pos += 8; // offset(4) + size(4)
+            // offset(4) + size(4)
+            pos += 8;
             var nameStart = pos;
             while (bytes[pos] != 0)
             {
                 pos++;
             }
             var name = Encoding.ASCII.GetString(bytes, nameStart, pos - nameStart);
-            pos = (pos + 4) & ~3; // align to 4 bytes (header is null-terminated, padded)
+            // align to 4 bytes (header is null-terminated, padded)
+            pos = (pos + 4) & ~3;
             if (name is "#~" or "#-")
             {
                 tablesOffset = offset;

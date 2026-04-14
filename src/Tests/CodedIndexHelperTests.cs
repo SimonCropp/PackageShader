@@ -429,7 +429,7 @@ public class CodedIndexHelperTests
     [Fact] public void EncodeToken_ZeroRid_HasCustomDebugInformation() => Assert.Equal(0u, EncodeZeroRid(CodedIndex.HasCustomDebugInformation));
 
     static uint EncodeZeroRid(CodedIndex codedIndex) =>
-        CodedIndexHelper.EncodeToken(codedIndex, new MetadataToken(TableIndex.TypeDef, 0));
+        CodedIndexHelper.EncodeToken(codedIndex, new(TableIndex.TypeDef, 0));
 
     // -------------------------------------------------------------------------
     // DecodeToken — zero value returns zero-RID token for all coded index types

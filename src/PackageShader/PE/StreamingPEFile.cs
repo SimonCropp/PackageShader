@@ -60,7 +60,8 @@ sealed class StreamingPEFile : IDisposable
         // Optional header size is in COFF header at offset 16
         var coffHeaderOffset = headers.CoffHeaderStartOffset;
         var optionalHeaderSize = headers.CoffHeader.SizeOfOptionalHeader;
-        SectionHeadersOffset = coffHeaderOffset + 20 + optionalHeaderSize; // 20 = COFF header size
+        // 20 = COFF header size
+        SectionHeadersOffset = coffHeaderOffset + 20 + optionalHeaderSize;
 
         // Convert section headers
         Sections = new SectionInfo[headers.SectionHeaders.Length];
@@ -133,7 +134,8 @@ sealed class StreamingPEFile : IDisposable
             throw new BadImageFormatException("Invalid metadata signature");
         }
 
-        stream.Position += 8; // Major/Minor version + Reserved
+        // Major/Minor version + Reserved
+        stream.Position += 8;
 
         // Version string
         var versionLength = reader.ReadInt32();
@@ -141,7 +143,8 @@ sealed class StreamingPEFile : IDisposable
         MetadataVersionString = Encoding.ASCII.GetString(versionBytes).TrimEnd('\0');
 
         // Align to 4-byte boundary
-        stream.Position += 2; // Flags
+        // Flags
+        stream.Position += 2;
 
         var streamCount = reader.ReadUInt16();
 
@@ -234,7 +237,8 @@ sealed class StreamingPEFile : IDisposable
     /// </summary>
     public void CopyRegion(long offset, long length, Stream destination)
     {
-        const int bufferSize = 81920; // 80KB buffer
+        // 80KB buffer
+        const int bufferSize = 81920;
         var buffer = new byte[bufferSize];
 
         stream.Position = offset;

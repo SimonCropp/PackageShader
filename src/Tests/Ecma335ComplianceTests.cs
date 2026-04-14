@@ -57,7 +57,10 @@ public class Ecma335ComplianceTests
         var typeRefCount = reader.GetRowCount(TableIndex.TypeRef);
 
         if (typeRefCount == 0)
-            return; // No TypeRef rows to test
+        {
+            // No TypeRef rows to test
+            return;
+        }
 
         // Valid RIDs [1, rowCount] should work
         for (uint rid = 1; rid <= typeRefCount; rid++)
@@ -89,7 +92,10 @@ public class Ecma335ComplianceTests
 
         var customAttrCount = reader.GetRowCount(TableIndex.CustomAttribute);
         if (customAttrCount == 0)
-            return; // No custom attributes to validate
+        {
+            // No custom attributes to validate
+            return;
+        }
 
         uint? previousParent = null;
 
@@ -224,7 +230,8 @@ public class Ecma335ComplianceTests
         // Test MethodDef (should use tag 2)
         var methodDefToken = new MetadataToken(TableIndex.MethodDef, 10);
         var encoded = CodedIndexHelper.EncodeToken(CodedIndex.CustomAttributeType, methodDefToken);
-        var tag = encoded & 0b111; // 3-bit tag
+        // 3-bit tag
+        var tag = encoded & 0b111;
         Assert.Equal(2u, tag);
 
         // Test MemberRef (should use tag 3)
@@ -235,7 +242,8 @@ public class Ecma335ComplianceTests
 
         // Verify that tags 0 and 1 would fail decoding
         Assert.Throws<ArgumentException>(() =>
-            CodedIndexHelper.DecodeToken(CodedIndex.CustomAttributeType, 0b001)); // Tag 1, RID 0
+            // Tag 1, RID 0
+            CodedIndexHelper.DecodeToken(CodedIndex.CustomAttributeType, 0b001));
     }
 
     /// <summary>
@@ -256,7 +264,10 @@ public class Ecma335ComplianceTests
             var typeRefRow = reader.ReadTypeRefRow(rid);
 
             if (typeRefRow.ResolutionScopeIndex == 0)
-                continue; // Null reference is valid
+            {
+                // Null reference is valid
+                continue;
+            }
 
             // Decode the ResolutionScope coded index
             var token = CodedIndexHelper.DecodeToken(CodedIndex.ResolutionScope, typeRefRow.ResolutionScopeIndex);
@@ -310,7 +321,10 @@ public class Ecma335ComplianceTests
 
         var assemblyRowCount = reader.GetRowCount(TableIndex.Assembly);
         if (assemblyRowCount == 0)
-            return; // No assembly row (modules without manifest)
+        {
+            // No assembly row (modules without manifest)
+            return;
+        }
 
         var assemblyRow = reader.ReadAssemblyRow(1);
 
@@ -400,7 +414,9 @@ public class Ecma335ComplianceTests
 
         // ECMA-335 II.24.2.6: If bit 1 is set, indexes into #GUID heap are 4 bytes wide
         // GuidIndexSize is based on number of GUIDs (each is 16 bytes), not byte size
-        var expectedGuidIndexSize = 2; // Most assemblies use 2-byte GUID indices
+
+        // Most assemblies use 2-byte GUID indices
+        var expectedGuidIndexSize = 2;
         Assert.Equal(expectedGuidIndexSize, reader.GuidIndexSize);
 
         // ECMA-335 II.24.2.6: If bit 2 is set, indexes into #Blob heap are 4 bytes wide
@@ -474,7 +490,9 @@ public class Ecma335ComplianceTests
         // ECMA-335 II.24.2.6: MajorVersion shall be 2
         // This is validated by System.Reflection.Metadata during PEReader construction
         // If the version is incorrect, it throws BadImageFormatException
-        Assert.NotNull(reader); // Successfully opened = correct version
+
+        // Successfully opened = correct version
+        Assert.NotNull(reader);
     }
 
     /// <summary>

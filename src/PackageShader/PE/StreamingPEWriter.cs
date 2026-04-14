@@ -238,7 +238,8 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
                 // Section is after metadata section - shift VirtualAddress by the calculated amount
                 if (vaShift > 0)
                 {
-                    output.Position = headerOffset + 12; // VirtualAddress offset
+                    // VirtualAddress offset
+                    output.Position = headerOffset + 12;
                     WriteUInt32(output, section.VirtualAddress + vaShift);
                 }
 
@@ -254,7 +255,8 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
         // Update SizeOfImage in optional header (increases by VA shift)
         if (vaShift > 0)
         {
-            var sizeOfImageOffset = source.OptionalHeaderOffset + 56; // SizeOfImage at offset 56 in optional header
+            // SizeOfImage at offset 56 in optional header
+            var sizeOfImageOffset = source.OptionalHeaderOffset + 56;
             output.Position = sizeOfImageOffset;
             var oldSizeOfImage = ReadUInt32(output);
             output.Position = sizeOfImageOffset;
@@ -403,11 +405,13 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
                 var originalFirstThunk = ReadUInt32(output);
                 if (originalFirstThunk == 0)
                 {
-                    break; // Null terminator
+                    // Null terminator
+                    break;
                 }
 
                 // Read other RVAs
-                output.Position = entryOffset + 12; // Name field
+                // Name field
+                output.Position = entryOffset + 12;
                 var nameRva = ReadUInt32(output);
                 var firstThunk = ReadUInt32(output);
 
@@ -448,7 +452,8 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
             // Re-read the patched values
             output.Position = importFileOffset;
             var patchedOft = ReadUInt32(output);
-            output.Position = importFileOffset + 16; // FirstThunk field
+            // FirstThunk field
+            output.Position = importFileOffset + 16;
             var patchedFt = ReadUInt32(output);
 
             // Each entry is 4 bytes (PE32) or 8 bytes (PE64)
@@ -555,7 +560,9 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
         // Patch base relocation table entries that point to shifted addresses
         // The .reloc section contains fixup entries for addresses that need adjusting when the image is loaded
         // If those entries point to shifted data, we need to update the offsets
-        var baseRelocDirOffset = dataDirectoriesOffset + 5 * 8; // Data directory 5 is Base Relocation Table
+
+        // Data directory 5 is Base Relocation Table
+        var baseRelocDirOffset = dataDirectoriesOffset + 5 * 8;
         output.Position = baseRelocDirOffset;
         var baseRelocRva = ReadUInt32(output);
         var baseRelocSize = ReadUInt32(output);
@@ -786,7 +793,8 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
             var entry = source.IsPE64 ? ReadUInt64(output) : ReadUInt32(output);
             if (entry == 0)
             {
-                break; // Null terminator
+                // Null terminator
+                break;
             }
 
             // Check if it's an ordinal import (high bit set) - skip those
@@ -830,7 +838,8 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
         var methodDefCount = metadata.GetRowCount(TableIndex.MethodDef);
         if (methodDefCount == 0)
         {
-            return; // No methods to patch
+            // No methods to patch
+            return;
         }
 
         // Calculate where the NEW metadata starts in the output file
@@ -918,7 +927,8 @@ sealed class StreamingPEWriter(StreamingPEFile source, StreamingMetadataReader m
         var fieldRvaCount = metadata.GetRowCount(TableIndex.FieldRva);
         if (fieldRvaCount == 0)
         {
-            return; // No FieldRVA entries to patch
+            // No FieldRVA entries to patch
+            return;
         }
 
         // Calculate where the NEW metadata starts in the output file

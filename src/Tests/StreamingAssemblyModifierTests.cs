@@ -247,7 +247,7 @@ public class StreamingAssemblyModifierTests
         // 64 KB so the test isn't sensitive to small fixture changes.
         const int approxBytesPerIvt = 50;
         var bytesNeeded = 65536 - (int)sourceBlobHeapSize + 16000;
-        var ivtCount = (bytesNeeded / approxBytesPerIvt) + 100;
+        var ivtCount = bytesNeeded / approxBytesPerIvt + 100;
 
         using var tempDir = new TempDirectory();
         var outputPath = Path.Combine(tempDir, "BlobPromoted.dll");

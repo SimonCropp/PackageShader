@@ -411,7 +411,8 @@ public partial class RoundTrip
             // (e.g., System.EnterpriseServices.Wrapper.dll in net48)
             // Try to read the metadata to verify it's actually valid
             var reader = peReader.GetMetadataReader();
-            _ = reader.GetAssemblyDefinition(); // This will throw if metadata is invalid
+            // This will throw if metadata is invalid
+            _ = reader.GetAssemblyDefinition();
 
             return true;
         }
@@ -667,7 +668,8 @@ public partial class RoundTrip
 
         // Clean up output
         output = AllClassesAndMethodsRegex().Replace(output, "");
-        output = OffsetInfoRegex().Replace(output, ""); // Remove offset info for comparison
+        // Remove offset info for comparison
+        output = OffsetInfoRegex().Replace(output, "");
         output = output.Trim();
 
         if (string.IsNullOrEmpty(output))

@@ -367,7 +367,8 @@ public class ModificationTests
         var initialSize = plan.FinalStringHeapSize;
 
         // Test with multi-byte UTF-8 characters
-        plan.GetOrAddString("Hello世界"); // "世界" is 6 bytes in UTF-8
+        // "世界" is 6 bytes in UTF-8
+        plan.GetOrAddString("Hello世界");
 
         // "Hello" = 5 bytes, "世界" = 6 bytes, null terminator = 1 byte
         Assert.Equal(initialSize + 12u, plan.FinalStringHeapSize);
@@ -387,19 +388,22 @@ public class ModificationTests
         // Test 1-byte length header (< 0x80)
         var blob1 = new byte[50];
         plan.GetOrAddBlob(blob1);
-        Assert.Equal(initialSize + 51u, plan.FinalBlobHeapSize); // 50 + 1 byte header
+        // 50 + 1 byte header
+        Assert.Equal(initialSize + 51u, plan.FinalBlobHeapSize);
 
         // Test 2-byte length header (>= 0x80, < 0x4000)
         var sizeAfterBlob1 = plan.FinalBlobHeapSize;
         var blob2 = new byte[200];
         plan.GetOrAddBlob(blob2);
-        Assert.Equal(sizeAfterBlob1 + 202u, plan.FinalBlobHeapSize); // 200 + 2 byte header
+        // 200 + 2 byte header
+        Assert.Equal(sizeAfterBlob1 + 202u, plan.FinalBlobHeapSize);
 
         // Test 4-byte length header (>= 0x4000)
         var sizeAfterBlob2 = plan.FinalBlobHeapSize;
         var blob3 = new byte[20000];
         plan.GetOrAddBlob(blob3);
-        Assert.Equal(sizeAfterBlob2 + 20004u, plan.FinalBlobHeapSize); // 20000 + 4 byte header
+        // 20000 + 4 byte header
+        Assert.Equal(sizeAfterBlob2 + 20004u, plan.FinalBlobHeapSize);
     }
 
     [Fact]
@@ -420,7 +424,9 @@ public class ModificationTests
         var sizeAfterSecond = plan.FinalStringHeapSize;
 
         // Size should only grow once
-        Assert.Equal(initialSize + 16u, sizeAfterFirst); // 15 bytes + null
+
+        // 15 bytes + null
+        Assert.Equal(initialSize + 16u, sizeAfterFirst);
         Assert.Equal(sizeAfterFirst, sizeAfterSecond);
     }
 
@@ -439,7 +445,8 @@ public class ModificationTests
         var largeString = new string('X', 10000);
         plan.GetOrAddString(largeString);
 
-        Assert.Equal(initialSize + 10001u, plan.FinalStringHeapSize); // 10000 + null
+        // 10000 + null
+        Assert.Equal(initialSize + 10001u, plan.FinalStringHeapSize);
     }
 
     [Fact]
@@ -468,7 +475,8 @@ public class ModificationTests
         var plan = new ModificationPlan(reader);
 
         var initialSize = plan.FinalBlobHeapSize;
-        var publicKey = new byte[160]; // Typical RSA public key
+        // Typical RSA public key
+        var publicKey = new byte[160];
         plan.SetAssemblyPublicKey(publicKey);
 
         // 160 bytes + 2 byte length header = 162 bytes
