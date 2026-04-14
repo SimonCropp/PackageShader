@@ -4,7 +4,8 @@
 /// </summary>
 static class StreamingStrongNameSigner
 {
-    const int BufferSize = 81920; // 80KB buffer
+    // 80KB buffer
+    const int BufferSize = 81920;
     const int ChecksumOffsetInOptionalHeader = 64;
 
     /// <summary>

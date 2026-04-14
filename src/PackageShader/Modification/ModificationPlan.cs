@@ -149,7 +149,8 @@ sealed class ModificationPlan(StreamingMetadataReader metadata)
         // This is a valid trade-off: correctness vs optimization.
 
         var index = nextStringIndex;
-        nextStringIndex += (uint) Encoding.UTF8.GetByteCount(value) + 1; // +1 for null terminator
+        // +1 for null terminator
+        nextStringIndex += (uint) Encoding.UTF8.GetByteCount(value) + 1;
 
         newStrings[value] = index;
         hasNewStrings = true;
@@ -278,7 +279,8 @@ sealed class ModificationPlan(StreamingMetadataReader metadata)
         // Add new blob heap data
         foreach (var (data, _) in newBlobs)
         {
-            size += data.Length + 4; // max header size
+            // max header size
+            size += data.Length + 4;
         }
 
         // Add new table rows

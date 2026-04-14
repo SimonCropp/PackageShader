@@ -615,15 +615,18 @@ public class ShaderTests
             var getPrimeMethod = type.GetMethod("GetPrime");
             Assert.NotNull(getPrimeMethod);
             var prime0 = (int)getPrimeMethod.Invoke(null, [0])!;
-            Assert.Equal(3, prime0); // First prime in the array
+            // First prime in the array
+            Assert.Equal(3, prime0);
             var prime5 = (int)getPrimeMethod.Invoke(null, [5])!;
-            Assert.Equal(29, prime5); // 6th prime in the array
+            // 6th prime in the array
+            Assert.Equal(29, prime5);
 
             // Test SumInts - accesses ReadOnlySpan<int> backed by FieldRVA data
             var sumIntsMethod = type.GetMethod("SumInts");
             Assert.NotNull(sumIntsMethod);
             var sum = (int)sumIntsMethod.Invoke(null, null)!;
-            Assert.Equal(1500, sum); // 100 + 200 + 300 + 400 + 500
+            // 100 + 200 + 300 + 400 + 500
+            Assert.Equal(1500, sum);
         }
         finally
         {

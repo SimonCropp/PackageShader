@@ -90,7 +90,8 @@
     {
         if (value == 0)
         {
-            return new(TableIndex.Module, 0); // Null reference
+            // Null reference
+            return new(TableIndex.Module, 0);
         }
 
         var (bits, tables) = GetCodedIndexInfo(codedIndex);
@@ -99,7 +100,8 @@
         var rid = value >> bits;
 
         // ECMA-335 II.24.2.6: Tag must be valid for this coded index type
-        if (tag >= tables.Length || (byte)tables[tag] == 0xFF)
+        if (tag >= tables.Length ||
+            (byte)tables[tag] == 0xFF)
         {
             throw new ArgumentException($"Invalid tag {tag} for coded index {codedIndex}");
         }

@@ -55,10 +55,14 @@ public class TableRowSerializationTests
 
         ms.Position = 0;
         using var reader = new BinaryReader(ms);
-        Assert.Equal(1, reader.ReadUInt16()); // MajorVersion
-        Assert.Equal(2, reader.ReadUInt16()); // MinorVersion
-        Assert.Equal(3, reader.ReadUInt16()); // BuildNumber
-        Assert.Equal(4, reader.ReadUInt16()); // RevisionNumber
+        // MajorVersion
+        Assert.Equal(1, reader.ReadUInt16());
+        // MinorVersion
+        Assert.Equal(2, reader.ReadUInt16());
+        // BuildNumber
+        Assert.Equal(3, reader.ReadUInt16());
+        // RevisionNumber
+        Assert.Equal(4, reader.ReadUInt16());
     }
 
     [Fact]
@@ -80,15 +84,24 @@ public class TableRowSerializationTests
 
         ms.Position = 0;
         using var reader = new BinaryReader(ms);
-        reader.ReadUInt16(); // MajorVersion
-        reader.ReadUInt16(); // MinorVersion
-        reader.ReadUInt16(); // BuildNumber
-        reader.ReadUInt16(); // RevisionNumber
-        reader.ReadUInt32(); // Flags
-        Assert.Equal(50, reader.ReadUInt16());  // PublicKeyOrTokenIndex (blob)
-        Assert.Equal(100, reader.ReadUInt16()); // NameIndex (string)
-        Assert.Equal(0, reader.ReadUInt16());   // CultureIndex (string)
-        Assert.Equal(0, reader.ReadUInt16());   // HashValueIndex (blob)
+        // MajorVersion
+        reader.ReadUInt16();
+        // MinorVersion
+        reader.ReadUInt16();
+        // BuildNumber
+        reader.ReadUInt16();
+        // RevisionNumber
+        reader.ReadUInt16();
+        // Flags
+        reader.ReadUInt32();
+        // PublicKeyOrTokenIndex (blob)
+        Assert.Equal(50, reader.ReadUInt16());
+        // NameIndex (string)
+        Assert.Equal(100, reader.ReadUInt16());
+        // CultureIndex (string)
+        Assert.Equal(0, reader.ReadUInt16());
+        // HashValueIndex (blob)
+        Assert.Equal(0, reader.ReadUInt16());
     }
 
     [Fact]
@@ -96,7 +109,10 @@ public class TableRowSerializationTests
     {
         var row = new AssemblyRefRow
         {
-            MajorVersion = 2, MinorVersion = 0, BuildNumber = 0, RevisionNumber = 0,
+            MajorVersion = 2,
+            MinorVersion = 0,
+            BuildNumber = 0,
+            RevisionNumber = 0,
             Flags = 0,
             PublicKeyOrTokenIndex = 70000,
             NameIndex = 80000,
@@ -110,21 +126,35 @@ public class TableRowSerializationTests
 
         ms.Position = 0;
         using var reader = new BinaryReader(ms);
-        reader.ReadUInt16(); // MajorVersion
-        reader.ReadUInt16(); // MinorVersion
-        reader.ReadUInt16(); // BuildNumber
-        reader.ReadUInt16(); // RevisionNumber
-        reader.ReadUInt32(); // Flags
-        Assert.Equal(70000u, reader.ReadUInt32()); // PublicKeyOrTokenIndex
-        Assert.Equal(80000u, reader.ReadUInt32()); // NameIndex
-        Assert.Equal(0u, reader.ReadUInt32());      // CultureIndex
-        Assert.Equal(0u, reader.ReadUInt32());      // HashValueIndex
+        // MajorVersion
+        reader.ReadUInt16();
+        // MinorVersion
+        reader.ReadUInt16();
+        // BuildNumber
+        reader.ReadUInt16();
+        // RevisionNumber
+        reader.ReadUInt16();
+        // Flags
+        reader.ReadUInt32();
+
+        // PublicKeyOrTokenIndex
+        Assert.Equal(70000u, reader.ReadUInt32());
+        // NameIndex
+        Assert.Equal(80000u, reader.ReadUInt32());
+        // CultureIndex
+        Assert.Equal(0u, reader.ReadUInt32());
+        // HashValueIndex
+        Assert.Equal(0u, reader.ReadUInt32());
     }
 
     [Fact]
     public void AssemblyRefRow_Write_FlagsPreserved()
     {
-        var row = new AssemblyRefRow { Flags = 0x0001, MajorVersion = 0 };
+        var row = new AssemblyRefRow
+        {
+            Flags = 0x0001,
+            MajorVersion = 0
+        };
         using var ms = new MemoryStream();
         using var writer = new BinaryWriter(ms);
         row.Write(writer, blobIndexSize: 2, stringIndexSize: 2);
@@ -141,7 +171,12 @@ public class TableRowSerializationTests
     [Fact]
     public void TypeRefRow_Write_2ByteIndices_CorrectSize()
     {
-        var row = new TypeRefRow { ResolutionScopeIndex = 5, NameIndex = 10, NamespaceIndex = 0 };
+        var row = new TypeRefRow
+        {
+            ResolutionScopeIndex = 5,
+            NameIndex = 10,
+            NamespaceIndex = 0
+        };
         using var ms = new MemoryStream();
         using var writer = new BinaryWriter(ms);
 

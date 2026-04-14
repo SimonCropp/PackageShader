@@ -218,4 +218,95 @@ public class StreamingAssemblyModifierTests
         var reader = peReader.GetMetadataReader();
         Assert.True(reader.IsAssembly);
     }
+
+    /// <summary>
+    /// Minimal repro for the heap-promotion bug fixed by the column-schema rewriter in
+    /// StreamingMetadataWriter. Takes a small fixture assembly and adds enough
+    /// InternalsVisibleTo entries to push the blob heap over 64 KB. That promotes blob
+    /// indices from 2 to 4 bytes, which forces every blob-bearing table to be re-emitted
+    /// at the wider width. Asserts the produced PE round-trips through PEReader and the
+    /// underlying StreamingMetadataReader reports the wider blob index size.
+    /// </summary>
+    [Fact]
+    public void RoundTrip_BlobHeapPromotion()
+    {
+        var assemblyPath = Path.Combine(binDirectory, "DummyAssembly.dll");
+
+        // Sanity check: source assembly is small enough that its blob heap uses 2-byte indices.
+        // If the fixture ever grows past 64 KB on its own this test should be re-tuned.
+        uint sourceBlobHeapSize;
+        using (var sourcePeFile = StreamingPEFile.Open(assemblyPath))
+        using (var sourceReader = new StreamingMetadataReader(sourcePeFile))
+        {
+            Assert.Equal(2, sourceReader.BlobIndexSize);
+            sourceBlobHeapSize = sourceReader.BlobHeapSize;
+        }
+
+        // Each AddInternalsVisibleTo("FriendAssembly_<i>...") creates a custom-attribute blob
+        // of roughly 55 bytes (prolog + serialized name + named-arg count). Aim well past
+        // 64 KB so the test isn't sensitive to small fixture changes.
+        const int approxBytesPerIvt = 50;
+        var bytesNeeded = 65536 - (int)sourceBlobHeapSize + 16000;
+        var ivtCount = bytesNeeded / approxBytesPerIvt + 100;
+
+        using var tempDir = new TempDirectory();
+        var outputPath = Path.Combine(tempDir, "BlobPromoted.dll");
+
+        using (var modifier = StreamingAssemblyModifier.Open(assemblyPath))
+        {
+            for (var i = 0; i < ivtCount; i++)
+            {
+                // Names must be unique so each one allocates a distinct blob.
+                modifier.AddInternalsVisibleTo($"FriendAssembly_{i:D6}_LongPaddingToInflateBlobHeap");
+            }
+
+            modifier.SetAssemblyName("BlobPromoted");
+            modifier.Save(outputPath);
+        }
+
+        // The produced PE must load cleanly and surface the rename + IVT entries.
+        using (var fs = File.OpenRead(outputPath))
+        using (var peReader = new PEReader(fs))
+        {
+            Assert.True(peReader.HasMetadata);
+
+            var reader = peReader.GetMetadataReader();
+            Assert.True(reader.IsAssembly);
+            Assert.Equal("BlobPromoted", reader.GetString(reader.GetAssemblyDefinition().Name));
+
+            var ivtFound = 0;
+            foreach (var attrHandle in reader.GetCustomAttributes(EntityHandle.AssemblyDefinition))
+            {
+                var attr = reader.GetCustomAttribute(attrHandle);
+                if (attr.Constructor.Kind != HandleKind.MemberReference)
+                {
+                    continue;
+                }
+
+                var memberRef = reader.GetMemberReference((MemberReferenceHandle)attr.Constructor);
+                if (memberRef.Parent.Kind != HandleKind.TypeReference)
+                {
+                    continue;
+                }
+
+                var typeRef = reader.GetTypeReference((TypeReferenceHandle)memberRef.Parent);
+                if (reader.GetString(typeRef.Name) == "InternalsVisibleToAttribute")
+                {
+                    ivtFound++;
+                }
+            }
+
+            Assert.Equal(ivtCount, ivtFound);
+
+            // All original type defs should have survived (minus the <Module> sentinel).
+            Assert.True(reader.TypeDefinitions.Count > 1);
+        }
+
+        // Re-open via our own metadata reader to confirm the heap-sizes byte was promoted.
+        using var promotedPeFile = StreamingPEFile.Open(outputPath);
+        using var promotedReader = new StreamingMetadataReader(promotedPeFile);
+        Assert.True(promotedReader.BlobHeapSize >= 0x10000,
+            $"expected blob heap >= 64 KB after promotion, got {promotedReader.BlobHeapSize}");
+        Assert.Equal(4, promotedReader.BlobIndexSize);
+    }
 }

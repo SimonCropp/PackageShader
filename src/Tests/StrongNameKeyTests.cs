@@ -101,7 +101,8 @@ public class StrongNameKeyTests
     {
         // Create a blob with invalid type byte (not 0x06 or 0x07)
         var blob = new byte[20];
-        blob[0] = 0x99; // Invalid blob type
+        // Invalid blob type
+        blob[0] = 0x99;
 
         Assert.Throws<CryptographicException>(() => StrongNameKey.FromBlob(blob));
     }

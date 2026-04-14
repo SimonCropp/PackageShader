@@ -151,10 +151,14 @@ public class StreamingPEFileTests
         var data = peFile.ReadBytesAt(peFile.MetadataFileOffset, 4);
 
         Assert.Equal(4, data.Length);
-        Assert.Equal(0x42, data[0]); // 'B'
-        Assert.Equal(0x53, data[1]); // 'S'
-        Assert.Equal(0x4A, data[2]); // 'J'
-        Assert.Equal(0x42, data[3]); // 'B'
+        // 'B'
+        Assert.Equal(0x42, data[0]);
+        // 'S'
+        Assert.Equal(0x53, data[1]);
+        // 'J'
+        Assert.Equal(0x4A, data[2]);
+        // 'B'
+        Assert.Equal(0x42, data[3]);
     }
 
     [Fact]
@@ -236,6 +240,7 @@ public class StreamingPEFileTests
 
         var peFile = StreamingPEFile.Open(assemblyPath);
         peFile.Dispose();
-        peFile.Dispose(); // Should not throw
+        // Should not throw
+        peFile.Dispose();
     }
 }

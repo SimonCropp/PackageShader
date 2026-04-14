@@ -22,7 +22,7 @@ public class ShaderReachabilityTests
         var sourceName = ReadAssemblyName(sourcePath);
         var targetName = sourceName + suffix;
         var targetPath = Path.Combine(tempDir, targetName + ".dll");
-        return new SourceTargetInfo(sourceName, sourcePath, targetName, targetPath, isShaded, isRoot);
+        return new(sourceName, sourcePath, targetName, targetPath, isShaded, isRoot);
     }
 
     // -------------------------------------------------------------------------

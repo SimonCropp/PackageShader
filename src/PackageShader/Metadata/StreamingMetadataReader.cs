@@ -86,7 +86,8 @@ sealed class StreamingMetadataReader : IDisposable
         }
 
         var header = peFile.ReadBytesAt(tableHeapOffset, 24);
-        var position = 6; // Skip reserved (4), MajorVersion (1), MinorVersion (1)
+        // Skip reserved (4), MajorVersion (1), MinorVersion (1)
+        var position = 6;
 
         // HeapSizes
         var heapSizes = header[position++];
@@ -94,7 +95,8 @@ sealed class StreamingMetadataReader : IDisposable
         GuidIndexSize = (heapSizes & 0x02) != 0 ? 4 : 2;
         BlobIndexSize = (heapSizes & 0x04) != 0 ? 4 : 2;
 
-        position++; // Skip reserved
+        // Skip reserved
+        position++;
 
         // Valid bitmask (8 bytes)
         Valid = BitConverter.ToInt64(header, position);
