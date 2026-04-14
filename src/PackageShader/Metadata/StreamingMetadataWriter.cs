@@ -301,19 +301,113 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
                 break;
 
             default:
-                // ECMA-335 II.24.2.6: When heap index sizes change, table rows must be rewritten.
-                // We cannot copy table data byte-for-byte because row sizes have changed.
+                // ECMA-335 II.24.2.6: When heap index sizes change, table rows must be rewritten
+                // because row widths have changed. Otherwise we can copy bytes verbatim.
                 if (IndexSizesChanged)
                 {
-                    throw new NotSupportedException(
-                        $"Table {table} needs rewriting due to heap index size changes " +
-                        $"(String: {source.StringIndexSize} -> {stringIndexSize} bytes, " +
-                        $"Blob: {source.BlobIndexSize} -> {blobIndexSize} bytes). " +
-                        $"This table type is not yet implemented for index size changes.");
+                    RewriteTableData(writer, table, rowCount);
                 }
-                // Copy unchanged table data (only safe when index sizes haven't changed)
-                source.CopyTableData(table, writer.BaseStream);
+                else
+                {
+                    source.CopyTableData(table, writer.BaseStream);
+                }
                 break;
+        }
+    }
+
+    /// <summary>
+    /// Re-emits a table's existing rows column-by-column, reading each cell at the source's
+    /// heap index width and writing it at the target's. Required when string/blob heap promotion
+    /// (2 → 4 bytes) widens row layouts so byte-for-byte copy is no longer valid.
+    /// Coded and table indices are not changed by shading, so they round-trip at source widths.
+    /// </summary>
+    void RewriteTableData(BinaryWriter writer, TableIndex table, int rowCount)
+    {
+        if (rowCount == 0)
+        {
+            return;
+        }
+
+        var columns = TableSchema.GetColumns(table);
+        if (columns.Length == 0)
+        {
+            // No schema known. The table has no heap indices in any standard layout, so the
+            // bytes are width-stable and a verbatim copy stays correct after promotion.
+            source.CopyTableData(table, writer.BaseStream);
+            return;
+        }
+
+        for (uint rid = 1; rid <= rowCount; rid++)
+        {
+            var rowBytes = source.ReadRow(table, rid);
+            var pos = 0;
+            foreach (var col in columns)
+            {
+                var srcSize = SourceColumnSize(col);
+                var value = ReadColumn(rowBytes, pos, srcSize);
+                pos += srcSize;
+                WriteColumn(writer, col, value);
+            }
+        }
+    }
+
+    int SourceColumnSize(ColumnSpec col) =>
+        col.Kind switch
+        {
+            ColumnKind.UInt16 => 2,
+            ColumnKind.UInt32 => 4,
+            ColumnKind.StringIdx => source.StringIndexSize,
+            ColumnKind.BlobIdx => source.BlobIndexSize,
+            ColumnKind.GuidIdx => source.GuidIndexSize,
+            ColumnKind.TableIdx => source.GetTableIndexSize((TableIndex)col.Param),
+            ColumnKind.CodedIdx => source.GetCodedIndexSize((CodedIndex)col.Param),
+            _ => 0
+        };
+
+    static uint ReadColumn(byte[] rowBytes, int offset, int size) =>
+        size == 2
+            ? BitConverter.ToUInt16(rowBytes, offset)
+            : BitConverter.ToUInt32(rowBytes, offset);
+
+    void WriteColumn(BinaryWriter writer, ColumnSpec col, uint value)
+    {
+        switch (col.Kind)
+        {
+            case ColumnKind.UInt16:
+                writer.Write((ushort)value);
+                break;
+            case ColumnKind.UInt32:
+                writer.Write(value);
+                break;
+            case ColumnKind.StringIdx:
+                WriteIndex(writer, value, stringIndexSize);
+                break;
+            case ColumnKind.BlobIdx:
+                WriteIndex(writer, value, blobIndexSize);
+                break;
+            case ColumnKind.GuidIdx:
+                WriteIndex(writer, value, guidIndexSize);
+                break;
+            case ColumnKind.TableIdx:
+                // Shading doesn't change row counts enough to flip table-index widths, so
+                // pass through at source width.
+                WriteIndex(writer, value, source.GetTableIndexSize((TableIndex)col.Param));
+                break;
+            case ColumnKind.CodedIdx:
+                WriteIndex(writer, value, source.GetCodedIndexSize((CodedIndex)col.Param));
+                break;
+        }
+    }
+
+    static void WriteIndex(BinaryWriter writer, uint value, int size)
+    {
+        if (size == 2)
+        {
+            writer.Write((ushort)value);
+        }
+        else
+        {
+            writer.Write(value);
         }
     }
 

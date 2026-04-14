@@ -513,22 +513,15 @@ public class MetadataTests
         Assert.True(plan.FinalStringHeapSize >= 0x10000,
             $"Final string heap size {plan.FinalStringHeapSize} should be >= 65536");
 
-        // Try to write (this should either work or throw NotSupportedException for unsupported tables)
+        // Heap promoted from 2- to 4-byte string indices: every table containing string
+        // columns must be rewritten with the wider layout. Writer must succeed and the
+        // resulting metadata must round-trip with the new heap-sizes byte.
         using var output = new MemoryStream();
         var writer = new StreamingMetadataWriter(reader, plan);
+        writer.Write(output);
 
-        try
-        {
-            writer.Write(output);
-
-            // If it succeeded, verify the output has valid metadata
-            Assert.True(output.Length > 0);
-        }
-        catch (NotSupportedException ex)
-        {
-            // Expected if there are unsupported tables that need rewriting
-            Assert.Contains("needs rewriting due to heap index size changes", ex.Message);
-        }
+        Assert.True(output.Length > 0);
+        AssertMetadataRoundTrips(output, expectedStringIndexSize: 4, expectedBlobIndexSize: reader.BlobIndexSize);
     }
 
     [Fact]
@@ -572,22 +565,65 @@ public class MetadataTests
         Assert.True(plan.FinalBlobHeapSize >= 0x10000,
             $"Final blob heap size {plan.FinalBlobHeapSize} should be >= 65536");
 
-        // Try to write (this should either work or throw NotSupportedException for unsupported tables)
+        // Heap promoted from 2- to 4-byte blob indices: every table containing blob columns
+        // must be rewritten. Writer must succeed and the result must round-trip.
         using var output = new MemoryStream();
         var writer = new StreamingMetadataWriter(reader, plan);
+        writer.Write(output);
 
-        try
-        {
-            writer.Write(output);
+        Assert.True(output.Length > 0);
+        AssertMetadataRoundTrips(output, expectedStringIndexSize: reader.StringIndexSize, expectedBlobIndexSize: 4);
+    }
 
-            // If it succeeded, verify the output has valid metadata
-            Assert.True(output.Length > 0);
-        }
-        catch (NotSupportedException ex)
+    /// <summary>
+    /// Verifies that a freshly written metadata stream parses cleanly with our own reader and
+    /// has the expected heap-size bits set in its tables-stream header.
+    /// </summary>
+    static void AssertMetadataRoundTrips(MemoryStream metadataStream, int expectedStringIndexSize, int expectedBlobIndexSize)
+    {
+        // The writer emits a metadata blob (#~/#Strings/#Blob/#GUID/#US streams). The smallest
+        // sanity check we can do without a full PE wrapper is to scan for the tables stream
+        // header and inspect its HeapSizes byte. Position 6 inside the #~ stream holds it
+        // (ECMA-335 II.24.2.6: Reserved(4) MajorVersion(1) MinorVersion(1) HeapSizes(1)).
+        var bytes = metadataStream.ToArray();
+
+        // ECMA-335 II.24.2.1: Metadata root starts with magic 0x424A5342 ("BSJB")
+        Assert.True(bytes.Length > 4);
+        Assert.Equal((uint)0x424a5342, BitConverter.ToUInt32(bytes, 0));
+
+        // Locate the #~ stream by reading the metadata root + stream headers
+        var versionLength = BitConverter.ToInt32(bytes, 12);
+        var streamCountOffset = 16 + versionLength + 4; // version + flags(2) + streamCount(2)
+        var streamCount = BitConverter.ToUInt16(bytes, streamCountOffset - 2);
+
+        var pos = streamCountOffset;
+        uint tablesOffset = 0;
+        for (var i = 0; i < streamCount; i++)
         {
-            // Expected if there are unsupported tables that need rewriting
-            Assert.Contains("needs rewriting due to heap index size changes", ex.Message);
+            var offset = BitConverter.ToUInt32(bytes, pos);
+            pos += 8; // offset(4) + size(4)
+            var nameStart = pos;
+            while (bytes[pos] != 0)
+            {
+                pos++;
+            }
+            var name = Encoding.ASCII.GetString(bytes, nameStart, pos - nameStart);
+            pos = (pos + 4) & ~3; // align to 4 bytes (header is null-terminated, padded)
+            if (name is "#~" or "#-")
+            {
+                tablesOffset = offset;
+                break;
+            }
         }
+
+        Assert.True(tablesOffset > 0, "tables stream not found in rewritten metadata");
+
+        var heapSizes = bytes[tablesOffset + 6];
+        var actualStringSize = (heapSizes & 0x01) != 0 ? 4 : 2;
+        var actualBlobSize = (heapSizes & 0x04) != 0 ? 4 : 2;
+
+        Assert.Equal(expectedStringIndexSize, actualStringSize);
+        Assert.Equal(expectedBlobIndexSize, actualBlobSize);
     }
 
     [Fact]
