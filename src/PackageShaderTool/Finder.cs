@@ -27,12 +27,13 @@ public static class Finder
         {
             var name = Path.GetFileNameWithoutExtension(file);
             var fileDirectory = Path.GetDirectoryName(file)!;
+            // targetName/targetPath depend only on `name`, so compute once per file
+            // rather than once per pattern.
+            var targetName = getTargetName(name);
+            var targetPath = Path.Combine(fileDirectory, $"{targetName}.dll");
             var isShaded = false;
             foreach (var assemblyToShade in assemblyNamesToShade)
             {
-                var targetName = getTargetName(name);
-                var targetPath = Path.Combine(fileDirectory, $"{targetName}.dll");
-
                 if (assemblyToShade.EndsWith('*'))
                 {
                     var match = assemblyToShade.TrimEnd('*');
