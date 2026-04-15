@@ -1,3 +1,5 @@
+using System.Buffers;
+
 /// <summary>
 /// Signs assemblies with a strong name using streaming to avoid loading the entire file into memory.
 /// Uses System.Reflection.PortableExecutable for header parsing.
@@ -92,71 +94,77 @@ static class StreamingStrongNameSigner
     internal static byte[] ComputeStrongNameHashStreaming(FileStream stream, int checksumOffset, long signatureOffset, int signatureSize)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA1);
-        var buffer = new byte[BufferSize];
-
-        stream.Position = 0;
-        long position = 0;
-        var fileLength = stream.Length;
-
-        // Define regions to skip (checksum and signature)
-        var skipRegions = new[]
+        var buffer = ArrayPool<byte>.Shared.Rent(BufferSize);
+        try
         {
-            (start: checksumOffset, end: checksumOffset + 4),
-            (start: signatureOffset, end: signatureOffset + signatureSize)
-        };
+            stream.Position = 0;
+            long position = 0;
+            var fileLength = stream.Length;
 
-        // Sort by start position
-        Array.Sort(skipRegions, (a, b) => a.start.CompareTo(b.start));
-
-        var skipIndex = 0;
-
-        while (position < fileLength)
-        {
-            // Find next skip region
-            var nextSkipStart = skipIndex < skipRegions.Length ? skipRegions[skipIndex].start : long.MaxValue;
-            var nextSkipEnd = skipIndex < skipRegions.Length ? skipRegions[skipIndex].end : long.MaxValue;
-
-            if (position >= nextSkipStart && position < nextSkipEnd)
+            // Define regions to skip (checksum and signature)
+            var skipRegions = new[]
             {
-                // We're in a skip region, move past it
-                position = nextSkipEnd;
-                stream.Position = position;
-                skipIndex++;
-                continue;
-            }
+                (start: checksumOffset, end: checksumOffset + 4),
+                (start: signatureOffset, end: signatureOffset + signatureSize)
+            };
 
-            // Calculate how much to read (stop at next skip region or EOF)
-            var bytesToRead = Math.Min(BufferSize, fileLength - position);
-            if (nextSkipStart < long.MaxValue &&
-                position + bytesToRead > nextSkipStart)
-            {
-                bytesToRead = nextSkipStart - position;
-            }
+            // Sort by start position
+            Array.Sort(skipRegions, (a, b) => a.start.CompareTo(b.start));
 
-            if (bytesToRead <= 0)
+            var skipIndex = 0;
+
+            while (position < fileLength)
             {
-                if (skipIndex < skipRegions.Length)
+                // Find next skip region
+                var nextSkipStart = skipIndex < skipRegions.Length ? skipRegions[skipIndex].start : long.MaxValue;
+                var nextSkipEnd = skipIndex < skipRegions.Length ? skipRegions[skipIndex].end : long.MaxValue;
+
+                if (position >= nextSkipStart && position < nextSkipEnd)
                 {
-                    position = skipRegions[skipIndex].end;
+                    // We're in a skip region, move past it
+                    position = nextSkipEnd;
                     stream.Position = position;
                     skipIndex++;
                     continue;
                 }
 
-                break;
+                // Calculate how much to read (stop at next skip region or EOF)
+                var bytesToRead = Math.Min(BufferSize, fileLength - position);
+                if (nextSkipStart < long.MaxValue &&
+                    position + bytesToRead > nextSkipStart)
+                {
+                    bytesToRead = nextSkipStart - position;
+                }
+
+                if (bytesToRead <= 0)
+                {
+                    if (skipIndex < skipRegions.Length)
+                    {
+                        position = skipRegions[skipIndex].end;
+                        stream.Position = position;
+                        skipIndex++;
+                        continue;
+                    }
+
+                    break;
+                }
+
+                // Read and hash
+                var read = stream.Read(buffer, 0, (int) bytesToRead);
+                if (read == 0)
+                {
+                    break;
+                }
+
+                hash.AppendData(buffer, 0, read);
+                position += read;
             }
 
-            // Read and hash
-            var read = stream.Read(buffer, 0, (int) bytesToRead);
-            if (read == 0)
-            {
-                break;
-            }
-
-            hash.AppendData(buffer, 0, read);
-            position += read;
+            return hash.GetHashAndReset();
         }
-
-        return hash.GetHashAndReset();
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
 }
