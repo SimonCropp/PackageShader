@@ -75,7 +75,7 @@ static class StreamingStrongNameSigner
         return true;
     }
 
-    static long ResolveRvaToFileOffset(PEHeaders headers, int rva)
+    internal static long ResolveRvaToFileOffset(PEHeaders headers, int rva)
     {
         foreach (var section in headers.SectionHeaders)
         {
@@ -89,7 +89,7 @@ static class StreamingStrongNameSigner
         return 0;
     }
 
-    static byte[] ComputeStrongNameHashStreaming(FileStream stream, int checksumOffset, long signatureOffset, int signatureSize)
+    internal static byte[] ComputeStrongNameHashStreaming(FileStream stream, int checksumOffset, long signatureOffset, int signatureSize)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA1);
         var buffer = new byte[BufferSize];

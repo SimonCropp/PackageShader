@@ -680,4 +680,235 @@ public class MetadataTests
     }
 
     #endregion
+
+    #region StreamingMetadataWriter Helper Tests
+
+    [Fact]
+    public void WriteCompressedLength_Zero_WritesSingleZeroByte()
+    {
+        var bytes = WriteCompressed(0);
+
+        Assert.Equal([0x00], bytes);
+    }
+
+    [Fact]
+    public void WriteCompressedLength_Below0x80_WritesSingleByte()
+    {
+        var bytes = WriteCompressed(0x42);
+
+        Assert.Equal([0x42], bytes);
+    }
+
+    [Fact]
+    public void WriteCompressedLength_At0x7F_WritesSingleByte()
+    {
+        var bytes = WriteCompressed(0x7F);
+
+        Assert.Equal([0x7F], bytes);
+    }
+
+    [Fact]
+    public void WriteCompressedLength_At0x80_WritesTwoBytes()
+    {
+        // 0x80 → first byte is 0x80 (0x80 | 0x00), second byte is 0x80
+        var bytes = WriteCompressed(0x80);
+
+        Assert.Equal([0x80, 0x80], bytes);
+    }
+
+    [Fact]
+    public void WriteCompressedLength_At0x3FFF_WritesTwoBytes()
+    {
+        // 0x3FFF → first byte is 0xBF (0x80 | 0x3F), second byte is 0xFF
+        var bytes = WriteCompressed(0x3FFF);
+
+        Assert.Equal([0xBF, 0xFF], bytes);
+    }
+
+    [Fact]
+    public void WriteCompressedLength_At0x4000_WritesFourBytes()
+    {
+        // 0x4000 → four-byte encoding with 0xC0 prefix
+        var bytes = WriteCompressed(0x4000);
+
+        Assert.Equal([0xC0, 0x00, 0x40, 0x00], bytes);
+    }
+
+    [Fact]
+    public void WriteCompressedLength_LargeValue_WritesFourBytes()
+    {
+        // 0x1FFFFFFF → encoded with leading 0xDF (0xC0 | 0x1F)
+        var bytes = WriteCompressed(0x1FFFFFFF);
+
+        Assert.Equal([0xDF, 0xFF, 0xFF, 0xFF], bytes);
+    }
+
+    [Fact]
+    public void AlignTo4_AtZero_WritesNothing()
+    {
+        var stream = new MemoryStream();
+        using (var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
+        {
+            StreamingMetadataWriter.AlignTo4(writer);
+        }
+
+        Assert.Equal(0, stream.Length);
+    }
+
+    [Fact]
+    public void AlignTo4_AtOne_WritesThreeZeros()
+    {
+        var stream = new MemoryStream();
+        using (var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
+        {
+            writer.Write((byte)0xAB);
+            StreamingMetadataWriter.AlignTo4(writer);
+        }
+
+        Assert.Equal([0xAB, 0x00, 0x00, 0x00], stream.ToArray());
+    }
+
+    [Fact]
+    public void AlignTo4_AtThree_WritesOneZero()
+    {
+        var stream = new MemoryStream();
+        using (var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
+        {
+            writer.Write((byte)0xAA);
+            writer.Write((byte)0xBB);
+            writer.Write((byte)0xCC);
+            StreamingMetadataWriter.AlignTo4(writer);
+        }
+
+        Assert.Equal([0xAA, 0xBB, 0xCC, 0x00], stream.ToArray());
+    }
+
+    [Fact]
+    public void AlignTo4_AtFour_WritesNothing()
+    {
+        var stream = new MemoryStream();
+        using (var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
+        {
+            writer.Write((byte)0x11);
+            writer.Write((byte)0x22);
+            writer.Write((byte)0x33);
+            writer.Write((byte)0x44);
+            StreamingMetadataWriter.AlignTo4(writer);
+        }
+
+        Assert.Equal([0x11, 0x22, 0x33, 0x44], stream.ToArray());
+    }
+
+    [Fact]
+    public void AlignTo4_AtFive_WritesThreeZeros()
+    {
+        var stream = new MemoryStream();
+        using (var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
+        {
+            writer.Write((byte)0x11);
+            writer.Write((byte)0x22);
+            writer.Write((byte)0x33);
+            writer.Write((byte)0x44);
+            writer.Write((byte)0x55);
+            StreamingMetadataWriter.AlignTo4(writer);
+        }
+
+        Assert.Equal([0x11, 0x22, 0x33, 0x44, 0x55, 0x00, 0x00, 0x00], stream.ToArray());
+    }
+
+    [Fact]
+    public void WriteAlignedString_EmptyString_WritesNullAndPadsToFour()
+    {
+        var bytes = WriteString("");
+
+        Assert.Equal([0x00, 0x00, 0x00, 0x00], bytes);
+    }
+
+    [Fact]
+    public void WriteAlignedString_SingleChar_WritesCharNullAndPads()
+    {
+        var bytes = WriteString("a");
+
+        Assert.Equal([(byte)'a', 0x00, 0x00, 0x00], bytes);
+    }
+
+    [Fact]
+    public void WriteAlignedString_AlreadyAligned_StillAligned()
+    {
+        // "abc" (3 bytes) + null terminator (1 byte) = 4 bytes → already aligned
+        var bytes = WriteString("abc");
+
+        Assert.Equal([(byte)'a', (byte)'b', (byte)'c', 0x00], bytes);
+    }
+
+    [Fact]
+    public void WriteAlignedString_FourChars_PadsToEight()
+    {
+        // "abcd" (4 bytes) + null terminator (1 byte) = 5 bytes → pad to 8
+        var bytes = WriteString("abcd");
+
+        Assert.Equal(
+            [(byte)'a', (byte)'b', (byte)'c', (byte)'d', 0x00, 0x00, 0x00, 0x00],
+            bytes);
+    }
+
+    [Fact]
+    public void WriteIndex_Size2_WritesTwoBytes()
+    {
+        var stream = new MemoryStream();
+        using (var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
+        {
+            StreamingMetadataWriter.WriteIndex(writer, 0x1234, 2);
+        }
+
+        Assert.Equal([0x34, 0x12], stream.ToArray());
+    }
+
+    [Fact]
+    public void WriteIndex_Size4_WritesFourBytes()
+    {
+        var stream = new MemoryStream();
+        using (var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
+        {
+            StreamingMetadataWriter.WriteIndex(writer, 0x12345678, 4);
+        }
+
+        Assert.Equal([0x78, 0x56, 0x34, 0x12], stream.ToArray());
+    }
+
+    [Fact]
+    public void WriteIndex_Size2_TruncatesHighBits()
+    {
+        var stream = new MemoryStream();
+        using (var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
+        {
+            StreamingMetadataWriter.WriteIndex(writer, 0x00012345, 2);
+        }
+
+        Assert.Equal([0x45, 0x23], stream.ToArray());
+    }
+
+    static byte[] WriteCompressed(int length)
+    {
+        var stream = new MemoryStream();
+        using (var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
+        {
+            StreamingMetadataWriter.WriteCompressedLength(writer, length);
+        }
+
+        return stream.ToArray();
+    }
+
+    static byte[] WriteString(string value)
+    {
+        var stream = new MemoryStream();
+        using (var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
+        {
+            StreamingMetadataWriter.WriteAlignedString(writer, value);
+        }
+
+        return stream.ToArray();
+    }
+
+    #endregion
 }

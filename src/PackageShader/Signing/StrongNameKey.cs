@@ -53,7 +53,7 @@ public sealed class StrongNameKey
         return new(rsa, publicKey, publicKeyToken, blob);
     }
 
-    static RSA FromCapiKeyBlob(byte[] blob)
+    internal static RSA FromCapiKeyBlob(byte[] blob)
     {
         if (blob == null ||
             blob.Length < 12)
@@ -72,7 +72,7 @@ public sealed class StrongNameKey
         };
     }
 
-    static RSA FromCapiPrivateKeyBlob(byte[] blob, int offset)
+    internal static RSA FromCapiPrivateKeyBlob(byte[] blob, int offset)
     {
         // Validate header: PRIVATEKEYBLOB (0x07), Version (0x02), Reserved (0x0000)
         if (blob[offset] != 0x07 || blob[offset + 1] != 0x02)
@@ -131,7 +131,7 @@ public sealed class StrongNameKey
         return rsa;
     }
 
-    static RSA FromCapiPublicKeyBlob(byte[] blob, int offset)
+    internal static RSA FromCapiPublicKeyBlob(byte[] blob, int offset)
     {
         // Validate header: PUBLICKEYBLOB (0x06), Version (0x02)
         if (blob[offset] != 0x06 || blob[offset + 1] != 0x02)
@@ -168,7 +168,7 @@ public sealed class StrongNameKey
         return rsa;
     }
 
-    static byte[] ReadReversed(byte[] data, ref int pos, int length)
+    internal static byte[] ReadReversed(byte[] data, ref int pos, int length)
     {
         var result = new byte[length];
         Array.Copy(data, pos, result, 0, length);
@@ -177,7 +177,7 @@ public sealed class StrongNameKey
         return result;
     }
 
-    static byte[] TrimLeadingZeros(byte[] data)
+    internal static byte[] TrimLeadingZeros(byte[] data)
     {
         var start = 0;
         while (start < data.Length - 1 && data[start] == 0)
@@ -195,7 +195,7 @@ public sealed class StrongNameKey
         return result;
     }
 
-    static byte[] BuildPublicKeyBlob(RSA rsa)
+    internal static byte[] BuildPublicKeyBlob(RSA rsa)
     {
         var parameters = rsa.ExportParameters(false);
         var keyLength = parameters.Modulus!.Length;

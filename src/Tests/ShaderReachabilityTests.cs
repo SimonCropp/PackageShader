@@ -247,4 +247,133 @@ public class ShaderReachabilityTests
         Shader.Run([root, stray], false, null);
         Assert.True(File.Exists(root.TargetPath));
     }
+
+    // -------------------------------------------------------------------------
+    // Direct tests of Shader.ValidateConfiguration and GetAssembliesReachableFromRoot
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void ValidateConfiguration_NoShadedAssemblies_ShortCircuits()
+    {
+        // All unshaded, all pointing to non-existent files
+        // Should short-circuit before touching the filesystem
+        var infos = new List<SourceTargetInfo>
+        {
+            new("A", "/missing/A.dll", "A", "/missing/A.dll", false, true),
+            new("B", "/missing/B.dll", "B", "/missing/B.dll", false, false)
+        };
+
+        // Should not throw — no shaded assemblies means nothing to validate
+        Shader.ValidateConfiguration(infos);
+    }
+
+    [Fact]
+    public void ValidateConfiguration_UnshadedNonExistentFile_SkipsFileRead()
+    {
+        // Unshaded assembly with a bogus path — should be skipped rather than throwing
+        var infos = new List<SourceTargetInfo>
+        {
+            new("Shaded", "/missing/Shaded.dll", "Shaded_Shaded", "/missing/Shaded_Shaded.dll", true, false),
+            new("Root", "/missing/Root.dll", "Root", "/missing/Root.dll", false, true),
+            new("Missing", "/missing/Missing.dll", "Missing", "/missing/Missing.dll", false, false)
+        };
+
+        // Root is also missing, so no graph can be built from it — reachable set contains only "Root".
+        // "Missing" is not reachable, so validation skips it regardless of its missing file.
+        Shader.ValidateConfiguration(infos);
+    }
+
+    [Fact]
+    public void GetAssembliesReachableFromRoot_NoRootAssembly_ReturnsAllNames()
+    {
+        var infos = new List<SourceTargetInfo>
+        {
+            new("A", "/missing/A.dll", "A_S", "/missing/A_S.dll", true, false),
+            new("B", "/missing/B.dll", "B_S", "/missing/B_S.dll", true, false),
+            new("C", "/missing/C.dll", "C", "/missing/C.dll", false, false)
+        };
+
+        var reachable = Shader.GetAssembliesReachableFromRoot(infos);
+
+        // Conservative fallback: with no root, every assembly is considered reachable
+        Assert.Contains("A", reachable);
+        Assert.Contains("B", reachable);
+        Assert.Contains("C", reachable);
+    }
+
+    [Fact]
+    public void GetAssembliesReachableFromRoot_NoRootAssembly_IsCaseInsensitive()
+    {
+        var infos = new List<SourceTargetInfo>
+        {
+            new("MyAsm", "/missing/MyAsm.dll", "MyAsm_S", "/missing/MyAsm_S.dll", true, false)
+        };
+
+        var reachable = Shader.GetAssembliesReachableFromRoot(infos);
+
+        Assert.Contains("myasm", reachable);
+        Assert.Contains("MYASM", reachable);
+    }
+
+    [Fact]
+    public void GetAssembliesReachableFromRoot_RootPointsToMissingFile_ReturnsJustRoot()
+    {
+        var infos = new List<SourceTargetInfo>
+        {
+            new("Root", "/missing/Root.dll", "Root", "/missing/Root.dll", false, true),
+            new("A", "/missing/A.dll", "A_S", "/missing/A_S.dll", true, false)
+        };
+
+        var reachable = Shader.GetAssembliesReachableFromRoot(infos);
+
+        // Root is added before file existence check; A is not reachable because root file is missing
+        Assert.Contains("Root", reachable);
+        Assert.DoesNotContain("A", reachable);
+    }
+
+    [Fact]
+    public void GetAssembliesReachableFromRoot_RealAssembly_DiscoversReferences()
+    {
+        using var tempDir = new TempDirectory();
+
+        File.Copy(
+            Path.Combine(binDirectory, "AssemblyToProcess.dll"),
+            Path.Combine(tempDir, "AssemblyToProcess.dll"));
+        File.Copy(
+            Path.Combine(binDirectory, "AssemblyToInclude.dll"),
+            Path.Combine(tempDir, "AssemblyToInclude.dll"));
+
+        var root = MakeInfo(tempDir, "AssemblyToProcess.dll", isShaded: false, isRoot: true, suffix: "_Renamed");
+        var dep = MakeInfo(tempDir, "AssemblyToInclude.dll", isShaded: true, isRoot: false, suffix: "_Renamed");
+
+        var reachable = Shader.GetAssembliesReachableFromRoot([root, dep]);
+
+        // AssemblyToProcess references AssemblyToInclude, so both should be reachable
+        Assert.Contains(root.SourceName, reachable);
+        Assert.Contains(dep.SourceName, reachable);
+    }
+
+    [Fact]
+    public void ValidateConfiguration_BrokenConfig_ErrorMessageNamesBothAssemblies()
+    {
+        // AssemblyToProcess (unshaded, reachable via conservative fallback) references AssemblyToInclude (shaded)
+        using var tempDir = new TempDirectory();
+
+        File.Copy(
+            Path.Combine(binDirectory, "AssemblyToProcess.dll"),
+            Path.Combine(tempDir, "AssemblyToProcess.dll"));
+        File.Copy(
+            Path.Combine(binDirectory, "AssemblyToInclude.dll"),
+            Path.Combine(tempDir, "AssemblyToInclude.dll"));
+
+        var process = MakeInfo(tempDir, "AssemblyToProcess.dll", isShaded: false, isRoot: false, suffix: "_Renamed");
+        var include = MakeInfo(tempDir, "AssemblyToInclude.dll", isShaded: true, isRoot: false, suffix: "_Renamed");
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            Shader.ValidateConfiguration([process, include]));
+
+        Assert.Contains(process.SourceName, ex.Message);
+        Assert.Contains(include.SourceName, ex.Message);
+        Assert.Contains("reference", ex.Message.ToLower());
+    }
 }

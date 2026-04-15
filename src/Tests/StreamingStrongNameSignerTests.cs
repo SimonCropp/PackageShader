@@ -206,4 +206,235 @@ public class StreamingStrongNameSignerTests
         var publicKeyBytes = reader.GetBlobBytes(reader.GetAssemblyDefinition().PublicKey);
         Assert.True(publicKeyBytes.Length > 0, "Assembly should have a public key embedded");
     }
+
+    // -------------------------------------------------------------------------
+    // Direct tests of ResolveRvaToFileOffset
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void ResolveRvaToFileOffset_RvaInFirstSection_ReturnsFileOffset()
+    {
+        var assemblyPath = Path.Combine(binDirectory, "DummyAssembly.dll");
+
+        using var fs = File.OpenRead(assemblyPath);
+        using var peReader = new PEReader(fs);
+        var headers = peReader.PEHeaders;
+
+        var firstSection = headers.SectionHeaders[0];
+        var rva = firstSection.VirtualAddress;
+
+        var offset = StreamingStrongNameSigner.ResolveRvaToFileOffset(headers, rva);
+
+        Assert.Equal(firstSection.PointerToRawData, offset);
+    }
+
+    [Fact]
+    public void ResolveRvaToFileOffset_RvaMidSection_ReturnsCorrectOffset()
+    {
+        var assemblyPath = Path.Combine(binDirectory, "DummyAssembly.dll");
+
+        using var fs = File.OpenRead(assemblyPath);
+        using var peReader = new PEReader(fs);
+        var headers = peReader.PEHeaders;
+
+        var section = headers.SectionHeaders[0];
+        // Pick an RVA 16 bytes into the section
+        var rva = section.VirtualAddress + 16;
+
+        var offset = StreamingStrongNameSigner.ResolveRvaToFileOffset(headers, rva);
+
+        Assert.Equal(section.PointerToRawData + 16, offset);
+    }
+
+    [Fact]
+    public void ResolveRvaToFileOffset_RvaBelowAllSections_ReturnsZero()
+    {
+        var assemblyPath = Path.Combine(binDirectory, "DummyAssembly.dll");
+
+        using var fs = File.OpenRead(assemblyPath);
+        using var peReader = new PEReader(fs);
+        var headers = peReader.PEHeaders;
+
+        // RVA 1 is below any section (sections start at 0x2000 or higher in real PEs)
+        var offset = StreamingStrongNameSigner.ResolveRvaToFileOffset(headers, 1);
+
+        Assert.Equal(0, offset);
+    }
+
+    [Fact]
+    public void ResolveRvaToFileOffset_RvaAboveAllSections_ReturnsZero()
+    {
+        var assemblyPath = Path.Combine(binDirectory, "DummyAssembly.dll");
+
+        using var fs = File.OpenRead(assemblyPath);
+        using var peReader = new PEReader(fs);
+        var headers = peReader.PEHeaders;
+
+        // Use an RVA that's way beyond the end of the last section
+        var lastSection = headers.SectionHeaders[^1];
+        var rva = lastSection.VirtualAddress + lastSection.SizeOfRawData + 0x1000;
+
+        var offset = StreamingStrongNameSigner.ResolveRvaToFileOffset(headers, (int)rva);
+
+        Assert.Equal(0, offset);
+    }
+
+    // -------------------------------------------------------------------------
+    // Direct tests of ComputeStrongNameHashStreaming
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void ComputeStrongNameHashStreaming_ExcludesSkipRegions()
+    {
+        // Build a 200-byte file with known content
+        using var tempDir = new TempDirectory();
+        var path = Path.Combine(tempDir, "data.bin");
+        var data = new byte[200];
+        for (var i = 0; i < data.Length; i++)
+        {
+            data[i] = (byte)(i & 0xFF);
+        }
+        File.WriteAllBytes(path, data);
+
+        const int checksumOffset = 10;
+        const int checksumSize = 4;
+        const long signatureOffset = 50;
+        const int signatureSize = 16;
+
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read);
+        var actual = StreamingStrongNameSigner.ComputeStrongNameHashStreaming(
+            stream, checksumOffset, signatureOffset, signatureSize);
+
+        // Build the expected data by excluding both skip regions, then SHA1
+        var expectedData = new List<byte>();
+        expectedData.AddRange(data[..checksumOffset]);
+        expectedData.AddRange(data[(checksumOffset + checksumSize)..(int)signatureOffset]);
+        expectedData.AddRange(data[((int)signatureOffset + signatureSize)..]);
+        var expected = SHA1.HashData(expectedData.ToArray());
+
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void ComputeStrongNameHashStreaming_SignatureBeforeChecksum_StillSorts()
+    {
+        // Regions are given in order (checksum, signature) but signature offset < checksum offset
+        // The method sorts regions internally, so this should still work
+        using var tempDir = new TempDirectory();
+        var path = Path.Combine(tempDir, "data.bin");
+        var data = new byte[200];
+        for (var i = 0; i < data.Length; i++)
+        {
+            data[i] = (byte)(i & 0xFF);
+        }
+        File.WriteAllBytes(path, data);
+
+        const int checksumOffset = 100;
+        const int checksumSize = 4;
+        const long signatureOffset = 10;
+        const int signatureSize = 16;
+
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read);
+        var actual = StreamingStrongNameSigner.ComputeStrongNameHashStreaming(
+            stream, checksumOffset, signatureOffset, signatureSize);
+
+        var expectedData = new List<byte>();
+        expectedData.AddRange(data[..(int)signatureOffset]);
+        expectedData.AddRange(data[((int)signatureOffset + signatureSize)..checksumOffset]);
+        expectedData.AddRange(data[(checksumOffset + checksumSize)..]);
+        var expected = SHA1.HashData(expectedData.ToArray());
+
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void ComputeStrongNameHashStreaming_SkipAtStartOfFile()
+    {
+        using var tempDir = new TempDirectory();
+        var path = Path.Combine(tempDir, "data.bin");
+        var data = new byte[100];
+        for (var i = 0; i < data.Length; i++)
+        {
+            data[i] = (byte)(i & 0xFF);
+        }
+        File.WriteAllBytes(path, data);
+
+        // Checksum region at offset 0 — skip first 4 bytes
+        // Signature at offset 90 — skip last 10 bytes
+        const int checksumOffset = 0;
+        const long signatureOffset = 90;
+        const int signatureSize = 10;
+
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read);
+        var actual = StreamingStrongNameSigner.ComputeStrongNameHashStreaming(
+            stream, checksumOffset, signatureOffset, signatureSize);
+
+        var expectedData = new List<byte>();
+        expectedData.AddRange(data[4..90]);
+        var expected = SHA1.HashData(expectedData.ToArray());
+
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void ComputeStrongNameHashStreaming_SkipAtEndOfFile()
+    {
+        using var tempDir = new TempDirectory();
+        var path = Path.Combine(tempDir, "data.bin");
+        var data = new byte[100];
+        for (var i = 0; i < data.Length; i++)
+        {
+            data[i] = (byte)(i & 0xFF);
+        }
+        File.WriteAllBytes(path, data);
+
+        const int checksumOffset = 10;
+        const int checksumSize = 4;
+        // Signature region ends exactly at EOF
+        const long signatureOffset = 90;
+        const int signatureSize = 10;
+
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read);
+        var actual = StreamingStrongNameSigner.ComputeStrongNameHashStreaming(
+            stream, checksumOffset, signatureOffset, signatureSize);
+
+        var expectedData = new List<byte>();
+        expectedData.AddRange(data[..checksumOffset]);
+        expectedData.AddRange(data[(checksumOffset + checksumSize)..90]);
+        var expected = SHA1.HashData(expectedData.ToArray());
+
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void ComputeStrongNameHashStreaming_LargeFile_HandlesBufferBoundaries()
+    {
+        // File larger than buffer (81920) to exercise the read-in-chunks path
+        using var tempDir = new TempDirectory();
+        var path = Path.Combine(tempDir, "data.bin");
+        var data = new byte[200_000];
+        for (var i = 0; i < data.Length; i++)
+        {
+            data[i] = (byte)(i * 31 & 0xFF);
+        }
+        File.WriteAllBytes(path, data);
+
+        // Skip regions that straddle the 81920 buffer boundary
+        const int checksumOffset = 81918;
+        const int checksumSize = 4;
+        const long signatureOffset = 150_000;
+        const int signatureSize = 128;
+
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read);
+        var actual = StreamingStrongNameSigner.ComputeStrongNameHashStreaming(
+            stream, checksumOffset, signatureOffset, signatureSize);
+
+        var expectedData = new List<byte>();
+        expectedData.AddRange(data[..checksumOffset]);
+        expectedData.AddRange(data[(checksumOffset + checksumSize)..(int)signatureOffset]);
+        expectedData.AddRange(data[((int)signatureOffset + signatureSize)..]);
+        var expected = SHA1.HashData(expectedData.ToArray());
+
+        Assert.Equal(expected, actual);
+    }
 }

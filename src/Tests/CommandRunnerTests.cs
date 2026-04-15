@@ -108,4 +108,58 @@
         IEnumerable<string>? assembliesToExclude,
         string consoleOut,
         bool internalize);
+
+    // -------------------------------------------------------------------------
+    // Direct tests of ValidatePrefixSuffix
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void ValidatePrefixSuffix_Valid_NoThrow()
+    {
+        CommandRunner.ValidatePrefixSuffix("Shaded_");
+        CommandRunner.ValidatePrefixSuffix("_Shaded");
+    }
+
+    [Fact]
+    public void ValidatePrefixSuffix_Empty_Throws() =>
+        Assert.Throws<ErrorException>(() => CommandRunner.ValidatePrefixSuffix(""));
+
+    [Fact]
+    public void ValidatePrefixSuffix_Whitespace_Throws() =>
+        Assert.Throws<ErrorException>(() => CommandRunner.ValidatePrefixSuffix("   "));
+
+    [Fact]
+    public void ValidatePrefixSuffix_Tab_Throws() =>
+        Assert.Throws<ErrorException>(() => CommandRunner.ValidatePrefixSuffix("\t"));
+
+    // -------------------------------------------------------------------------
+    // Direct tests of FindTargetDirectory
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void FindTargetDirectory_Null_ReturnsCurrentDirectory()
+    {
+        var result = CommandRunner.FindTargetDirectory(null);
+
+        Assert.Equal(Environment.CurrentDirectory, result);
+    }
+
+    [Fact]
+    public void FindTargetDirectory_Absolute_ReturnsSame()
+    {
+        var absolutePath = Path.GetFullPath(Environment.CurrentDirectory);
+
+        var result = CommandRunner.FindTargetDirectory(absolutePath);
+
+        Assert.Equal(absolutePath, result);
+    }
+
+    [Fact]
+    public void FindTargetDirectory_Relative_ReturnsAbsolute()
+    {
+        var result = CommandRunner.FindTargetDirectory("subdir");
+
+        Assert.True(Path.IsPathRooted(result));
+        Assert.EndsWith("subdir", result);
+    }
 }

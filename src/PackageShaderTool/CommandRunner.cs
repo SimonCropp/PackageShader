@@ -81,7 +81,7 @@
         return Enumerable.Empty<Error>();
     }
 
-    static void ValidatePrefixSuffix(string value)
+    internal static void ValidatePrefixSuffix(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -89,7 +89,7 @@
         }
     }
 
-    static string FindTargetDirectory(string? targetDirectory)
+    internal static string FindTargetDirectory(string? targetDirectory)
     {
         if (targetDirectory == null)
         {

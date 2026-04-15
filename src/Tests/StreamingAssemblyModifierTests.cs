@@ -317,4 +317,104 @@ public class StreamingAssemblyModifierTests
             $"expected blob heap >= 64 KB after promotion, got {promotedReader.BlobHeapSize}");
         Assert.Equal(4, promotedReader.BlobIndexSize);
     }
+
+    // -------------------------------------------------------------------------
+    // Direct tests of CopyExternalPdb
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void CopyExternalPdb_SourceHasPdb_CopiesToTarget()
+    {
+        using var tempDir = new TempDirectory();
+
+        var sourceDll = Path.Combine(tempDir, "Source.dll");
+        var sourcePdb = Path.Combine(tempDir, "Source.pdb");
+        var targetDll = Path.Combine(tempDir, "Target.dll");
+        var targetPdb = Path.Combine(tempDir, "Target.pdb");
+
+        File.WriteAllBytes(sourceDll, [0x01]);
+        File.WriteAllBytes(sourcePdb, [0xAB, 0xCD, 0xEF]);
+
+        StreamingAssemblyModifier.CopyExternalPdb(sourceDll, targetDll);
+
+        Assert.True(File.Exists(targetPdb));
+        Assert.Equal(new byte[] { 0xAB, 0xCD, 0xEF }, File.ReadAllBytes(targetPdb));
+    }
+
+    [Fact]
+    public void CopyExternalPdb_NoSourcePdb_DoesNothing()
+    {
+        using var tempDir = new TempDirectory();
+
+        var sourceDll = Path.Combine(tempDir, "Source.dll");
+        var targetDll = Path.Combine(tempDir, "Target.dll");
+        var targetPdb = Path.Combine(tempDir, "Target.pdb");
+
+        File.WriteAllBytes(sourceDll, [0x01]);
+
+        StreamingAssemblyModifier.CopyExternalPdb(sourceDll, targetDll);
+
+        Assert.False(File.Exists(targetPdb));
+    }
+
+    [Fact]
+    public void CopyExternalPdb_SameFile_NoOp()
+    {
+        using var tempDir = new TempDirectory();
+
+        var dll = Path.Combine(tempDir, "Source.dll");
+        var pdb = Path.Combine(tempDir, "Source.pdb");
+        var originalPdbBytes = new byte[] { 0x11, 0x22, 0x33 };
+
+        File.WriteAllBytes(dll, [0x01]);
+        File.WriteAllBytes(pdb, originalPdbBytes);
+
+        // Passing the same path for source and target should short-circuit rather than attempt File.Copy to self
+        StreamingAssemblyModifier.CopyExternalPdb(dll, dll);
+
+        Assert.Equal(originalPdbBytes, File.ReadAllBytes(pdb));
+    }
+
+    [Fact]
+    public void CopyExternalPdb_SameFileCaseDifferent_NoOp()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var tempDir = new TempDirectory();
+
+        var dllLower = Path.Combine(tempDir, "source.dll");
+        var dllUpper = Path.Combine(tempDir, "SOURCE.dll");
+        var pdb = Path.Combine(tempDir, "source.pdb");
+        var originalPdbBytes = new byte[] { 0x11, 0x22, 0x33 };
+
+        File.WriteAllBytes(dllLower, [0x01]);
+        File.WriteAllBytes(pdb, originalPdbBytes);
+
+        // On case-insensitive filesystems (Windows), different-case paths point to the same file
+        StreamingAssemblyModifier.CopyExternalPdb(dllLower, dllUpper);
+
+        Assert.Equal(originalPdbBytes, File.ReadAllBytes(pdb));
+    }
+
+    [Fact]
+    public void CopyExternalPdb_TargetPdbAlreadyExists_Overwrites()
+    {
+        using var tempDir = new TempDirectory();
+
+        var sourceDll = Path.Combine(tempDir, "Source.dll");
+        var sourcePdb = Path.Combine(tempDir, "Source.pdb");
+        var targetDll = Path.Combine(tempDir, "Target.dll");
+        var targetPdb = Path.Combine(tempDir, "Target.pdb");
+
+        File.WriteAllBytes(sourceDll, [0x01]);
+        File.WriteAllBytes(sourcePdb, [0xAA]);
+        File.WriteAllBytes(targetPdb, [0xBB, 0xBB, 0xBB]);
+
+        StreamingAssemblyModifier.CopyExternalPdb(sourceDll, targetDll);
+
+        Assert.Equal(new byte[] { 0xAA }, File.ReadAllBytes(targetPdb));
+    }
 }

@@ -56,7 +56,7 @@ public static class Shader
         }
     }
 
-    static void ValidateConfiguration(List<SourceTargetInfo> infos)
+    internal static void ValidateConfiguration(List<SourceTargetInfo> infos)
     {
         // Build set of shaded assembly names
         var shadedNames = new HashSet<string>(
@@ -136,7 +136,7 @@ public static class Shader
         }
     }
 
-    static HashSet<string> GetAssembliesReachableFromRoot(List<SourceTargetInfo> infos)
+    internal static HashSet<string> GetAssembliesReachableFromRoot(List<SourceTargetInfo> infos)
     {
         var reachable = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var rootInfo = infos.FirstOrDefault(_ => _.IsRootAssembly);

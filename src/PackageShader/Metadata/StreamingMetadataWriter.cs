@@ -429,7 +429,7 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
         }
     }
 
-    static void WriteIndex(BinaryWriter writer, uint value, int size)
+    internal static void WriteIndex(BinaryWriter writer, uint value, int size)
     {
         if (size == 2)
         {
@@ -550,7 +550,7 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
     /// - 2 bytes: 10bbbbbb xxxxxxxx (length &lt; 16384)
     /// - 4 bytes: 110bbbbb xxxxxxxx yyyyyyyy zzzzzzzz (length &gt;= 16384)
     /// </summary>
-    static void WriteCompressedLength(BinaryWriter writer, int length)
+    internal static void WriteCompressedLength(BinaryWriter writer, int length)
     {
         if (length < 0x80)
         {
@@ -570,7 +570,7 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
         }
     }
 
-    static void WriteAlignedString(BinaryWriter writer, string value)
+    internal static void WriteAlignedString(BinaryWriter writer, string value)
     {
         var bytes = Encoding.ASCII.GetBytes(value);
         writer.Write(bytes);
@@ -589,7 +589,7 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
     /// ECMA-335 II.24.2.2: Stream sizes shall be multiples of 4 bytes.
     /// Pads the current position to the next 4-byte boundary.
     /// </summary>
-    static void AlignTo4(BinaryWriter writer)
+    internal static void AlignTo4(BinaryWriter writer)
     {
         var pos = writer.BaseStream.Position;
         var aligned = (pos + 3) & ~3;

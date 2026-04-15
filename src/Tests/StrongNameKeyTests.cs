@@ -200,6 +200,224 @@ public class StrongNameKeyTests
         Assert.Equal(0x00, key.PublicKey[7]);
     }
 
+    // -------------------------------------------------------------------------
+    // Direct tests of FromCapiKeyBlob / FromCapiPublicKeyBlob / FromCapiPrivateKeyBlob
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void FromCapiKeyBlob_EmptyBlob_Throws() =>
+        Assert.Throws<CryptographicException>(() => StrongNameKey.FromCapiKeyBlob([]));
+
+    [Fact]
+    public void FromCapiKeyBlob_TooShort_Throws() =>
+        Assert.Throws<CryptographicException>(() => StrongNameKey.FromCapiKeyBlob(new byte[11]));
+
+    [Fact]
+    public void FromCapiKeyBlob_UnknownFirstByte_Throws()
+    {
+        var blob = new byte[20];
+        blob[0] = 0x42;
+        Assert.Throws<CryptographicException>(() => StrongNameKey.FromCapiKeyBlob(blob));
+    }
+
+    [Fact]
+    public void FromCapiKeyBlob_WrapperTypeButWrongInnerByte_Throws()
+    {
+        // blob[0] == 0x00 but blob[12] != 0x06 → falls through to unknown format
+        var blob = new byte[32];
+        blob[0] = 0x00;
+        blob[12] = 0x99;
+        Assert.Throws<CryptographicException>(() => StrongNameKey.FromCapiKeyBlob(blob));
+    }
+
+    [Fact]
+    public void FromCapiPublicKeyBlob_WrongTypeByte_Throws()
+    {
+        var blob = new byte[20];
+        blob[0] = 0x07;
+        Assert.Throws<CryptographicException>(() => StrongNameKey.FromCapiPublicKeyBlob(blob, 0));
+    }
+
+    [Fact]
+    public void FromCapiPublicKeyBlob_WrongVersionByte_Throws()
+    {
+        var blob = new byte[20];
+        blob[0] = 0x06;
+        blob[1] = 0x03;
+        Assert.Throws<CryptographicException>(() => StrongNameKey.FromCapiPublicKeyBlob(blob, 0));
+    }
+
+    [Fact]
+    public void FromCapiPublicKeyBlob_WrongMagic_Throws()
+    {
+        var blob = new byte[20];
+        blob[0] = 0x06;
+        blob[1] = 0x02;
+        // Wrong magic (not "RSA1")
+        blob[8] = 0x00;
+        blob[9] = 0x00;
+        blob[10] = 0x00;
+        blob[11] = 0x00;
+        Assert.Throws<CryptographicException>(() => StrongNameKey.FromCapiPublicKeyBlob(blob, 0));
+    }
+
+    [Fact]
+    public void FromCapiPrivateKeyBlob_WrongTypeByte_Throws()
+    {
+        var blob = new byte[256];
+        blob[0] = 0x06;
+        blob[1] = 0x02;
+        Assert.Throws<CryptographicException>(() => StrongNameKey.FromCapiPrivateKeyBlob(blob, 0));
+    }
+
+    [Fact]
+    public void FromCapiPrivateKeyBlob_WrongVersionByte_Throws()
+    {
+        var blob = new byte[256];
+        blob[0] = 0x07;
+        blob[1] = 0x05;
+        Assert.Throws<CryptographicException>(() => StrongNameKey.FromCapiPrivateKeyBlob(blob, 0));
+    }
+
+    [Fact]
+    public void FromCapiPrivateKeyBlob_WrongMagic_Throws()
+    {
+        var blob = new byte[256];
+        blob[0] = 0x07;
+        blob[1] = 0x02;
+        blob[8] = 0x00;
+        blob[9] = 0x00;
+        blob[10] = 0x00;
+        blob[11] = 0x00;
+        Assert.Throws<CryptographicException>(() => StrongNameKey.FromCapiPrivateKeyBlob(blob, 0));
+    }
+
+    [Fact]
+    public void FromCapiPublicKeyBlob_ValidBlob_ParsesAtOffset()
+    {
+        // Build a full .NET-wrapped blob, then parse the inner CAPI blob starting at offset 12
+        var wrapped = CreatePublicKeyBlob(65537, 2048);
+        var rsa = StrongNameKey.FromCapiPublicKeyBlob(wrapped, 12);
+
+        var parameters = rsa.ExportParameters(false);
+        Assert.Equal(65537, ToInt(parameters.Exponent!));
+        Assert.Equal(256, parameters.Modulus!.Length);
+    }
+
+    [Fact]
+    public void BuildPublicKeyBlob_RoundTripsThroughFromBlob()
+    {
+        using var rsa = RSA.Create(2048);
+        var publicKeyBlob = StrongNameKey.BuildPublicKeyBlob(rsa);
+
+        // The blob format has a 12-byte .NET header, so inner blob starts at offset 12
+        var reparsedRsa = StrongNameKey.FromCapiPublicKeyBlob(publicKeyBlob, 12);
+
+        var originalParams = rsa.ExportParameters(false);
+        var reparsedParams = reparsedRsa.ExportParameters(false);
+
+        Assert.Equal(originalParams.Modulus, reparsedParams.Modulus);
+    }
+
+    [Fact]
+    public void BuildPublicKeyBlob_StartsWithExpectedHeader()
+    {
+        using var rsa = RSA.Create(2048);
+        var blob = StrongNameKey.BuildPublicKeyBlob(rsa);
+
+        // ALG_ID for signature (CALG_RSA_SIGN = 0x00002400, little-endian)
+        Assert.Equal(0x00, blob[0]);
+        Assert.Equal(0x24, blob[1]);
+        Assert.Equal(0x00, blob[2]);
+        Assert.Equal(0x00, blob[3]);
+        // ALG_ID for hash (CALG_SHA1 = 0x00008004, little-endian)
+        Assert.Equal(0x04, blob[4]);
+        Assert.Equal(0x80, blob[5]);
+    }
+
+    // -------------------------------------------------------------------------
+    // Direct tests of TrimLeadingZeros / ReadReversed
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void TrimLeadingZeros_NoLeadingZeros_ReturnsSame()
+    {
+        var input = new byte[] { 0x01, 0x02, 0x03 };
+        var result = StrongNameKey.TrimLeadingZeros(input);
+
+        Assert.Same(input, result);
+    }
+
+    [Fact]
+    public void TrimLeadingZeros_SingleLeadingZero_Trims()
+    {
+        var result = StrongNameKey.TrimLeadingZeros([0x00, 0x01, 0x02]);
+
+        Assert.Equal([0x01, 0x02], result);
+    }
+
+    [Fact]
+    public void TrimLeadingZeros_MultipleLeadingZeros_Trims()
+    {
+        var result = StrongNameKey.TrimLeadingZeros([0x00, 0x00, 0x00, 0x01]);
+
+        Assert.Equal([0x01], result);
+    }
+
+    [Fact]
+    public void TrimLeadingZeros_AllZerosExceptLast_ReturnsLastByte()
+    {
+        // Loop condition is `start < data.Length - 1`, so the final byte is always preserved
+        var result = StrongNameKey.TrimLeadingZeros([0x00, 0x00, 0x00, 0x00]);
+
+        Assert.Equal([0x00], result);
+    }
+
+    [Fact]
+    public void TrimLeadingZeros_SingleByte_ReturnsSame()
+    {
+        var input = new byte[] { 0x00 };
+        var result = StrongNameKey.TrimLeadingZeros(input);
+
+        Assert.Same(input, result);
+    }
+
+    [Fact]
+    public void ReadReversed_BasicCase_ReversesBytesAndAdvancesPos()
+    {
+        var data = new byte[] { 0x01, 0x02, 0x03, 0x04, 0x05 };
+        var pos = 1;
+
+        var result = StrongNameKey.ReadReversed(data, ref pos, 3);
+
+        Assert.Equal([0x04, 0x03, 0x02], result);
+        Assert.Equal(4, pos);
+    }
+
+    [Fact]
+    public void ReadReversed_ZeroLength_EmptyResultPosUnchanged()
+    {
+        var data = new byte[] { 0x01, 0x02, 0x03 };
+        var pos = 1;
+
+        var result = StrongNameKey.ReadReversed(data, ref pos, 0);
+
+        Assert.Empty(result);
+        Assert.Equal(1, pos);
+    }
+
+    [Fact]
+    public void ReadReversed_SingleByte_ReturnsSameByte()
+    {
+        var data = new byte[] { 0x01, 0x02, 0x03 };
+        var pos = 0;
+
+        var result = StrongNameKey.ReadReversed(data, ref pos, 1);
+
+        Assert.Equal([0x01], result);
+        Assert.Equal(1, pos);
+    }
+
     static int ToInt(byte[] bytes) =>
         bytes.Aggregate(0, (current, t) => (current << 8) | t);
 

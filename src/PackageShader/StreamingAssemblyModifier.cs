@@ -188,7 +188,7 @@ sealed class StreamingAssemblyModifier : IDisposable
         CopyExternalPdb(peFile.FilePath, path);
     }
 
-    static void CopyExternalPdb(string sourceDll, string targetDll)
+    internal static void CopyExternalPdb(string sourceDll, string targetDll)
     {
         var sourcePdb = Path.ChangeExtension(sourceDll, ".pdb");
         var targetPdb = Path.ChangeExtension(targetDll, ".pdb");
