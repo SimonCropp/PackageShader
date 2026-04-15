@@ -193,9 +193,11 @@ sealed class StreamingAssemblyModifier : IDisposable
         var sourcePdb = Path.ChangeExtension(sourceDll, ".pdb");
         var targetPdb = Path.ChangeExtension(targetDll, ".pdb");
 
-        // Skip if source and target resolve to the same file. Use the filesystem's case
-        // sensitivity: Windows is case-insensitive, Linux (and typical Unix) is case-sensitive.
-        var pathComparison = OperatingSystem.IsWindows()
+        // Skip if source and target resolve to the same file. The default filesystems on
+        // Windows (NTFS) and macOS (APFS) are case-insensitive; Linux filesystems are
+        // case-sensitive. Picking the wrong comparison here would either silently skip a
+        // copy (false positive, lost symbols) or attempt File.Copy onto itself (crash).
+        var pathComparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
             ? StringComparison.OrdinalIgnoreCase
             : StringComparison.Ordinal;
         if (string.Equals(Path.GetFullPath(sourcePdb), Path.GetFullPath(targetPdb), pathComparison))
