@@ -193,8 +193,12 @@ sealed class StreamingAssemblyModifier : IDisposable
         var sourcePdb = Path.ChangeExtension(sourceDll, ".pdb");
         var targetPdb = Path.ChangeExtension(targetDll, ".pdb");
 
-        // Skip if source and target are the same file
-        if (string.Equals(Path.GetFullPath(sourcePdb), Path.GetFullPath(targetPdb), StringComparison.OrdinalIgnoreCase))
+        // Skip if source and target resolve to the same file. Use the filesystem's case
+        // sensitivity: Windows is case-insensitive, Linux (and typical Unix) is case-sensitive.
+        var pathComparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        if (string.Equals(Path.GetFullPath(sourcePdb), Path.GetFullPath(targetPdb), pathComparison))
         {
             return;
         }
