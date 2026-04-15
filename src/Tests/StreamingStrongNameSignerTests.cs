@@ -274,7 +274,7 @@ public class StreamingStrongNameSignerTests
         var lastSection = headers.SectionHeaders[^1];
         var rva = lastSection.VirtualAddress + lastSection.SizeOfRawData + 0x1000;
 
-        var offset = StreamingStrongNameSigner.ResolveRvaToFileOffset(headers, (int)rva);
+        var offset = StreamingStrongNameSigner.ResolveRvaToFileOffset(headers, rva);
 
         Assert.Equal(0, offset);
     }

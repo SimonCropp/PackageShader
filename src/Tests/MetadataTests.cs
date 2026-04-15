@@ -821,7 +821,7 @@ public class MetadataTests
     {
         var bytes = WriteString("");
 
-        Assert.Equal([0x00, 0x00, 0x00, 0x00], bytes);
+        Assert.Equal("\0\0\0\0"u8.ToArray(), bytes);
     }
 
     [Fact]
@@ -829,7 +829,7 @@ public class MetadataTests
     {
         var bytes = WriteString("a");
 
-        Assert.Equal([(byte)'a', 0x00, 0x00, 0x00], bytes);
+        Assert.Equal("a\0\0\0"u8.ToArray(), bytes);
     }
 
     [Fact]
@@ -838,7 +838,7 @@ public class MetadataTests
         // "abc" (3 bytes) + null terminator (1 byte) = 4 bytes → already aligned
         var bytes = WriteString("abc");
 
-        Assert.Equal([(byte)'a', (byte)'b', (byte)'c', 0x00], bytes);
+        Assert.Equal("abc\0"u8.ToArray(), bytes);
     }
 
     [Fact]
@@ -848,7 +848,7 @@ public class MetadataTests
         var bytes = WriteString("abcd");
 
         Assert.Equal(
-            [(byte)'a', (byte)'b', (byte)'c', (byte)'d', 0x00, 0x00, 0x00, 0x00],
+            "abcd\0\0\0\0"u8.ToArray(),
             bytes);
     }
 
@@ -885,7 +885,7 @@ public class MetadataTests
             StreamingMetadataWriter.WriteIndex(writer, 0x00012345, 2);
         }
 
-        Assert.Equal([0x45, 0x23], stream.ToArray());
+        Assert.Equal("E#"u8.ToArray(), stream.ToArray());
     }
 
     static byte[] WriteCompressed(int length)

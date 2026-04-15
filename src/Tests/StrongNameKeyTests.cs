@@ -368,7 +368,7 @@ public class StrongNameKeyTests
     public void TrimLeadingZeros_AllZerosExceptLast_ReturnsLastByte()
     {
         // Loop condition is `start < data.Length - 1`, so the final byte is always preserved
-        var result = StrongNameKey.TrimLeadingZeros([0x00, 0x00, 0x00, 0x00]);
+        var result = StrongNameKey.TrimLeadingZeros("\0\0\0\0"u8.ToArray());
 
         Assert.Equal([0x00], result);
     }
