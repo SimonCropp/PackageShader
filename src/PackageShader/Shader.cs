@@ -71,8 +71,9 @@ public static class Shader
             return;
         }
 
-        // Build set of assemblies reachable from root (these are the only ones that matter)
-        var reachableFromRoot = GetAssembliesReachableFromRoot(infos);
+        // Analyze reachability and cache AssemblyRef lists in a single pass so
+        // the validation loop below doesn't have to re-open every assembly.
+        var (reachableFromRoot, refsBySourceName) = AnalyzeReachability(infos);
 
         // Check each non-root, unshaded assembly for references to shaded assemblies
         foreach (var info in infos)
@@ -90,31 +91,15 @@ public static class Shader
                 continue;
             }
 
-            if (!File.Exists(info.SourcePath))
+            if (!refsBySourceName.TryGetValue(info.SourceName, out var refs))
             {
-                // Skip if file doesn't exist
+                // File didn't exist during analysis — skip (matches the original File.Exists branch)
                 continue;
             }
 
-            // Read assembly references
-            using var peFile = StreamingPEFile.Open(info.SourcePath);
-            using var reader = new StreamingMetadataReader(peFile);
-
             var problematicRefs = new List<string>();
-
-            // Check each assembly reference
-            var refCount = reader.GetRowCount(TableIndex.AssemblyRef);
-            for (uint rid = 1; rid <= refCount; rid++)
+            foreach (var refName in refs)
             {
-                var found = reader.FindAssemblyRefByRid(rid);
-                if (found == null)
-                {
-                    continue;
-                }
-
-                var refName = found.Value.name;
-
-                // Check if this unshaded assembly references a shaded assembly
                 if (shadedNames.Contains(refName))
                 {
                     problematicRefs.Add(refName);
@@ -136,17 +121,38 @@ public static class Shader
         }
     }
 
-    internal static HashSet<string> GetAssembliesReachableFromRoot(List<SourceTargetInfo> infos)
+    internal static HashSet<string> GetAssembliesReachableFromRoot(List<SourceTargetInfo> infos) =>
+        AnalyzeReachability(infos).Reachable;
+
+    static (HashSet<string> Reachable, Dictionary<string, List<string>> RefsBySourceName) AnalyzeReachability(List<SourceTargetInfo> infos)
     {
         var reachable = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var refsBySourceName = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         var rootInfo = infos.FirstOrDefault(_ => _.IsRootAssembly);
 
         if (rootInfo == null)
         {
-            // No root assembly - consider all assemblies reachable (conservative)
-            return new(
-                infos.Select(_ => _.SourceName),
-                StringComparer.OrdinalIgnoreCase);
+            // No root assembly - consider all assemblies reachable (conservative fallback).
+            // Read refs for each so validation can check without re-opening.
+            foreach (var info in infos)
+            {
+                reachable.Add(info.SourceName);
+            }
+
+            foreach (var info in infos)
+            {
+                if (refsBySourceName.ContainsKey(info.SourceName) ||
+                    !File.Exists(info.SourcePath))
+                {
+                    continue;
+                }
+
+                using var peFile = StreamingPEFile.Open(info.SourcePath);
+                using var reader = new StreamingMetadataReader(peFile);
+                refsBySourceName[info.SourceName] = ReadAssemblyRefs(reader);
+            }
+
+            return (reachable, refsBySourceName);
         }
 
         // Group by name to handle duplicates (e.g., IntermediateAssembly may also be in ReferenceCopyLocalPaths)
@@ -166,20 +172,15 @@ public static class Shader
                 continue;
             }
 
-            // Get references from current assembly
+            // Get references from current assembly and cache them for validation
             using var peFile = StreamingPEFile.Open(current.SourcePath);
             using var reader = new StreamingMetadataReader(peFile);
 
-            var refCount = reader.GetRowCount(TableIndex.AssemblyRef);
-            for (uint rid = 1; rid <= refCount; rid++)
-            {
-                var found = reader.FindAssemblyRefByRid(rid);
-                if (found == null)
-                {
-                    continue;
-                }
+            var refs = ReadAssemblyRefs(reader);
+            refsBySourceName[current.SourceName] = refs;
 
-                var refName = found.Value.name;
+            foreach (var refName in refs)
+            {
                 if (!reachable.Add(refName) || !infoByName.TryGetValue(refName, out var refInfo))
                 {
                     continue;
@@ -189,6 +190,24 @@ public static class Shader
             }
         }
 
-        return reachable;
+        return (reachable, refsBySourceName);
+    }
+
+    static List<string> ReadAssemblyRefs(StreamingMetadataReader reader)
+    {
+        var refs = new List<string>();
+        var refCount = reader.GetRowCount(TableIndex.AssemblyRef);
+        for (uint rid = 1; rid <= refCount; rid++)
+        {
+            var found = reader.FindAssemblyRefByRid(rid);
+            if (found == null)
+            {
+                continue;
+            }
+
+            refs.Add(found.Value.name);
+        }
+
+        return refs;
     }
 }
