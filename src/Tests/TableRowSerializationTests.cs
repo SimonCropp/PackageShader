@@ -70,7 +70,10 @@ public class TableRowSerializationTests
     {
         var row = new AssemblyRefRow
         {
-            MajorVersion = 1, MinorVersion = 0, BuildNumber = 0, RevisionNumber = 0,
+            MajorVersion = 1,
+            MinorVersion = 0,
+            BuildNumber = 0,
+            RevisionNumber = 0,
             Flags = 0,
             PublicKeyOrTokenIndex = 50,
             NameIndex = 100,
@@ -189,7 +192,12 @@ public class TableRowSerializationTests
     [Fact]
     public void TypeRefRow_Write_4ByteIndices_CorrectSize()
     {
-        var row = new TypeRefRow { ResolutionScopeIndex = 5, NameIndex = 10, NamespaceIndex = 0 };
+        var row = new TypeRefRow
+        {
+            ResolutionScopeIndex = 5,
+            NameIndex = 10,
+            NamespaceIndex = 0
+        };
         using var ms = new MemoryStream();
         using var writer = new BinaryWriter(ms);
 
@@ -276,7 +284,12 @@ public class TableRowSerializationTests
     [Fact]
     public void MemberRefRow_Write_2ByteIndices_CorrectSize()
     {
-        var row = new MemberRefRow { ClassIndex = 5, NameIndex = 10, SignatureIndex = 20 };
+        var row = new MemberRefRow
+        {
+            ClassIndex = 5,
+            NameIndex = 10,
+            SignatureIndex = 20
+        };
         using var ms = new MemoryStream();
         using var writer = new BinaryWriter(ms);
 
@@ -289,7 +302,10 @@ public class TableRowSerializationTests
     [Fact]
     public void MemberRefRow_Write_4ByteIndices_CorrectSize()
     {
-        var row = new MemberRefRow { ClassIndex = 5, NameIndex = 10, SignatureIndex = 20 };
+        var row = new MemberRefRow {
+            ClassIndex = 5,
+            NameIndex = 10,
+            SignatureIndex = 20 };
         using var ms = new MemoryStream();
         using var writer = new BinaryWriter(ms);
 
@@ -375,7 +391,12 @@ public class TableRowSerializationTests
     [Fact]
     public void CustomAttributeRow_Write_2ByteIndices_CorrectSize()
     {
-        var row = new CustomAttributeRow { ParentIndex = 5, TypeIndex = 10, ValueIndex = 20 };
+        var row = new CustomAttributeRow
+        {
+            ParentIndex = 5,
+            TypeIndex = 10,
+            ValueIndex = 20
+        };
         using var ms = new MemoryStream();
         using var writer = new BinaryWriter(ms);
 
@@ -388,7 +409,12 @@ public class TableRowSerializationTests
     [Fact]
     public void CustomAttributeRow_Write_4ByteIndices_CorrectSize()
     {
-        var row = new CustomAttributeRow { ParentIndex = 5, TypeIndex = 10, ValueIndex = 20 };
+        var row = new CustomAttributeRow
+        {
+            ParentIndex = 5,
+            TypeIndex = 10,
+            ValueIndex = 20
+        };
         using var ms = new MemoryStream();
         using var writer = new BinaryWriter(ms);
 

@@ -210,7 +210,10 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
         // Row counts
         for (var i = 0; i < 58; i++)
         {
-            if ((valid & (1L << i)) == 0) continue;
+            if ((valid & (1L << i)) == 0)
+            {
+                continue;
+            }
 
             var table = (TableIndex)i;
             var count = source.GetRowCount(table);

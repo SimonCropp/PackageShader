@@ -54,9 +54,11 @@ public class ShaderReachabilityTests
     {
         using var tempDir = new TempDirectory();
 
-        File.Copy(Path.Combine(binDirectory, "AssemblyToProcess.dll"),
+        File.Copy(
+            Path.Combine(binDirectory, "AssemblyToProcess.dll"),
             Path.Combine(tempDir, "AssemblyToProcess.dll"));
-        File.Copy(Path.Combine(binDirectory, "AssemblyToInclude.dll"),
+        File.Copy(
+            Path.Combine(binDirectory, "AssemblyToInclude.dll"),
             Path.Combine(tempDir, "AssemblyToInclude.dll"));
 
         // AssemblyToProcess = root (exempt), AssemblyToInclude = shaded
@@ -78,9 +80,11 @@ public class ShaderReachabilityTests
     {
         using var tempDir = new TempDirectory();
 
-        File.Copy(Path.Combine(binDirectory, "AssemblyToInclude.dll"),
+        File.Copy(
+            Path.Combine(binDirectory, "AssemblyToInclude.dll"),
             Path.Combine(tempDir, "AssemblyToInclude.dll"));
-        File.Copy(Path.Combine(binDirectory, "AssemblyToProcess.dll"),
+        File.Copy(
+            Path.Combine(binDirectory, "AssemblyToProcess.dll"),
             Path.Combine(tempDir, "AssemblyToProcess.dll"));
 
         // Both shaded → neither is validated → no exception even if they reference each other
@@ -99,7 +103,8 @@ public class ShaderReachabilityTests
     {
         using var tempDir = new TempDirectory();
 
-        File.Copy(Path.Combine(binDirectory, "DummyAssembly.dll"),
+        File.Copy(
+            Path.Combine(binDirectory, "DummyAssembly.dll"),
             Path.Combine(tempDir, "DummyAssembly.dll"));
 
         var info = MakeInfo(tempDir, "DummyAssembly.dll", isShaded: true, suffix: "_ShadedV2");
@@ -119,9 +124,11 @@ public class ShaderReachabilityTests
     {
         using var tempDir = new TempDirectory();
 
-        File.Copy(Path.Combine(binDirectory, "AssemblyToInclude.dll"),
+        File.Copy(
+            Path.Combine(binDirectory, "AssemblyToInclude.dll"),
             Path.Combine(tempDir, "AssemblyToInclude.dll"));
-        File.Copy(Path.Combine(binDirectory, "AssemblyToProcess.dll"),
+        File.Copy(
+            Path.Combine(binDirectory, "AssemblyToProcess.dll"),
             Path.Combine(tempDir, "AssemblyToProcess.dll"));
 
         var includedInfo = MakeInfo(tempDir, "AssemblyToInclude.dll", isShaded: true, suffix: "_Shaded");
@@ -148,9 +155,11 @@ public class ShaderReachabilityTests
     {
         using var tempDir = new TempDirectory();
 
-        File.Copy(Path.Combine(binDirectory, "AssemblyToInclude.dll"),
+        File.Copy(
+            Path.Combine(binDirectory, "AssemblyToInclude.dll"),
             Path.Combine(tempDir, "AssemblyToInclude.dll"));
-        File.Copy(Path.Combine(binDirectory, "AssemblyToProcess.dll"),
+        File.Copy(
+            Path.Combine(binDirectory, "AssemblyToProcess.dll"),
             Path.Combine(tempDir, "AssemblyToProcess.dll"));
 
         // No root (IsRootAssembly = false) — both shaded → no validation error
@@ -184,7 +193,8 @@ public class ShaderReachabilityTests
     {
         using var tempDir = new TempDirectory();
 
-        File.Copy(Path.Combine(binDirectory, "DummyAssembly.dll"),
+        File.Copy(
+            Path.Combine(binDirectory, "DummyAssembly.dll"),
             Path.Combine(tempDir, "DummyAssembly.dll"));
 
         var info = MakeInfo(tempDir, "DummyAssembly.dll", isShaded: true, suffix: "_Shaded");
@@ -200,7 +210,10 @@ public class ShaderReachabilityTests
         foreach (var typeHandle in mr.TypeDefinitions)
         {
             var typeDef = mr.GetTypeDefinition(typeHandle);
-            if (mr.GetString(typeDef.Name) == "<Module>") continue;
+            if (mr.GetString(typeDef.Name) == "<Module>")
+            {
+                continue;
+            }
 
             var visibility = typeDef.Attributes & TypeAttributes.VisibilityMask;
             Assert.NotEqual(TypeAttributes.Public, visibility);
@@ -220,9 +233,11 @@ public class ShaderReachabilityTests
         // this test verifies that an unreachable unshaded assembly doesn't cause issues.
         using var tempDir = new TempDirectory();
 
-        File.Copy(Path.Combine(binDirectory, "DummyAssembly.dll"),
+        File.Copy(
+            Path.Combine(binDirectory, "DummyAssembly.dll"),
             Path.Combine(tempDir, "DummyAssembly.dll"));
-        File.Copy(Path.Combine(binDirectory, "AssemblyToInclude.dll"),
+        File.Copy(
+            Path.Combine(binDirectory, "AssemblyToInclude.dll"),
             Path.Combine(tempDir, "AssemblyToInclude.dll"));
 
         var root = MakeInfo(tempDir, "DummyAssembly.dll", isShaded: false, isRoot: true, suffix: "_Renamed");

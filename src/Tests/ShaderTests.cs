@@ -261,7 +261,10 @@ public class ShaderTests
         }
     }
 
-    static void CompileAssembly(string directory, string assemblyName, string code,
+    static void CompileAssembly(
+        string directory,
+        string assemblyName,
+        string code,
         params string[] referenceNames)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(code);
@@ -423,7 +426,8 @@ public class ShaderTests
                 $"Original Resource RVA {originalResourceRva} should be within .rsrc section");
         }
 
-        if (originalRelocSection.Name == ".reloc" && originalRelocRva > 0)
+        if (originalRelocSection.Name == ".reloc" &&
+            originalRelocRva > 0)
         {
             Assert.True(
                 originalRelocRva >= originalRelocSection.VirtualAddress &&

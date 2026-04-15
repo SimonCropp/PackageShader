@@ -11,7 +11,10 @@
         foreach (var table in tables)
         {
             // Skip placeholder/unused table entries (0xFF)
-            if ((byte)table == 0xFF) continue;
+            if ((byte)table == 0xFF)
+            {
+                continue;
+            }
             max = Math.Max(getRowCount(table), max);
         }
 

@@ -316,7 +316,11 @@ sealed class StreamingAssemblyModifier : IDisposable
 
     public void Dispose()
     {
-        if (disposed) return;
+        if (disposed)
+        {
+            return;
+        }
+
         disposed = true;
         metadata.Dispose();
         peFile.Dispose();

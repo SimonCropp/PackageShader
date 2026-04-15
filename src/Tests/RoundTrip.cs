@@ -427,7 +427,8 @@ public partial class RoundTrip
         // Use SDK packs directory - always use the LOWEST available version for determinism
         // This ensures that as long as machines have at least one compatible SDK version,
         // they'll produce the same output
-        var packsDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+        var packsDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
             "dotnet", "packs", packName);
 
         if (!Directory.Exists(packsDir))

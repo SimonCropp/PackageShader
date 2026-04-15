@@ -64,7 +64,9 @@ public class StreamingAssemblyModifierTests
 
             // Skip <Module> type
             if (typeName == "<Module>")
+            {
                 continue;
+            }
 
             // Check visibility - should not be public
             var visibility = typeDef.Attributes & TypeAttributes.VisibilityMask;
@@ -120,19 +122,23 @@ public class StreamingAssemblyModifierTests
         foreach (var attrHandle in reader.GetCustomAttributes(EntityHandle.AssemblyDefinition))
         {
             var attr = reader.GetCustomAttribute(attrHandle);
-            if (attr.Constructor.Kind == HandleKind.MemberReference)
+            if (attr.Constructor.Kind != HandleKind.MemberReference)
             {
-                var memberRef = reader.GetMemberReference((MemberReferenceHandle)attr.Constructor);
-                if (memberRef.Parent.Kind == HandleKind.TypeReference)
-                {
-                    var typeRef = reader.GetTypeReference((TypeReferenceHandle)memberRef.Parent);
-                    var typeName = reader.GetString(typeRef.Name);
-                    if (typeName == "InternalsVisibleToAttribute")
-                    {
-                        hasIVT = true;
-                        break;
-                    }
-                }
+                continue;
+            }
+
+            var memberRef = reader.GetMemberReference((MemberReferenceHandle)attr.Constructor);
+            if (memberRef.Parent.Kind != HandleKind.TypeReference)
+            {
+                continue;
+            }
+
+            var typeRef = reader.GetTypeReference((TypeReferenceHandle)memberRef.Parent);
+            var typeName = reader.GetString(typeRef.Name);
+            if (typeName == "InternalsVisibleToAttribute")
+            {
+                hasIVT = true;
+                break;
             }
         }
 
@@ -179,7 +185,9 @@ public class StreamingAssemblyModifierTests
 
         // Skip if PDB doesn't exist
         if (!File.Exists(pdbPath))
+        {
             return;
+        }
 
         using var tempDir = new TempDirectory();
         var outputPath = Path.Combine(tempDir, "WithSymbols.dll");

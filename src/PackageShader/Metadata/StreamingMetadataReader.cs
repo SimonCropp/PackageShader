@@ -257,7 +257,9 @@ sealed class StreamingMetadataReader : IDisposable
     {
         var index = (int) codedIndex;
         if (codedIndexSizes[index] != 0)
+        {
             return codedIndexSizes[index];
+        }
 
         return codedIndexSizes[index] = CodedIndexHelper.GetSize(codedIndex, GetRowCount);
     }
@@ -536,7 +538,10 @@ sealed class StreamingMetadataReader : IDisposable
     public void CopyTableData(TableIndex table, Stream destination)
     {
         var info = tables[(int) table];
-        if (info.RowCount == 0) return;
+        if (info.RowCount == 0)
+        {
+            return;
+        }
 
         var size = info.RowSize * info.RowCount;
         var offset = tableDataOffset + info.Offset;
@@ -552,7 +557,10 @@ sealed class StreamingMetadataReader : IDisposable
 
     public void Dispose()
     {
-        if (disposed) return;
+        if (disposed)
+        {
+            return;
+        }
         disposed = true;
         // Don't dispose _peFile - caller owns it
         // PEReader is owned by StreamingPEFile
