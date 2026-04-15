@@ -400,6 +400,34 @@ public class StreamingAssemblyModifierTests
     }
 
     [Fact]
+    public void CopyExternalPdb_CaseSensitiveFs_DistinctFiles_Copies()
+    {
+        // On a case-sensitive filesystem (Linux, typical macOS), source.pdb and SOURCE.pdb
+        // are distinct files — the same-file short-circuit in CopyExternalPdb must NOT
+        // treat them as equal, otherwise the target PDB is silently not created.
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var tempDir = new TempDirectory();
+
+        var sourceDll = Path.Combine(tempDir, "source.dll");
+        var sourcePdb = Path.Combine(tempDir, "source.pdb");
+        var targetDll = Path.Combine(tempDir, "SOURCE.dll");
+        var targetPdb = Path.Combine(tempDir, "SOURCE.pdb");
+        var sourcePdbBytes = new byte[] { 0xAB, 0xCD, 0xEF };
+
+        File.WriteAllBytes(sourceDll, [0x01]);
+        File.WriteAllBytes(sourcePdb, sourcePdbBytes);
+
+        StreamingAssemblyModifier.CopyExternalPdb(sourceDll, targetDll);
+
+        Assert.True(File.Exists(targetPdb), "Target PDB should be created on a case-sensitive filesystem");
+        Assert.Equal(sourcePdbBytes, File.ReadAllBytes(targetPdb));
+    }
+
+    [Fact]
     public void CopyExternalPdb_TargetPdbAlreadyExists_Overwrites()
     {
         using var tempDir = new TempDirectory();
