@@ -41,6 +41,9 @@ public static class Finder
                     {
                         yield return new(name, file, targetName, targetPath, true);
                         isShaded = true;
+                        // Stop after the first match so overlapping patterns (e.g. "Foo" and "Foo*")
+                        // don't yield duplicate entries for the same file.
+                        break;
                     }
 
                     continue;
@@ -50,6 +53,7 @@ public static class Finder
                 {
                     yield return new(name, file, targetName, targetPath, true);
                     isShaded = true;
+                    break;
                 }
             }
 
