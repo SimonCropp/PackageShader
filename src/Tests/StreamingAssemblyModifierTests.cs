@@ -378,12 +378,14 @@ public class StreamingAssemblyModifierTests
     [Fact]
     public void CopyExternalPdb_SameFileCaseDifferent_NoOp()
     {
-        if (!OperatingSystem.IsWindows())
+        // Covers case-insensitive filesystems: Windows NTFS and macOS default APFS.
+        // Linux ext4 is case-sensitive and takes the distinct-files path instead.
+        using var tempDir = new TempDirectory();
+
+        if (IsFilesystemCaseSensitive(tempDir))
         {
             return;
         }
-
-        using var tempDir = new TempDirectory();
 
         var dllLower = Path.Combine(tempDir, "source.dll");
         var dllUpper = Path.Combine(tempDir, "SOURCE.dll");
@@ -393,10 +395,53 @@ public class StreamingAssemblyModifierTests
         File.WriteAllBytes(dllLower, [0x01]);
         File.WriteAllBytes(pdb, originalPdbBytes);
 
-        // On case-insensitive filesystems (Windows), different-case paths point to the same file
         StreamingAssemblyModifier.CopyExternalPdb(dllLower, dllUpper);
 
         Assert.Equal(originalPdbBytes, File.ReadAllBytes(pdb));
+    }
+
+    [Fact]
+    public void CopyExternalPdb_CaseSensitiveFs_DistinctFiles_Copies()
+    {
+        // On a case-sensitive filesystem (typical Linux), source.pdb and SOURCE.pdb are
+        // distinct files — the same-file short-circuit in CopyExternalPdb must NOT treat
+        // them as equal, otherwise the target PDB is silently not created. macOS default
+        // APFS is case-insensitive, so probe at runtime rather than assume per OS.
+        using var tempDir = new TempDirectory();
+
+        if (!IsFilesystemCaseSensitive(tempDir))
+        {
+            return;
+        }
+
+        var sourceDll = Path.Combine(tempDir, "source.dll");
+        var sourcePdb = Path.Combine(tempDir, "source.pdb");
+        var targetDll = Path.Combine(tempDir, "SOURCE.dll");
+        var targetPdb = Path.Combine(tempDir, "SOURCE.pdb");
+        var sourcePdbBytes = new byte[] { 0xAB, 0xCD, 0xEF };
+
+        File.WriteAllBytes(sourceDll, [0x01]);
+        File.WriteAllBytes(sourcePdb, sourcePdbBytes);
+
+        StreamingAssemblyModifier.CopyExternalPdb(sourceDll, targetDll);
+
+        Assert.True(File.Exists(targetPdb), "Target PDB should be created on a case-sensitive filesystem");
+        Assert.Equal(sourcePdbBytes, File.ReadAllBytes(targetPdb));
+    }
+
+    static bool IsFilesystemCaseSensitive(string directory)
+    {
+        var probe = Path.Combine(directory, "PackageShader_CaseProbe");
+        var probeOtherCase = Path.Combine(directory, "packageshader_caseprobe");
+        File.WriteAllText(probe, "");
+        try
+        {
+            return !File.Exists(probeOtherCase);
+        }
+        finally
+        {
+            File.Delete(probe);
+        }
     }
 
     [Fact]

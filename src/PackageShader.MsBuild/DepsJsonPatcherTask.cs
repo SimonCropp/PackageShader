@@ -95,13 +95,18 @@ public class DepsJsonPatcherTask : Task
 
                                     foreach (var rt in runtime)
                                     {
-                                        // rt.Key is like "lib/netstandard2.0/Newtonsoft.Json.dll"
-                                        if (rt.Key.IndexOf(libName, StringComparison.OrdinalIgnoreCase) >= 0)
+                                        // rt.Key is like "lib/netstandard2.0/Newtonsoft.Json.dll".
+                                        // We only rename when libName appears as a filename stem
+                                        // (preceded by '/' and followed by '.'), so that libName
+                                        // "Foo" does not match inside "FooBar.dll" or "Newtonsoft.Foo.dll".
+                                        var newRtKey = TryReplaceLibNameAtFilenameBoundary(rt.Key, libName, shadedName);
+                                        if (newRtKey == null)
                                         {
-                                            runtimeToRemove.Add(rt.Key);
-                                            var newRtKey = ReplaceIgnoreCase(rt.Key, libName, shadedName);
-                                            runtimeToAdd[newRtKey] = rt.Value?.DeepClone();
+                                            continue;
                                         }
+
+                                        runtimeToRemove.Add(rt.Key);
+                                        runtimeToAdd[newRtKey] = rt.Value?.DeepClone();
                                     }
 
                                     foreach (var key in runtimeToRemove)
@@ -169,11 +174,35 @@ public class DepsJsonPatcherTask : Task
         }
     }
 
-    static string ReplaceIgnoreCase(string input, string oldValue, string newValue)
+    /// <summary>
+    /// Replaces <paramref name="libName"/> inside a deps.json runtime key when it
+    /// appears as a filename stem (preceded by '/' or start, followed by '.'). Returns
+    /// the rewritten key, or null if no bounded match is found. This prevents spurious
+    /// substring matches like libName "Foo" matching inside "FooBar.dll".
+    /// </summary>
+    internal static string? TryReplaceLibNameAtFilenameBoundary(string key, string libName, string replacement)
     {
-        var index = input.IndexOf(oldValue, StringComparison.OrdinalIgnoreCase);
-        if (index < 0)
-            return input;
-        return input.Substring(0, index) + newValue + input.Substring(index + oldValue.Length);
+        var searchStart = 0;
+        while (searchStart <= key.Length - libName.Length)
+        {
+            var index = key.IndexOf(libName, searchStart, StringComparison.OrdinalIgnoreCase);
+            if (index < 0)
+            {
+                return null;
+            }
+
+            var beforeIsBoundary = index == 0 || key[index - 1] == '/';
+            var afterPos = index + libName.Length;
+            var afterIsBoundary = afterPos < key.Length && key[afterPos] == '.';
+
+            if (beforeIsBoundary && afterIsBoundary)
+            {
+                return key.Substring(0, index) + replacement + key.Substring(afterPos);
+            }
+
+            searchStart = index + 1;
+        }
+
+        return null;
     }
 }
