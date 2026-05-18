@@ -44,6 +44,7 @@
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="Argon" />
     <PackageReference Include="Microsoft.Build.Framework" />
+    <PackageReference Include="System.Security.Cryptography.Xml" />
     <None Update="test.snk">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
