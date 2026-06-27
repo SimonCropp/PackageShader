@@ -73,7 +73,7 @@ static class MetadataHelper
         var cultureStr = string.IsNullOrEmpty(culture) ? "neutral" : culture;
         var publicKeyOrToken = reader.GetBlobBytes(assemblyRef.PublicKeyOrToken);
         var tokenStr = publicKeyOrToken.Length == 8
-            ? BitConverter.ToString(publicKeyOrToken).Replace("-", "").ToLowerInvariant()
+            ? Convert.ToHexStringLower(publicKeyOrToken)
             : FormatPublicKeyToken(publicKeyOrToken);
 
         return $"{name}, Version={version}, Culture={cultureStr}, PublicKeyToken={tokenStr}";
@@ -94,7 +94,7 @@ static class MetadataHelper
             token[i] = hash[hash.Length - 1 - i];
         }
 
-        return BitConverter.ToString(token).Replace("-", "").ToLowerInvariant();
+        return Convert.ToHexStringLower(token);
     }
 
     public static List<string> GetAssemblyReferences(MetadataReader reader) =>
