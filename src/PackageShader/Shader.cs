@@ -157,8 +157,8 @@ public static class Shader
 
         // Group by name to handle duplicates (e.g., IntermediateAssembly may also be in ReferenceCopyLocalPaths)
         var infoByName = infos
-            .GroupBy(_ => _.SourceName, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(_ => _.Key, _ => _.First(), StringComparer.OrdinalIgnoreCase);
+            .DistinctBy(_ => _.SourceName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(_ => _.SourceName, StringComparer.OrdinalIgnoreCase);
         var toProcess = new Queue<SourceTargetInfo>();
         toProcess.Enqueue(rootInfo);
         reachable.Add(rootInfo.SourceName);
