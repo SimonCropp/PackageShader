@@ -3,8 +3,9 @@
     <Version>1.1.0</Version>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-    <NoWarn>CS1591</NoWarn>
+    <NoWarn>CS1591;SC023</NoWarn>
     <Configurations>Debug;Release</Configurations>
     <ResolveAssemblyReferencesSilent>true</ResolveAssemblyReferencesSilent>
+    <Verify_SponsorshipLicenseIgnored>true</Verify_SponsorshipLicenseIgnored>
   </PropertyGroup>
 </Project>
