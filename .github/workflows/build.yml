@@ -25,7 +25,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        # Intel mac: the test project has PlatformTarget x64, which cannot load on arm64 runners.
+        os: [windows-latest, macos-15-intel, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
