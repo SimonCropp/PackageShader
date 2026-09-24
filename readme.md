@@ -1,6 +1,6 @@
 # <img src='/src/icon.png' height='30px'> PackageShader
 
-[![Build status](https://img.shields.io/appveyor/build/SimonCropp/packageshader)](https://ci.appveyor.com/project/SimonCropp/packageshader)
+[![Build status](https://github.com/SimonCropp/PackageShader/actions/workflows/build.yml/badge.svg)](https://github.com/SimonCropp/PackageShader/actions/workflows/build.yml)
 [![NuGet Status](https://img.shields.io/nuget/v/PackageShader.svg?label=PackageShader)](https://www.nuget.org/packages/PackageShader/)
 [![NuGet Status](https://img.shields.io/nuget/v/PackageShaderTool.svg?label=PackageShaderTool)](https://www.nuget.org/packages/PackageShaderTool/)
 [![NuGet Status](https://img.shields.io/nuget/v/PackageShader.MsBuild.svg?label=PackageShader.MsBuild)](https://www.nuget.org/packages/PackageShader.MsBuild/)
