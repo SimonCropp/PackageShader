@@ -7,7 +7,7 @@
     <PackageVersion Include="Argon" Version="0.37.0" />
     <PackageVersion Include="CliWrap" Version="3.10.5" />
     <PackageVersion Include="CommandLineParser" Version="2.9.1" />
-    <PackageVersion Include="MarkdownSnippets.MsBuild" Version="28.4.4" />
+    <PackageVersion Include="MarkdownSnippets.MsBuild" Version="28.5.0" />
     <PackageVersion Include="Microsoft.Build.Framework" Version="18.9.6" Pinned="true" />
     <PackageVersion Include="Microsoft.Build.Tasks.Core" Version="18.9.6" Pinned="true" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
@@ -27,6 +27,6 @@
     <PackageVersion Include="DiffEngine" Version="20.5.2" />
     <PackageVersion Include="EmptyFiles" Version="8.19.0" />
     <PackageVersion Include="SimpleInfoName" Version="3.2.0" />
-    <PackageVersion Include="Verify" Version="33.1.4" />
+    <PackageVersion Include="Verify" Version="33.1.5" />
   </ItemGroup>
 </Project>
