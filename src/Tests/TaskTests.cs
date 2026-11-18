@@ -382,6 +382,39 @@ public class TaskTests
     }
 
 #if !DEBUG
+    // The test projects restore the package this build produced. Once a version is released,
+    // nuget.org and the global packages folder hold a package with the same version as the one
+    // in nugets, so the mapping pins PackageShader to the local feed and each project gets its
+    // own packages folder.
+    static Task WriteNuGetConfig(string projectDir, CancellationToken cancel)
+    {
+        var localFeed = Path.Combine(ProjectFiles.SolutionDirectory.Path, "..", "nugets");
+        var packagesFolder = Path.Combine(projectDir, "packages");
+        var nugetConfig =
+            $"""
+             <?xml version="1.0" encoding="utf-8"?>
+             <configuration>
+               <config>
+                 <add key="globalPackagesFolder" value="{packagesFolder}" />
+               </config>
+               <packageSources>
+                 <clear />
+                 <add key="local" value="{localFeed}" />
+                 <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+               </packageSources>
+               <packageSourceMapping>
+                 <packageSource key="local">
+                   <package pattern="PackageShader*" />
+                 </packageSource>
+                 <packageSource key="nuget.org">
+                   <package pattern="*" />
+                 </packageSource>
+               </packageSourceMapping>
+             </configuration>
+             """;
+        return File.WriteAllTextAsync(Path.Combine(projectDir, "NuGet.config"), nugetConfig, cancel);
+    }
+
     [Fact]
     public async Task IncludesShadedAssembliesInPackageWhenIncludeBuildOutputIsFalse_ReleaseOnly()
     {
@@ -426,20 +459,7 @@ public class TaskTests
             """;
         await File.WriteAllTextAsync(Path.Combine(projectDir, "TestClass.cs"), classContent, TestContext.Current.CancellationToken);
 
-        // Create NuGet.config pointing to local PackageShader package
-        var packageShaderBinPath = Path.Combine(ProjectFiles.SolutionDirectory.Path, "..", "nugets");
-        var nugetConfig =
-            $"""
-             <?xml version="1.0" encoding="utf-8"?>
-             <configuration>
-               <packageSources>
-                 <clear />
-                 <add key="local" value="{packageShaderBinPath}" />
-                 <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-               </packageSources>
-             </configuration>
-             """;
-        await File.WriteAllTextAsync(Path.Combine(projectDir, "NuGet.config"), nugetConfig, TestContext.Current.CancellationToken);
+        await WriteNuGetConfig(projectDir, TestContext.Current.CancellationToken);
 
         // Restore
         var restoreResult = await Cli.Wrap("dotnet")
@@ -536,19 +556,7 @@ public class TaskTests
             "System.Console.Write(typeof(Newtonsoft.Json.JsonConvert).Assembly.GetName().Name);",
             cancel);
 
-        var packageShaderBinPath = Path.Combine(ProjectFiles.SolutionDirectory.Path, "..", "nugets");
-        var nugetConfig =
-            $"""
-             <?xml version="1.0" encoding="utf-8"?>
-             <configuration>
-               <packageSources>
-                 <clear />
-                 <add key="local" value="{packageShaderBinPath}" />
-                 <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-               </packageSources>
-             </configuration>
-             """;
-        await File.WriteAllTextAsync(Path.Combine(projectDir, "NuGet.config"), nugetConfig, cancel);
+        await WriteNuGetConfig(projectDir, cancel);
 
         async Task<string> Run(string command, params string[] arguments)
         {
@@ -723,24 +731,7 @@ public class TaskTests
             """;
         await File.WriteAllTextAsync(Path.Combine(projectDir, "MyClass.cs"), classContent, TestContext.Current.CancellationToken);
 
-        // Create NuGet.config pointing to local PackageShader package
-        var packageShaderBinPath = Path.Combine(ProjectFiles.SolutionDirectory.Path, "..", "nugets");
-        var localPackagesFolder = Path.Combine(projectDir, "packages");
-        var nugetConfig =
-            $"""
-             <?xml version="1.0" encoding="utf-8"?>
-             <configuration>
-               <config>
-                 <add key="globalPackagesFolder" value="{localPackagesFolder}" />
-               </config>
-               <packageSources>
-                 <clear />
-                 <add key="local" value="{packageShaderBinPath}" />
-                 <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-               </packageSources>
-             </configuration>
-             """;
-        await File.WriteAllTextAsync(Path.Combine(projectDir, "NuGet.config"), nugetConfig, TestContext.Current.CancellationToken);
+        await WriteNuGetConfig(projectDir, TestContext.Current.CancellationToken);
 
         // Restore
         var restoreResult = await Cli.Wrap("dotnet")
@@ -836,25 +827,7 @@ public class TaskTests
             """;
         await File.WriteAllTextAsync(Path.Combine(projectDir, "MyClass.cs"), classContent, TestContext.Current.CancellationToken);
 
-        // Create NuGet.config pointing to local PackageShader package
-        // Use a local packages folder to avoid global cache issues when testing local package changes
-        var packageShaderBinPath = Path.Combine(ProjectFiles.SolutionDirectory.Path, "..", "nugets");
-        var localPackagesFolder = Path.Combine(projectDir, "packages");
-        var nugetConfig =
-            $"""
-             <?xml version="1.0" encoding="utf-8"?>
-             <configuration>
-               <config>
-                 <add key="globalPackagesFolder" value="{localPackagesFolder}" />
-               </config>
-               <packageSources>
-                 <clear />
-                 <add key="local" value="{packageShaderBinPath}" />
-                 <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-               </packageSources>
-             </configuration>
-             """;
-        await File.WriteAllTextAsync(Path.Combine(projectDir, "NuGet.config"), nugetConfig, TestContext.Current.CancellationToken);
+        await WriteNuGetConfig(projectDir, TestContext.Current.CancellationToken);
 
         // Restore
         var restoreResult = await Cli.Wrap("dotnet")
@@ -1046,20 +1019,7 @@ public class TaskTests
             """;
         await File.WriteAllTextAsync(Path.Combine(projectDir, "TestClass.cs"), classContent, TestContext.Current.CancellationToken);
 
-        // Create NuGet.config pointing to local PackageShader package
-        var packageShaderBinPath = Path.Combine(ProjectFiles.SolutionDirectory.Path, "..", "nugets");
-        var nugetConfig =
-            $"""
-             <?xml version="1.0" encoding="utf-8"?>
-             <configuration>
-               <packageSources>
-                 <clear />
-                 <add key="local" value="{packageShaderBinPath}" />
-                 <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-               </packageSources>
-             </configuration>
-             """;
-        await File.WriteAllTextAsync(Path.Combine(projectDir, "NuGet.config"), nugetConfig, TestContext.Current.CancellationToken);
+        await WriteNuGetConfig(projectDir, TestContext.Current.CancellationToken);
 
         // Restore
         var restoreResult = await Cli.Wrap("dotnet")
