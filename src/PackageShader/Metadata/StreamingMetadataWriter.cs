@@ -18,11 +18,31 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
         source.StringIndexSize != stringIndexSize ||
         source.BlobIndexSize != blobIndexSize;
 
+    // Where each table was written, from the start of the metadata, and the width of its rows
+    // there. Added rows move every later table, and heap index promotion widens every row holding
+    // a heap index, so neither can be taken from the source layout.
+    readonly long[] tableOffsets = new long[64];
+    readonly int[] tableRowSizes = new int[64];
+    long metadataStart;
+
+    /// <summary>
+    /// The offset of the first row of <paramref name="table"/> from the start of the written
+    /// metadata. Valid once <see cref="Write"/> has run.
+    /// </summary>
+    public long GetTableOffset(TableIndex table) => tableOffsets[(int)table];
+
+    /// <summary>
+    /// The width the rows of <paramref name="table"/> were written at. Valid once
+    /// <see cref="Write"/> has run.
+    /// </summary>
+    public int GetRowSize(TableIndex table) => tableRowSizes[(int)table];
+
     /// <summary>
     /// Writes the complete metadata section to the output stream.
     /// </summary>
     public void Write(Stream output)
     {
+        metadataStart = output.Position;
         using var writer = new BinaryWriter(output, Encoding.UTF8, leaveOpen: true);
 
         // Write metadata root header
@@ -208,6 +228,7 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
         writer.Write(sorted);
 
         // Row counts
+        var rowCounts = new int[58];
         for (var i = 0; i < 58; i++)
         {
             if ((valid & (1L << i)) == 0)
@@ -232,6 +253,7 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
                 count += plan.NewCustomAttributes.Count;
             }
 
+            rowCounts[i] = count;
             writer.Write((uint)count);
         }
 
@@ -244,7 +266,13 @@ sealed class StreamingMetadataWriter(StreamingMetadataReader source, Modificatio
             }
 
             var table = (TableIndex)i;
+            var tableStart = writer.BaseStream.Position;
             WriteTableData(writer, table);
+            tableOffsets[i] = tableStart - metadataStart;
+            if (rowCounts[i] > 0)
+            {
+                tableRowSizes[i] = (int)((writer.BaseStream.Position - tableStart) / rowCounts[i]);
+            }
         }
 
         AlignTo4(writer);

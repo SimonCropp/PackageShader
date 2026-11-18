@@ -306,10 +306,12 @@ public class StreamingStrongNameSignerTests
             stream, checksumOffset, signatureOffset, signatureSize);
 
         // Build the expected data by excluding both skip regions, then SHA1
-        var expectedData = new List<byte>();
-        expectedData.AddRange(data[..checksumOffset]);
-        expectedData.AddRange(data[(checksumOffset + checksumSize)..(int)signatureOffset]);
-        expectedData.AddRange(data[((int)signatureOffset + signatureSize)..]);
+        List<byte> expectedData =
+        [
+            .. data[..checksumOffset],
+            .. data[(checksumOffset + checksumSize)..(int) signatureOffset],
+            .. data[((int) signatureOffset + signatureSize)..]
+        ];
         var expected = SHA1.HashData(expectedData.ToArray());
 
         Assert.Equal(expected, actual);
@@ -338,10 +340,12 @@ public class StreamingStrongNameSignerTests
         var actual = StreamingStrongNameSigner.ComputeStrongNameHashStreaming(
             stream, checksumOffset, signatureOffset, signatureSize);
 
-        var expectedData = new List<byte>();
-        expectedData.AddRange(data[..(int)signatureOffset]);
-        expectedData.AddRange(data[((int)signatureOffset + signatureSize)..checksumOffset]);
-        expectedData.AddRange(data[(checksumOffset + checksumSize)..]);
+        List<byte> expectedData =
+        [
+            .. data[..(int) signatureOffset],
+            .. data[((int) signatureOffset + signatureSize)..checksumOffset],
+            .. data[(checksumOffset + checksumSize)..]
+        ];
         var expected = SHA1.HashData(expectedData.ToArray());
 
         Assert.Equal(expected, actual);
@@ -398,9 +402,11 @@ public class StreamingStrongNameSignerTests
         var actual = StreamingStrongNameSigner.ComputeStrongNameHashStreaming(
             stream, checksumOffset, signatureOffset, signatureSize);
 
-        var expectedData = new List<byte>();
-        expectedData.AddRange(data[..checksumOffset]);
-        expectedData.AddRange(data[(checksumOffset + checksumSize)..90]);
+        List<byte> expectedData =
+        [
+            .. data[..checksumOffset],
+            .. data[(checksumOffset + checksumSize)..90]
+        ];
         var expected = SHA1.HashData(expectedData.ToArray());
 
         Assert.Equal(expected, actual);
@@ -429,10 +435,12 @@ public class StreamingStrongNameSignerTests
         var actual = StreamingStrongNameSigner.ComputeStrongNameHashStreaming(
             stream, checksumOffset, signatureOffset, signatureSize);
 
-        var expectedData = new List<byte>();
-        expectedData.AddRange(data[..checksumOffset]);
-        expectedData.AddRange(data[(checksumOffset + checksumSize)..(int)signatureOffset]);
-        expectedData.AddRange(data[((int)signatureOffset + signatureSize)..]);
+        List<byte> expectedData =
+        [
+            .. data[..checksumOffset],
+            .. data[(checksumOffset + checksumSize)..(int) signatureOffset],
+            .. data[((int) signatureOffset + signatureSize)..]
+        ];
         var expected = SHA1.HashData(expectedData.ToArray());
 
         Assert.Equal(expected, actual);

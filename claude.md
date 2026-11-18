@@ -42,13 +42,13 @@ dotnet run --project src/Tests --configuration Debug
 dotnet build src/PackageShader/PackageShader.csproj --configuration Debug
 ```
 
-**Requirements**: .NET SDK 10.0.102+ (see `src/global.json`)
+**Requirements**: .NET SDK 11.0.100+ (see `global.json`)
 
 ## Test Framework
 
 - **Framework**: xunit.v3 with Verify.XunitV3 for snapshot testing
 - **Snapshot files**: `*.verified.txt` files in `src/Tests/` are baseline comparisons
-- **Test project**: `src/Tests/Tests.csproj` (targets net10.0)
+- **Test project**: `src/Tests/Tests.csproj` (targets net11.0)
 
 ## Architecture
 
