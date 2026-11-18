@@ -475,7 +475,7 @@ public class TaskTests
 
         // Build
         var buildResult = await Cli.Wrap("dotnet")
-            .WithArguments(["build", "-c", "Release"])
+            .WithArguments(["build", "-c", "Release", "-nodeReuse:false"])
             .WithWorkingDirectory(projectDir)
             .WithValidation(CommandResultValidation.None)
             .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
@@ -487,7 +487,7 @@ public class TaskTests
 
         // Pack (with --no-build to test temp file persistence)
         var packResult = await Cli.Wrap("dotnet")
-            .WithArguments(["pack", "-c", "Release", "--no-build"])
+            .WithArguments(["pack", "-c", "Release", "--no-build", "-nodeReuse:false"])
             .WithWorkingDirectory(projectDir)
             .WithValidation(CommandResultValidation.None)
             .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
@@ -563,6 +563,9 @@ public class TaskTests
             var result = await Cli.Wrap(command)
                 .WithArguments(arguments)
                 .WithWorkingDirectory(projectDir)
+                // A node kept for reuse holds the task assembly open in the project's packages
+                // folder, and the directory then cannot be deleted.
+                .WithEnvironmentVariables(_ => _.Set("MSBUILDDISABLENODEREUSE", "1"))
                 .WithValidation(CommandResultValidation.None)
                 .ExecuteBufferedAsync(cancel);
             if (result.ExitCode != 0)
@@ -1035,7 +1038,7 @@ public class TaskTests
 
         // Build
         var buildResult = await Cli.Wrap("dotnet")
-            .WithArguments(["build", "-c", "Release"])
+            .WithArguments(["build", "-c", "Release", "-nodeReuse:false"])
             .WithWorkingDirectory(projectDir)
             .WithValidation(CommandResultValidation.None)
             .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
@@ -1047,7 +1050,7 @@ public class TaskTests
 
         // Pack (with --no-build to test temp file persistence)
         var packResult = await Cli.Wrap("dotnet")
-            .WithArguments(["pack", "-c", "Release", "--no-build"])
+            .WithArguments(["pack", "-c", "Release", "--no-build", "-nodeReuse:false"])
             .WithWorkingDirectory(projectDir)
             .WithValidation(CommandResultValidation.None)
             .ExecuteBufferedAsync(TestContext.Current.CancellationToken);
