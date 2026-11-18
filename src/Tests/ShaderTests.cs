@@ -602,6 +602,53 @@ public class ShaderTests
             modifier.Save(shadedPath);
         }
 
+        AssertStaticFieldDataReadable(shadedPath);
+    }
+
+    /// <summary>
+    /// Tests that FieldRVA entries are patched when the rebuilt metadata promotes the #Blob heap
+    /// from 2-byte to 4-byte indices. Promotion widens every row holding a blob index, so the
+    /// FieldRVA table no longer sits where it did in the source metadata. Parlot 2's
+    /// netstandard2.0 build crosses the 64 KB boundary when shaded, and its character table then
+    /// read unrelated bytes.
+    /// </summary>
+    [Fact]
+    public void FieldRVAsPatchedWhenBlobHeapIndexWidens()
+    {
+        using var directory = new TempDirectory();
+
+        var sourceAssembly = Path.Combine(binDirectory, "AssemblyWithStaticFields.dll");
+        using (var originalPeFile = StreamingPEFile.Open(sourceAssembly))
+        using (var originalReader = new StreamingMetadataReader(originalPeFile))
+        {
+            Assert.Equal(2, originalReader.BlobIndexSize);
+        }
+
+        // Each attribute's blob holds the friend name, so long names take the #Blob heap past
+        // 2^16 bytes.
+        var shadedPath = Path.Combine(directory, "Shaded.AssemblyWithStaticFields.dll");
+        using (var modifier = StreamingAssemblyModifier.Open(sourceAssembly))
+        {
+            for (var i = 0; i < 70; i++)
+            {
+                modifier.AddInternalsVisibleTo($"FriendAssembly{i}{new('x', 1000)}");
+            }
+
+            modifier.SetAssemblyName("Shaded.AssemblyWithStaticFields");
+            modifier.Save(shadedPath);
+        }
+
+        using (var shadedPeFile = StreamingPEFile.Open(shadedPath))
+        using (var shadedReader = new StreamingMetadataReader(shadedPeFile))
+        {
+            Assert.Equal(4, shadedReader.BlobIndexSize);
+        }
+
+        AssertStaticFieldDataReadable(shadedPath);
+    }
+
+    static void AssertStaticFieldDataReadable(string shadedPath)
+    {
         // Verify the assembly can be loaded and static data is accessible
         var loadContext = new AssemblyLoadContext("FieldRVATest", isCollectible: true);
         try

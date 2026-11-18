@@ -227,7 +227,7 @@ public class TaskTests
     public void Cancel_DoesNotThrow()
     {
         var task = new ShadeTask();
-        var exception = Record.Exception(() => task.Cancel());
+        var exception = Record.Exception(task.Cancel);
         Assert.Null(exception);
     }
 

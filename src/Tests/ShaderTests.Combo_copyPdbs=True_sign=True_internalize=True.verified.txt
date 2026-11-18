@@ -2,7 +2,7 @@
   {
     Name: AssemblyToInclude, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
     References: [
-      System.Runtime, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
+      System.Runtime, Version=11.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
     ],
     HasExternalSymbols: false,
     HasEmbeddedSymbols: false
@@ -17,7 +17,7 @@
       AssemblyWithPdb_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
       AssemblyWithStrongName_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
       Newtonsoft.Json_Shaded, Version=13.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
-      System.Runtime, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
+      System.Runtime, Version=11.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
     ],
     HasExternalSymbols: true,
     HasEmbeddedSymbols: false
@@ -25,7 +25,7 @@
   {
     Name: AssemblyWithEmbeddedSymbols_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
     References: [
-      System.Runtime, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
+      System.Runtime, Version=11.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
     ],
     InternalsVisibleTo: [
       AssemblyToInclude, PublicKey=002400000480000094000000060200000024000052534131000400000100010059964A931488BCDBD14657F1EE0DF32DF61B57B3D14D7290C262C2CC9DDAAD6EC984044F761F778E1823049D2CB996A4F58C8EA5B46C37891414CB34B4036B1C178D7B582289D2EEF3C0F1E9B692C229A306831EE3D371D9E883F0EB0F74AEAC6C6AB8C85FD1EC04B267E15A31532C4B4E2191F5980459DB4DCE0081F1050FB8,
@@ -43,7 +43,7 @@
   {
     Name: AssemblyWithNoStrongName_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
     References: [
-      System.Runtime, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
+      System.Runtime, Version=11.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
     ],
     InternalsVisibleTo: [
       AssemblyToInclude, PublicKey=002400000480000094000000060200000024000052534131000400000100010059964A931488BCDBD14657F1EE0DF32DF61B57B3D14D7290C262C2CC9DDAAD6EC984044F761F778E1823049D2CB996A4F58C8EA5B46C37891414CB34B4036B1C178D7B582289D2EEF3C0F1E9B692C229A306831EE3D371D9E883F0EB0F74AEAC6C6AB8C85FD1EC04B267E15A31532C4B4E2191F5980459DB4DCE0081F1050FB8,
@@ -61,7 +61,7 @@
   {
     Name: AssemblyWithNoSymbols_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
     References: [
-      System.Runtime, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
+      System.Runtime, Version=11.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
     ],
     InternalsVisibleTo: [
       AssemblyToInclude, PublicKey=002400000480000094000000060200000024000052534131000400000100010059964A931488BCDBD14657F1EE0DF32DF61B57B3D14D7290C262C2CC9DDAAD6EC984044F761F778E1823049D2CB996A4F58C8EA5B46C37891414CB34B4036B1C178D7B582289D2EEF3C0F1E9B692C229A306831EE3D371D9E883F0EB0F74AEAC6C6AB8C85FD1EC04B267E15A31532C4B4E2191F5980459DB4DCE0081F1050FB8,
@@ -79,7 +79,7 @@
   {
     Name: AssemblyWithPdb_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
     References: [
-      System.Runtime, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
+      System.Runtime, Version=11.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
     ],
     InternalsVisibleTo: [
       AssemblyToInclude, PublicKey=002400000480000094000000060200000024000052534131000400000100010059964A931488BCDBD14657F1EE0DF32DF61B57B3D14D7290C262C2CC9DDAAD6EC984044F761F778E1823049D2CB996A4F58C8EA5B46C37891414CB34B4036B1C178D7B582289D2EEF3C0F1E9B692C229A306831EE3D371D9E883F0EB0F74AEAC6C6AB8C85FD1EC04B267E15A31532C4B4E2191F5980459DB4DCE0081F1050FB8,
@@ -97,7 +97,7 @@
   {
     Name: AssemblyWithResources_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
     References: [
-      System.Runtime, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
+      System.Runtime, Version=11.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
     ],
     InternalsVisibleTo: [
       AssemblyToInclude, PublicKey=002400000480000094000000060200000024000052534131000400000100010059964A931488BCDBD14657F1EE0DF32DF61B57B3D14D7290C262C2CC9DDAAD6EC984044F761F778E1823049D2CB996A4F58C8EA5B46C37891414CB34B4036B1C178D7B582289D2EEF3C0F1E9B692C229A306831EE3D371D9E883F0EB0F74AEAC6C6AB8C85FD1EC04B267E15A31532C4B4E2191F5980459DB4DCE0081F1050FB8,
@@ -115,7 +115,7 @@
   {
     Name: AssemblyWithStrongName_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=fba2ec45388e2af0,
     References: [
-      System.Runtime, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
+      System.Runtime, Version=11.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
     ],
     InternalsVisibleTo: [
       AssemblyToInclude, PublicKey=002400000480000094000000060200000024000052534131000400000100010059964A931488BCDBD14657F1EE0DF32DF61B57B3D14D7290C262C2CC9DDAAD6EC984044F761F778E1823049D2CB996A4F58C8EA5B46C37891414CB34B4036B1C178D7B582289D2EEF3C0F1E9B692C229A306831EE3D371D9E883F0EB0F74AEAC6C6AB8C85FD1EC04B267E15A31532C4B4E2191F5980459DB4DCE0081F1050FB8,
