@@ -3,6 +3,16 @@ public class ShaderTests
 {
     static string binDirectory = Path.GetDirectoryName(typeof(ShaderTests).Assembly.Location)!;
 
+    // A tag build passes -p:Version, which overrides the Version the fixture projects pin, so the
+    // fixtures take the version being released. Only that exact version is scrubbed, so a version
+    // the shader gets wrong still shows in the snapshot.
+    static string fixtureVersion = AssemblyName
+        .GetAssemblyName(Path.Combine(binDirectory, "AssemblyToProcess.dll"))
+        .Version!
+        .ToString();
+
+    static Regex fixtureVersionRegex = new($@"(Assembly\w+, Version=){Regex.Escape(fixtureVersion)},");
+
     static List<string> assemblyFiles =
     [
         "AssemblyToProcess",
@@ -90,7 +100,8 @@ public class ShaderTests
 
         EnsureLoadable(directory);
         await Verify(results)
-            .UseParameters(copyPdbs, sign, internalize);
+            .UseParameters(copyPdbs, sign, internalize)
+            .ScrubLinesWithReplace(_ => fixtureVersionRegex.Replace(_, "$1{Scrubbed},"));
     }
 
     static void EnsureLoadable(string directory)
