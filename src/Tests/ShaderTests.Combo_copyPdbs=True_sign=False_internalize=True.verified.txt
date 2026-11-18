@@ -1,6 +1,6 @@
 ﻿[
   {
-    Name: AssemblyToInclude, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null,
+    Name: AssemblyToInclude, Version={Scrubbed}, Culture=neutral, PublicKeyToken=null,
     References: [
       System.Runtime, Version=11.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
     ],
@@ -8,14 +8,14 @@
     HasEmbeddedSymbols: false
   },
   {
-    Name: AssemblyToProcess, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null,
+    Name: AssemblyToProcess, Version={Scrubbed}, Culture=neutral, PublicKeyToken=null,
     References: [
-      AssemblyToInclude, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null,
-      AssemblyWithEmbeddedSymbols_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null,
-      AssemblyWithNoStrongName_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null,
-      AssemblyWithNoSymbols_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null,
-      AssemblyWithPdb_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null,
-      AssemblyWithStrongName_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null,
+      AssemblyToInclude, Version={Scrubbed}, Culture=neutral, PublicKeyToken=null,
+      AssemblyWithEmbeddedSymbols_Shaded, Version={Scrubbed}, Culture=neutral, PublicKeyToken=null,
+      AssemblyWithNoStrongName_Shaded, Version={Scrubbed}, Culture=neutral, PublicKeyToken=null,
+      AssemblyWithNoSymbols_Shaded, Version={Scrubbed}, Culture=neutral, PublicKeyToken=null,
+      AssemblyWithPdb_Shaded, Version={Scrubbed}, Culture=neutral, PublicKeyToken=null,
+      AssemblyWithStrongName_Shaded, Version={Scrubbed}, Culture=neutral, PublicKeyToken=null,
       Newtonsoft.Json_Shaded, Version=13.0.0.0, Culture=neutral, PublicKeyToken=null,
       System.Runtime, Version=11.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
     ],
@@ -23,7 +23,7 @@
     HasEmbeddedSymbols: false
   },
   {
-    Name: AssemblyWithEmbeddedSymbols_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null,
+    Name: AssemblyWithEmbeddedSymbols_Shaded, Version={Scrubbed}, Culture=neutral, PublicKeyToken=null,
     References: [
       System.Runtime, Version=11.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
     ],
@@ -41,7 +41,7 @@
     HasEmbeddedSymbols: true
   },
   {
-    Name: AssemblyWithNoStrongName_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null,
+    Name: AssemblyWithNoStrongName_Shaded, Version={Scrubbed}, Culture=neutral, PublicKeyToken=null,
     References: [
       System.Runtime, Version=11.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
     ],
@@ -59,7 +59,7 @@
     HasEmbeddedSymbols: false
   },
   {
-    Name: AssemblyWithNoSymbols_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null,
+    Name: AssemblyWithNoSymbols_Shaded, Version={Scrubbed}, Culture=neutral, PublicKeyToken=null,
     References: [
       System.Runtime, Version=11.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
     ],
@@ -77,7 +77,7 @@
     HasEmbeddedSymbols: false
   },
   {
-    Name: AssemblyWithPdb_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null,
+    Name: AssemblyWithPdb_Shaded, Version={Scrubbed}, Culture=neutral, PublicKeyToken=null,
     References: [
       System.Runtime, Version=11.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
     ],
@@ -95,7 +95,7 @@
     HasEmbeddedSymbols: false
   },
   {
-    Name: AssemblyWithResources_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null,
+    Name: AssemblyWithResources_Shaded, Version={Scrubbed}, Culture=neutral, PublicKeyToken=null,
     References: [
       System.Runtime, Version=11.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
     ],
@@ -113,7 +113,7 @@
     HasEmbeddedSymbols: false
   },
   {
-    Name: AssemblyWithStrongName_Shaded, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null,
+    Name: AssemblyWithStrongName_Shaded, Version={Scrubbed}, Culture=neutral, PublicKeyToken=null,
     References: [
       System.Runtime, Version=11.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
     ],
