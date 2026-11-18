@@ -232,6 +232,8 @@ https://www.nuget.org/packages/PackageShader.MsBuild/
 
 Automatically shade assemblies at build time via MSBuild integration.
 
+**.NET SDK 11 or higher is required to build with this package.** The task runs inside the MSBuild that builds the project, and uses the System.Reflection.Metadata and System.Text.Json that MSBuild loads. Version 2 needs version 11 of both; under the .NET 10 SDK the task fails with `FileNotFoundException` for `System.Reflection.Metadata, Version=11.0.0.0`. The project itself can target any framework.
+
 
 ### Installation
 

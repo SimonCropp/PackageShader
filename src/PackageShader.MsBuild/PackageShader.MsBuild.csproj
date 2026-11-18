@@ -24,9 +24,13 @@
       <Pack>true</Pack>
       <PackagePath>buildMultiTargeting</PackagePath>
     </Content>
-    <PackageReference Include="Microsoft.Build.Tasks.Core" />
+    <!-- Both are supplied by the MSBuild that loads the task, so neither is a dependency of the
+         package. Declared, they flow into every project that uses the task: System.Text.Json
+         11.0.0 is not pruned on net10.0, so such a project compiled against System.Text.Json and
+         System.Text.Encodings.Web 11.0.0.0 and failed to load them on a .NET 10 host. -->
+    <PackageReference Include="Microsoft.Build.Tasks.Core" PrivateAssets="all" />
     <PackageReference Include="ProjectDefaults" PrivateAssets="all" />
-    <PackageReference Include="System.Text.Json" />
+    <PackageReference Include="System.Text.Json" PrivateAssets="all" />
     <ProjectReference Include="..\PackageShader\PackageShader.csproj" PrivateAssets="All" />
   </ItemGroup>
 </Project>

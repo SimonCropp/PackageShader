@@ -43,6 +43,9 @@
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="Argon" />
     <PackageReference Include="Microsoft.Build.Framework" />
+    <!-- The task tests construct the tasks, whose base types live here. The task project keeps
+         this reference private, so it no longer reaches the tests through that project. -->
+    <PackageReference Include="Microsoft.Build.Tasks.Core" />
     <PackageReference Include="System.Security.Cryptography.Xml" />
     <None Update="test.snk">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

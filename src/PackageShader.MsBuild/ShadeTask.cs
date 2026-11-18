@@ -134,6 +134,15 @@ public class ShadeTask :
             var targetPath = Path.Combine(IntermediateDirectory, $"{name}.dll");
             var isRoot = sourcePath == IntermediateAssembly;
             sourceTargetInfos.Add(new(name, sourcePath, name, targetPath, IsShaded: false, IsRootAssembly: isRoot));
+
+            // The project's own assembly is rewritten where it is and reaches the output the way it
+            // always does. Listed as copy-local too, it was a second file at the same path, which
+            // publish rejects with NETSDK1152.
+            if (isRoot)
+            {
+                continue;
+            }
+
             ProcessCopyLocal(sourcePath, targetPath);
         }
 

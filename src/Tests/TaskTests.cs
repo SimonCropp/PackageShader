@@ -85,6 +85,22 @@ public class TaskTests
         Assert.NotEmpty(task.CopyLocalPathsToAdd);
     }
 
+    // The project's own assembly is rewritten where it is and reaches the output on its own. As a
+    // copy-local item too it was a second file at the same path, which publish rejects
+    // (NETSDK1152).
+    [Fact]
+    public void Execute_DoesNotListIntermediateAssemblyAsCopyLocal()
+    {
+        using var tempDir = new TempDirectory();
+        var task = CreateTask(tempDir, sign: false, internalize: false);
+
+        task.Execute();
+
+        var added = task.CopyLocalPathsToAdd.Select(_ => Path.GetFileName(_.ItemSpec)).ToList();
+        Assert.DoesNotContain("AssemblyToProcess.dll", added);
+        Assert.DoesNotContain("AssemblyToProcess.pdb", added);
+    }
+
     [Fact]
     public void Execute_WithAssembliesToShade_OnlyShadesThoseAssemblies()
     {
@@ -314,7 +330,7 @@ public class TaskTests
     static List<string> GetTestAssemblyPaths(string tempDir) =>
         Directory.GetFiles(tempDir, "*.dll").ToList();
 
-    class MockBuildEngine : IBuildEngine
+    internal class MockBuildEngine : IBuildEngine
     {
         public List<string> Errors { get; } = [];
         public List<string> Warnings { get; } = [];
@@ -484,6 +500,83 @@ public class TaskTests
             LibEntries = libEntries,
             HasOriginalAssembly = originalEntry != null
         });
+    }
+
+    // An app that shades a package has to run from its build output, from a framework-dependent
+    // publish and from a self-contained one. Each failed differently: the deps.json localPath named
+    // the original file, publish listed the project's own assembly twice (NETSDK1152) and published
+    // the original beside the shaded copy, and a self-contained build handed the runtime pack's
+    // native libraries to the shader.
+    [Fact]
+    public async Task ShadedExeRunsFromBuildAndPublish()
+    {
+        using var projectDir = new TempDirectory();
+        var cancel = TestContext.Current.CancellationToken;
+
+        var packageVersion = typeof(ShadeTask).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!
+            .InformationalVersion;
+
+        var projectContent =
+            $"""
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <OutputType>Exe</OutputType>
+                <TargetFramework>net11.0</TargetFramework>
+              </PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="PackageShader.MsBuild" Version="{packageVersion}" PrivateAssets="all" />
+                <PackageReference Include="Newtonsoft.Json" Version="13.0.3" Shade="true" />
+              </ItemGroup>
+            </Project>
+            """;
+        await File.WriteAllTextAsync(Path.Combine(projectDir, "App.csproj"), projectContent, cancel);
+        await File.WriteAllTextAsync(
+            Path.Combine(projectDir, "Program.cs"),
+            "System.Console.Write(typeof(Newtonsoft.Json.JsonConvert).Assembly.GetName().Name);",
+            cancel);
+
+        var packageShaderBinPath = Path.Combine(ProjectFiles.SolutionDirectory.Path, "..", "nugets");
+        var nugetConfig =
+            $"""
+             <?xml version="1.0" encoding="utf-8"?>
+             <configuration>
+               <packageSources>
+                 <clear />
+                 <add key="local" value="{packageShaderBinPath}" />
+                 <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+               </packageSources>
+             </configuration>
+             """;
+        await File.WriteAllTextAsync(Path.Combine(projectDir, "NuGet.config"), nugetConfig, cancel);
+
+        async Task<string> Run(string command, params string[] arguments)
+        {
+            var result = await Cli.Wrap(command)
+                .WithArguments(arguments)
+                .WithWorkingDirectory(projectDir)
+                .WithValidation(CommandResultValidation.None)
+                .ExecuteBufferedAsync(cancel);
+            if (result.ExitCode != 0)
+            {
+                throw new($"{command} {string.Join(' ', arguments)} failed:\n{result.StandardOutput}\n{result.StandardError}");
+            }
+
+            return result.StandardOutput.Trim();
+        }
+
+        Assert.Equal("App.Newtonsoft.Json", await Run("dotnet", "run", "-c", "Release"));
+
+        var frameworkDependent = Path.Combine(projectDir, "framework-dependent");
+        await Run("dotnet", "publish", "-c", "Release", "-o", frameworkDependent);
+        Assert.False(File.Exists(Path.Combine(frameworkDependent, "Newtonsoft.Json.dll")));
+        Assert.Equal("App.Newtonsoft.Json", await Run("dotnet", Path.Combine(frameworkDependent, "App.dll")));
+
+        var selfContained = Path.Combine(projectDir, "self-contained");
+        await Run("dotnet", "publish", "-c", "Release", "-r", System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier, "--self-contained", "-o", selfContained);
+        Assert.False(File.Exists(Path.Combine(selfContained, "Newtonsoft.Json.dll")));
+        var appHost = Path.Combine(selfContained, OperatingSystem.IsWindows() ? "App.exe" : "App");
+        Assert.Equal("App.Newtonsoft.Json", await Run(appHost));
     }
 #endif
 
