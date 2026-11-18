@@ -1,3 +1,6 @@
+using System.Text.Json.Nodes;
+using Microsoft.Build.Utilities;
+
 public class DepsJsonPatcherTaskTests
 {
     // -------------------------------------------------------------------------
@@ -152,5 +155,93 @@ public class DepsJsonPatcherTaskTests
             "Shaded");
 
         Assert.Equal("lib/FooBar.other/Shaded.dll", result);
+    }
+
+    // -------------------------------------------------------------------------
+    // Execute — what the host reads to find the shaded assembly
+    // -------------------------------------------------------------------------
+
+    const string appDepsJson =
+        """
+        {
+          "targets": {
+            ".NETCoreApp,Version=v11.0": {
+              "App/1.0.0": {
+                "dependencies": {
+                  "Newtonsoft.Json": "13.0.4"
+                },
+                "runtime": {
+                  "App.dll": {}
+                }
+              },
+              "Newtonsoft.Json/13.0.4": {
+                "runtime": {
+                  "lib/net6.0/Newtonsoft.Json.dll": {
+                    "assemblyVersion": "13.0.0.0",
+                    "localPath": "Newtonsoft.Json.dll"
+                  }
+                }
+              }
+            }
+          },
+          "libraries": {
+            "App/1.0.0": {
+              "type": "project"
+            },
+            "Newtonsoft.Json/13.0.4": {
+              "type": "package",
+              "path": "newtonsoft.json/13.0.4"
+            }
+          }
+        }
+        """;
+
+    // Since .NET 9 the host finds an app-local asset by its localPath. Left naming the original
+    // file, it pointed at a file shading had renamed, and the app failed to load the assembly.
+    [Fact]
+    public void Execute_RenamesLocalPathOfShadedAsset()
+    {
+        var target = Patch(appDepsJson)["targets"]![".NETCoreApp,Version=v11.0"]!;
+
+        var asset = target["App.Newtonsoft.Json/13.0.4"]!["runtime"]!["lib/net6.0/App.Newtonsoft.Json.dll"]!;
+        Assert.Equal("App.Newtonsoft.Json.dll", asset["localPath"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void Execute_RenamesDependencyOnShadedLibrary()
+    {
+        var target = Patch(appDepsJson)["targets"]![".NETCoreApp,Version=v11.0"]!;
+
+        var dependencies = target["App/1.0.0"]!["dependencies"]!.AsObject();
+        Assert.Equal("13.0.4", dependencies["App.Newtonsoft.Json"]!.GetValue<string>());
+        Assert.False(dependencies.ContainsKey("Newtonsoft.Json"));
+    }
+
+    // A publish that reuses an up-to-date deps.json runs the patch over a file it already patched.
+    [Fact]
+    public void Execute_OnPatchedFile_ChangesNothing()
+    {
+        var once = Patch(appDepsJson).ToJsonString();
+
+        Assert.Equal(once, Patch(once).ToJsonString());
+    }
+
+    static JsonNode Patch(string json)
+    {
+        using var directory = new TempDirectory();
+        var path = Path.Combine(directory, "App.deps.json");
+        File.WriteAllText(path, json);
+
+        var mapping = new TaskItem("App.Newtonsoft.Json");
+        mapping.SetMetadata("OriginalName", "Newtonsoft.Json");
+        var task = new DepsJsonPatcherTask
+        {
+            BuildEngine = new TaskTests.MockBuildEngine(),
+            DepsJsonPath = path,
+            ShadedNameMappings = [mapping]
+        };
+
+        Assert.True(task.Execute());
+        return JsonNode.Parse(File.ReadAllText(path))!;
     }
 }

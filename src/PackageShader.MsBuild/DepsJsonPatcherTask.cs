@@ -106,7 +106,9 @@ public class DepsJsonPatcherTask : Task
                                         }
 
                                         runtimeToRemove.Add(rt.Key);
-                                        runtimeToAdd[newRtKey] = rt.Value?.DeepClone();
+                                        var asset = rt.Value?.DeepClone();
+                                        RenameLocalPath(asset, libName, shadedName);
+                                        runtimeToAdd[newRtKey] = asset;
                                     }
 
                                     foreach (var key in runtimeToRemove)
@@ -126,6 +128,13 @@ public class DepsJsonPatcherTask : Task
                         tfmLibraries.Remove(key);
                     foreach (var kv in librariesToAdd)
                         tfmLibraries[kv.Key] = kv.Value;
+
+                    // A library that depends on a shaded one names it in its dependencies, and
+                    // the shaded library is now listed under its new name.
+                    foreach (var lib in tfmLibraries)
+                    {
+                        modified |= RenameDependencies(lib.Value?["dependencies"]?.AsObject(), mappings);
+                    }
                 }
             }
 
@@ -172,6 +181,56 @@ public class DepsJsonPatcherTask : Task
             Log.LogError($"DepsJsonPatcher: {ex.Message}");
             return false;
         }
+    }
+
+    /// <summary>
+    /// Renames the file an asset's <c>localPath</c> names. Since .NET 9 the host finds an
+    /// app-local asset by its <c>localPath</c>, so one still naming the original file points at a
+    /// file that shading renamed, and the shaded assembly fails to load.
+    /// </summary>
+    static void RenameLocalPath(JsonNode? asset, string libName, string shadedName)
+    {
+        if (asset is not JsonObject assetObject ||
+            assetObject["localPath"] is not JsonValue localPathValue ||
+            !localPathValue.TryGetValue<string>(out var localPath))
+        {
+            return;
+        }
+
+        var renamed = TryReplaceLibNameAtFilenameBoundary(localPath, libName, shadedName);
+        if (renamed != null)
+        {
+            assetObject["localPath"] = renamed;
+        }
+    }
+
+    /// <summary>
+    /// Renames the shaded libraries a library's <c>dependencies</c> name, keeping their versions.
+    /// </summary>
+    static bool RenameDependencies(JsonObject? dependencies, Dictionary<string, string> mappings)
+    {
+        if (dependencies == null)
+        {
+            return false;
+        }
+
+        var renames = new List<(string From, string To)>();
+        foreach (var dependency in dependencies)
+        {
+            if (mappings.TryGetValue(dependency.Key, out var shadedName))
+            {
+                renames.Add((dependency.Key, shadedName));
+            }
+        }
+
+        foreach (var (from, to) in renames)
+        {
+            var version = dependencies[from]?.DeepClone();
+            dependencies.Remove(from);
+            dependencies[to] = version;
+        }
+
+        return renames.Count > 0;
     }
 
     /// <summary>

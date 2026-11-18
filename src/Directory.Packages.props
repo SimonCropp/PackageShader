@@ -7,7 +7,7 @@
     <PackageVersion Include="Argon" Version="0.38.2" />
     <PackageVersion Include="CliWrap" Version="3.10.5" />
     <PackageVersion Include="CommandLineParser" Version="2.9.1" />
-    <PackageVersion Include="MarkdownSnippets.MsBuild" Version="29.0.0" />
+    <PackageVersion Include="MarkdownSnippets.MsBuild" Version="30.0.1" />
     <PackageVersion Include="Microsoft.Build.Framework" Version="18.9.6" Pinned="true" />
     <PackageVersion Include="Microsoft.Build.Tasks.Core" Version="18.9.6" Pinned="true" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.12.0" />
@@ -21,11 +21,11 @@
     <PackageVersion Include="System.Reflection.Metadata" Version="11.0.0" />
     <PackageVersion Include="System.Security.Cryptography.Xml" Version="11.0.0" />
     <PackageVersion Include="System.Text.Json" Version="11.0.0" />
-    <PackageVersion Include="Verify.XunitV3" Version="33.5.0" />
+    <PackageVersion Include="Verify.XunitV3" Version="33.6.0" />
     <PackageVersion Include="xunit.v3" Version="4.0.3" />
-    <PackageVersion Include="DiffEngine" Version="21.0.0" />
+    <PackageVersion Include="DiffEngine" Version="21.1.0" />
     <PackageVersion Include="EmptyFiles" Version="8.20.1" />
     <PackageVersion Include="SimpleInfoName" Version="3.2.1" />
-    <PackageVersion Include="Verify" Version="33.5.0" />
+    <PackageVersion Include="Verify" Version="33.6.0" />
   </ItemGroup>
 </Project>

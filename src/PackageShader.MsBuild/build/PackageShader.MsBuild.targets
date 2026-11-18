@@ -56,6 +56,14 @@
     AfterTargets="AfterCompile"
     DependsOnTargets="_CollectShadedReferences;_MatchShadedAssemblies"
     Condition="'@(IntermediateAssembly)' != '' And $(DesignTimeBuild) != true">
+    <!-- What the task may rewrite. Not the runtime pack a self-contained build copies locally:
+         the framework references nothing the project shades, and its assemblies must keep their
+         strong names. Not native libraries either, which are not .NET assemblies at all. -->
+    <ItemGroup Condition="'@(_AssembliesToShade)' != ''">
+      <_ShadeCopyLocalPaths Include="@(ReferenceCopyLocalPaths)"
+                            Exclude="@(RuntimePackAsset)"
+                            Condition="'%(ReferenceCopyLocalPaths.AssetType)' != 'native'" />
+    </ItemGroup>
     <!-- Condition on _AssembliesToShade moved here because DependsOnTargets runs after target condition is evaluated -->
     <PackageShader.ShadeTask
       Condition="'@(_AssembliesToShade)' != ''"
@@ -65,7 +73,7 @@
       Internalize="$(Shader_Internalize)"
       AssembliesToShade="@(_AssembliesToShade)"
       SolutionDir="$(SolutionDir)"
-      ReferenceCopyLocalPaths="@(ReferenceCopyLocalPaths)"
+      ReferenceCopyLocalPaths="@(_ShadeCopyLocalPaths)"
       AssemblyOriginatorKeyFile="$(AssemblyOriginatorKeyFile)">
 
       <Output
@@ -163,6 +171,27 @@
     </PropertyGroup>
     <PackageShader.DepsJsonPatcherTask
       DepsJsonPath="$(_DepsJsonPath)"
+      ShadedNameMappings="@(_ShadedNameMappings)" />
+  </Target>
+
+  <!-- Publish collects package files again, from the assets file rather than from
+       ReferenceCopyLocalPaths, so each file the shade step replaced would be published beside its
+       replacement. The replacements come through ReferenceCopyLocalPaths as usual. -->
+  <Target Name="_RemoveShadedOriginalsFromPublish"
+          AfterTargets="_ComputeResolvedCopyLocalPublishAssets"
+          Condition="'@(CopyLocalPathsToRemove)' != ''">
+    <ItemGroup>
+      <_ResolvedCopyLocalPublishAssets Remove="@(CopyLocalPathsToRemove)" />
+    </ItemGroup>
+  </Target>
+
+  <!-- A publish that cannot reuse the build's deps.json (self-contained, trimmed, single file)
+       generates its own from the assets file, naming the original assemblies again. -->
+  <Target Name="_PatchPublishDepsJson"
+          AfterTargets="GeneratePublishDependencyFile"
+          Condition="'@(_ShadedNameMappings)' != '' And '$(IntermediateDepsFilePath)' != ''">
+    <PackageShader.DepsJsonPatcherTask
+      DepsJsonPath="$(IntermediateDepsFilePath)"
       ShadedNameMappings="@(_ShadedNameMappings)" />
   </Target>
 
