@@ -75,7 +75,7 @@ public class ShadeTask :
 
         // Only shade assemblies in the explicit shade list
         var assembliesToShade = assemblyCopyLocalPaths
-            .Where(_ => assembliesToShadeSet.Contains(_))
+            .Where(assembliesToShadeSet.Contains)
             .ToList();
 
         // Assemblies that reference shaded ones but aren't shaded themselves
